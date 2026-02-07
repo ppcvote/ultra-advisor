@@ -2,7 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "installCommand": "rm -rf package-lock.json && npm install",
   "functions": {
     "api/**/*.ts": {
       "runtime": "@vercel/node@5.5.24"
