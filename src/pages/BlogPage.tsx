@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import {
   ArrowLeft, Calendar, Clock, ChevronRight, Search, Tag, User,
   TrendingUp, BookOpen, Calculator, Home, Landmark, PiggyBank,
@@ -341,15 +342,20 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
     };
   }, [currentArticle]);
 
-  // 過濾文章
-  const filteredPosts = blogArticles.filter(post => {
-    const matchesCategory = selectedCategory === 'all' || post.category === selectedCategory;
-    const matchesSearch = searchQuery === '' ||
-      post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesCategory && matchesSearch;
-  });
+  // 過濾文章（按發布日期倒序排列，最新的在前）
+  const filteredPosts = blogArticles
+    .filter(post => {
+      const matchesCategory = selectedCategory === 'all' || post.category === selectedCategory;
+      const matchesSearch = searchQuery === '' ||
+        post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        post.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+      return matchesCategory && matchesSearch;
+    })
+    .sort((a, b) => {
+      // 按發布日期倒序（最新的在前）
+      return new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime();
+    });
 
   const featuredPosts = getFeaturedArticles();
 
@@ -563,7 +569,10 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
           {/* 文章內容 */}
           <div
             className="article-content prose prose-invert prose-lg max-w-none"
-            dangerouslySetInnerHTML={{ __html: processedContent }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(processedContent, {
+              ADD_ATTR: ['class', 'style', 'target', 'rel', 'id'],
+              ADD_TAGS: ['style'],
+            }) }}
           />
 
           {/* 文章內容樣式覆蓋 */}
