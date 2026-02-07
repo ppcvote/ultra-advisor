@@ -342,20 +342,15 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
     };
   }, [currentArticle]);
 
-  // 過濾文章（按發布日期倒序排列，最新的在前）
-  const filteredPosts = blogArticles
-    .filter(post => {
-      const matchesCategory = selectedCategory === 'all' || post.category === selectedCategory;
-      const matchesSearch = searchQuery === '' ||
-        post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        post.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesCategory && matchesSearch;
-    })
-    .sort((a, b) => {
-      // 按發布日期倒序（最新的在前）
-      return new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime();
-    });
+  // 過濾文章
+  const filteredPosts = blogArticles.filter(post => {
+    const matchesCategory = selectedCategory === 'all' || post.category === selectedCategory;
+    const matchesSearch = searchQuery === '' ||
+      post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesCategory && matchesSearch;
+  });
 
   const featuredPosts = getFeaturedArticles();
 
