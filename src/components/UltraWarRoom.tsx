@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Rnd } from 'react-rnd';
 import {
   Calculator, Lock, User, Camera, Mail, Phone, MessageCircle, Instagram,
   Home, TrendingUp, Coins, Check, AlertCircle, Eye, EyeOff, Info, Zap,
   Users, Search, Plus, Trash2, LogOut, Settings, X,
   Clock, TriangleAlert, ShieldAlert, Activity, Edit3, Save, Loader2,
-  Heart, RefreshCw, Download, Sparkles, Crown, BarChart3, Bell,
+  Heart, RefreshCw, Download, Sparkles, Crown, BarChart3, Bell, BellOff,
   MessageSquarePlus, Send, Lightbulb, ChevronDown, BookOpen, Sun, Moon,
   Share2, Quote, Calendar, Layout, Type, ImageIcon, ExternalLink, PenTool, RotateCcw, Handshake,
   MapPin, Coffee, Navigation, Wifi, ParkingCircle, Volume2
@@ -14,6 +13,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart
 } from 'recharts';
 import html2canvas from 'html2canvas';
+import * as htmlToImage from 'html-to-image';
 import { getTodayQuote, getTodayBackground, formatDateChinese, getRandomQuote, getRandomBackground, DailyQuote, getTodayIGQuote, getRandomIGQuote, IGStyleQuote } from '../data/dailyQuotes';
 import { useTheme } from '../context/ThemeContext';
 import { 
@@ -36,10 +36,11 @@ import {
   orderBy,
   Timestamp
 } from 'firebase/firestore';
-import { 
-  ref, 
-  uploadBytes, 
-  getDownloadURL 
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject
 } from 'firebase/storage';
 import { db, storage } from '../firebase';
 
@@ -56,9 +57,15 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 // 🆕 任務看板
 import MissionCard from './MissionCard';
 import PWAInstallModal from './PWAInstallModal';
+import InsurancePolicyScanner from './InsurancePolicyScanner';
+import ClientManager from './ClientManager';
+import CheckupClientSelector from './insurance/CheckupClientSelector';
 
 // 🆕 知識庫文章
 import { blogArticles } from '../data/blog/index';
+
+// 🆕 Threads 社群助理
+import ThreadsAssistant from './threads/ThreadsAssistant';
 
 // ==========================================
 // 🏪 Ultra Alliance 模擬合作夥伴資料
@@ -77,7 +84,9 @@ interface Partner {
 }
 
 // 模擬合作夥伴資料（未來從 Firestore 讀取）
+// isUltraPartner = true 為正式合作店家，false 為 Google 高評分推薦
 const MOCK_PARTNERS: Partner[] = [
+  // ===== Ultra 合作店家 =====
   {
     id: '1',
     name: '路易莎咖啡 信義旗艦店',
@@ -126,6 +135,7 @@ const MOCK_PARTNERS: Partner[] = [
     rating: 4.7,
     isUltraPartner: true,
   },
+  // ===== Google 高評分推薦（非合作，但適合約客戶） =====
   {
     id: '5',
     name: '星巴克 101 門市',
@@ -133,8 +143,56 @@ const MOCK_PARTNERS: Partner[] = [
     category: 'cafe',
     location: { lat: 25.0339, lng: 121.5645, address: '台北市信義區市府路45號' },
     features: { quiet: false, parking: true, power: true },
-    offer: { title: 'Google 推薦', description: '評分 4.5 以上' },
+    offer: { title: '高評分推薦', description: 'Google 4.5 ★' },
     image: 'https://images.unsplash.com/photo-1453614512568-c4024d13c247?w=400&h=300&fit=crop',
+    rating: 4.5,
+    isUltraPartner: false,
+  },
+  {
+    id: '6',
+    name: 'ABG Coffee 大安店',
+    type: 'meeting_spot',
+    category: 'cafe',
+    location: { lat: 25.0280, lng: 121.5450, address: '台北市大安區復興南路一段107巷5弄18號' },
+    features: { quiet: true, parking: false, power: true },
+    offer: { title: '高評分推薦', description: 'Google 4.7 ★' },
+    image: 'https://images.unsplash.com/photo-1559496417-e7f25cb247f3?w=400&h=300&fit=crop',
+    rating: 4.7,
+    isUltraPartner: false,
+  },
+  {
+    id: '7',
+    name: 'Fika Fika Cafe',
+    type: 'meeting_spot',
+    category: 'cafe',
+    location: { lat: 25.0520, lng: 121.5210, address: '台北市中山區伊通街33號' },
+    features: { quiet: true, parking: false, power: true },
+    offer: { title: '高評分推薦', description: 'Google 4.6 ★' },
+    image: 'https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=400&h=300&fit=crop',
+    rating: 4.6,
+    isUltraPartner: false,
+  },
+  {
+    id: '8',
+    name: 'All Day Roasting Company',
+    type: 'meeting_spot',
+    category: 'cafe',
+    location: { lat: 25.0410, lng: 121.5490, address: '台北市大安區仁愛路四段27巷4弄1號' },
+    features: { quiet: true, parking: true, power: true },
+    offer: { title: '高評分推薦', description: 'Google 4.8 ★' },
+    image: 'https://images.unsplash.com/photo-1521017432531-fbd92d768814?w=400&h=300&fit=crop',
+    rating: 4.8,
+    isUltraPartner: false,
+  },
+  {
+    id: '9',
+    name: 'Café de Gear',
+    type: 'meeting_spot',
+    category: 'cafe',
+    location: { lat: 25.0350, lng: 121.5580, address: '台北市大安區敦化南路一段160巷53號' },
+    features: { quiet: true, parking: true, power: true },
+    offer: { title: '高評分推薦', description: 'Google 4.5 ★' },
+    image: 'https://images.unsplash.com/photo-1559925393-8be0ec4767c8?w=400&h=300&fit=crop',
     rating: 4.5,
     isUltraPartner: false,
   },
@@ -557,18 +615,108 @@ const NAME_FONT_STYLES: Record<NameFontStyle, { name: string; fontFamily: string
 // 自訂背景介面
 interface CustomBackground {
   id: string;
-  dataUrl: string;
+  dataUrl: string;       // base64 用於本地預覽/截圖
+  storageUrl?: string;   // Firebase Storage URL（持久化）
+  storagePath?: string;  // Storage 路徑（用於刪除）
   uploadedAt: number;
 }
+
+// 濾鏡類型
+type FilterStyle = 'grayscale' | 'sepia' | 'warm' | 'cool' | 'none';
+
+const FILTER_STYLES: Record<FilterStyle, { name: string; css: string; preview: string }> = {
+  grayscale: { name: '黑白', css: 'grayscale(100%)', preview: '⬛' },
+  sepia: { name: '復古', css: 'sepia(80%)', preview: '🟤' },
+  warm: { name: '暖色', css: 'sepia(30%) saturate(140%) brightness(105%)', preview: '🟠' },
+  cool: { name: '冷色', css: 'saturate(80%) hue-rotate(20deg) brightness(105%)', preview: '🔵' },
+  none: { name: '原色', css: 'none', preview: '🌈' },
+};
+
+// 預載入圖片並套用濾鏡，返回 data URL
+const loadImageWithFilter = (imageUrl: string, filterStyle: FilterStyle): Promise<string> => {
+  return new Promise((resolve) => {
+    // 如果是原色，直接返回原圖
+    if (filterStyle === 'none') {
+      resolve(imageUrl);
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        resolve(imageUrl);
+        return;
+      }
+
+      // 繪製圖片
+      ctx.drawImage(img, 0, 0);
+
+      // 取得像素資料並套用濾鏡
+      try {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+
+          if (filterStyle === 'grayscale') {
+            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            data[i] = gray;
+            data[i + 1] = gray;
+            data[i + 2] = gray;
+          } else if (filterStyle === 'sepia') {
+            data[i] = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
+            data[i + 1] = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
+            data[i + 2] = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
+          } else if (filterStyle === 'warm') {
+            data[i] = Math.min(255, r * 1.1);
+            data[i + 1] = Math.min(255, g * 1.0);
+            data[i + 2] = Math.min(255, b * 0.9);
+          } else if (filterStyle === 'cool') {
+            data[i] = Math.min(255, r * 0.9);
+            data[i + 1] = Math.min(255, g * 1.0);
+            data[i + 2] = Math.min(255, b * 1.1);
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+      } catch (e) {
+        // 跨域錯誤，返回原圖
+        console.warn('無法處理跨域圖片，使用原圖');
+        resolve(imageUrl);
+      }
+    };
+
+    img.onerror = () => {
+      resolve(imageUrl);
+    };
+
+    // 設定超時
+    setTimeout(() => resolve(imageUrl), 5000);
+
+    img.src = imageUrl;
+  });
+};
 
 interface MarketDataCardProps {
   userId?: string;
   userDisplayName?: string;
   userPhotoURL?: string;
-  userLineQrCode?: string; // 會員自訂的 LINE QR Code
+  membership?: any;
+  onOpenThreadsAssistant?: () => void;
 }
 
-const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName, userPhotoURL, userLineQrCode }) => {
+const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName, userPhotoURL, membership, onOpenThreadsAssistant }) => {
   const [showStoryPreview, setShowStoryPreview] = useState(false);
   const [totalShareDays, setTotalShareDays] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -596,11 +744,17 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
   const [fontStyle, setFontStyle] = useState<FontStyle>('default');
   // 顧問名字字體
   const [nameFontStyle, setNameFontStyle] = useState<NameFontStyle>('default');
+  // 金句字體大小（百分比，100 = 預設大小）
+  const [quoteFontSize, setQuoteFontSize] = useState(100);
   // 自訂背景
   const [customBackgrounds, setCustomBackgrounds] = useState<CustomBackground[]>([]);
   const [selectedCustomBgIndex, setSelectedCustomBgIndex] = useState<number | null>(null);
   const [isUploadingBg, setIsUploadingBg] = useState(false);
   const bgInputRef = useRef<HTMLInputElement>(null);
+  // 濾鏡選擇
+  const [filterStyle, setFilterStyle] = useState<FilterStyle>('grayscale');
+  // 頭像大小
+  const [avatarSize, setAvatarSize] = useState<'small' | 'medium' | 'large'>('large');
 
   // ========== 簽名功能狀態 ==========
   const [showSignaturePad, setShowSignaturePad] = useState(false);
@@ -611,12 +765,9 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
   const isDrawingRef = useRef(false);
   const lastPosRef = useRef({ x: 0, y: 0 });
 
-  // ========== 雜誌風格拖拉位置與尺寸狀態 ==========
-  const [magazineTitlePos, setMagazineTitlePos] = useState({ x: 24, y: 80 });
-  const [magazineTitleSize, setMagazineTitleSize] = useState({ width: 280, height: 'auto' as number | 'auto' });
-  const [magazineContentPos, setMagazineContentPos] = useState({ x: 24, y: 180 });
-  const [magazineContentSize, setMagazineContentSize] = useState({ width: 280, height: 'auto' as number | 'auto' });
-  const [isEditingLayout, setIsEditingLayout] = useState(false); // 是否處於編輯模式
+  // ========== 雜誌風格位置（固定值，移除拖拉功能）==========
+  const magazineTitlePos = { x: 24, y: 80 };
+  const magazineContentPos = { x: 24, y: 140 };
 
   // ========== Ultra Alliance GPS 狀態 ==========
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -639,15 +790,19 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
         setIsLocating(false);
 
         // 計算並排序附近夥伴
+        // 排序優先級：1. Ultra 合作店家優先 2. 評分高優先 3. 距離近優先
         const partnersWithDistance = MOCK_PARTNERS.map(partner => ({
           ...partner,
           distance: calculateDistance(latitude, longitude, partner.location.lat, partner.location.lng)
         }))
-        .filter(p => p.distance <= 3) // 3km 內
+        .filter(p => p.distance <= 5) // 5km 內（擴大範圍以確保有足夠結果）
         .sort((a, b) => {
-          // 優先顯示 Ultra Partner，然後按距離排序
+          // 1. Ultra 合作店家優先
           if (a.isUltraPartner && !b.isUltraPartner) return -1;
           if (!a.isUltraPartner && b.isUltraPartner) return 1;
+          // 2. 同類型則按評分排序（高→低）
+          if (a.rating !== b.rating) return b.rating - a.rating;
+          // 3. 評分相同則按距離（近→遠）
           return a.distance - b.distance;
         })
         .slice(0, 3); // 只取前 3 間
@@ -676,15 +831,9 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
   // 不再自動請求定位，讓用戶進入 Alliance 頁面後再請求
 
-  // ========== 雜誌風格 - 可拖拉元素位置 ==========
-  const [magazineDayBadgePos, setMagazineDayBadgePos] = useState({ x: 270, y: 24 }); // Day 徽章（右上）
-
-  // ========== IG 風格 - 可拖拉元素位置 ==========
-  const [igDayBadgePos, setIgDayBadgePos] = useState({ x: 270, y: 20 }); // Day 徽章（右上）
-  const [igTitlePos, setIgTitlePos] = useState({ x: 16, y: 180 }); // 標題（左側）
-  const [igTitleSize, setIgTitleSize] = useState({ width: 280, height: 'auto' as number | 'auto' });
-  const [igContentPos, setIgContentPos] = useState({ x: 16, y: 300 }); // 內文（左側）
-  const [igContentSize, setIgContentSize] = useState({ width: 280, height: 'auto' as number | 'auto' });
+  // ========== IG 風格位置（固定值，移除拖拉功能）==========
+  const igTitlePos = { x: 16, y: 180 };
+  const igContentPos = { x: 16, y: 260 };
 
   const todayQuote = getTodayQuote();
   const todayBg = getTodayBackground();
@@ -722,6 +871,18 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
     ? customText
     : displayQuote.text;
 
+  // 將句號後自動換行（用於顯示）
+  const formatQuoteWithLineBreaks = (text: string) => {
+    // 以句號（。）分割，但保留句號
+    const parts = text.split(/(?<=。)/);
+    return parts.map((part, index) => (
+      <span key={index}>
+        {part}
+        {index < parts.length - 1 && <br />}
+      </span>
+    ));
+  };
+
   // 隨機切換文案和背景
   const handleShuffle = () => {
     if (layoutStyle === 'left' || layoutStyle === 'magazine') {
@@ -742,7 +903,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
     setSelectedCustomBgIndex(null);
   };
 
-  // ========== 背景上傳處理 ==========
+  // ========== 背景上傳處理（上傳至 Firebase Storage + Firestore 持久化）==========
   const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -764,6 +925,8 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
         continue;
       }
 
+      const bgId = `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
       // 轉 base64（供 html2canvas 截圖）
       const dataUrl = await new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -771,27 +934,121 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
         reader.readAsDataURL(file);
       });
 
+      // 上傳至 Firebase Storage
+      let storageUrl = '';
+      let storagePath = '';
+      if (userId) {
+        try {
+          storagePath = `dailyStoryBg/${userId}/${bgId}`;
+          const storageRef = ref(storage, storagePath);
+          await uploadBytes(storageRef, file);
+          storageUrl = await getDownloadURL(storageRef);
+        } catch (err) {
+          console.error('[DailyStory] 背景上傳 Storage 失敗:', err);
+        }
+      }
+
       newBackgrounds.push({
-        id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: bgId,
         dataUrl,
+        storageUrl: storageUrl || undefined,
+        storagePath: storagePath || undefined,
         uploadedAt: Date.now()
       });
     }
 
-    setCustomBackgrounds(prev => [...prev, ...newBackgrounds]);
+    const updatedBgs = [...customBackgrounds, ...newBackgrounds];
+    setCustomBackgrounds(updatedBgs);
     setIsUploadingBg(false);
     e.target.value = '';
+
+    // 儲存到 Firestore
+    if (userId) {
+      try {
+        const docRef = doc(db, 'users', userId, 'dailyStory', 'customBackgrounds');
+        await setDoc(docRef, {
+          backgrounds: updatedBgs.map(bg => ({
+            id: bg.id,
+            storageUrl: bg.storageUrl || '',
+            storagePath: bg.storagePath || '',
+            uploadedAt: bg.uploadedAt
+          })),
+          updatedAt: Timestamp.now()
+        });
+      } catch (err) {
+        console.error('[DailyStory] 儲存背景清單失敗:', err);
+      }
+    }
   };
 
-  // 刪除自訂背景
-  const handleDeleteBg = (index: number) => {
-    setCustomBackgrounds(prev => prev.filter((_, i) => i !== index));
+  // 刪除自訂背景（同步刪除 Storage + Firestore）
+  const handleDeleteBg = async (index: number) => {
+    const bgToDelete = customBackgrounds[index];
+    const updatedBgs = customBackgrounds.filter((_, i) => i !== index);
+    setCustomBackgrounds(updatedBgs);
+
     if (selectedCustomBgIndex === index) {
       setSelectedCustomBgIndex(null);
     } else if (selectedCustomBgIndex !== null && selectedCustomBgIndex > index) {
       setSelectedCustomBgIndex(prev => prev! - 1);
     }
+
+    // 刪除 Storage 檔案
+    if (bgToDelete.storagePath) {
+      try {
+        const storageRef = ref(storage, bgToDelete.storagePath);
+        await deleteObject(storageRef);
+      } catch (err) {
+        console.error('[DailyStory] 刪除 Storage 背景失敗:', err);
+      }
+    }
+
+    // 更新 Firestore
+    if (userId) {
+      try {
+        const docRef = doc(db, 'users', userId, 'dailyStory', 'customBackgrounds');
+        await setDoc(docRef, {
+          backgrounds: updatedBgs.map(bg => ({
+            id: bg.id,
+            storageUrl: bg.storageUrl || '',
+            storagePath: bg.storagePath || '',
+            uploadedAt: bg.uploadedAt
+          })),
+          updatedAt: Timestamp.now()
+        });
+      } catch (err) {
+        console.error('[DailyStory] 更新背景清單失敗:', err);
+      }
+    }
   };
+
+  // 載入已儲存的自訂背景
+  useEffect(() => {
+    if (!userId) return;
+    const loadCustomBgs = async () => {
+      try {
+        const docRef = doc(db, 'users', userId, 'dailyStory', 'customBackgrounds');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const savedBgs: CustomBackground[] = (data.backgrounds || []).map((bg: any) => ({
+            id: bg.id,
+            dataUrl: bg.storageUrl || '',  // 用 storageUrl 作為圖片來源
+            storageUrl: bg.storageUrl,
+            storagePath: bg.storagePath,
+            uploadedAt: bg.uploadedAt
+          }));
+          if (savedBgs.length > 0) {
+            setCustomBackgrounds(savedBgs);
+            console.log(`[DailyStory] 載入 ${savedBgs.length} 張自訂背景`);
+          }
+        }
+      } catch (err) {
+        console.error('[DailyStory] 載入自訂背景失敗:', err);
+      }
+    };
+    loadCustomBgs();
+  }, [userId]);
 
   // ========== 簽名功能處理 ==========
   // 初始化簽名畫布
@@ -993,6 +1250,15 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
     }
   };
 
+  // 頭像尺寸對應的 CSS 配置
+  const getAvatarSizeConfig = () => {
+    switch (avatarSize) {
+      case 'small': return { size: 'w-7 h-7', text: 'text-sm', nameText: 'text-xs' };
+      case 'large': return { size: 'w-14 h-14', text: 'text-xl', nameText: 'text-base' };
+      default: return { size: 'w-10 h-10', text: 'text-lg', nameText: 'text-sm' }; // medium
+    }
+  };
+
   // 當簽名畫布彈窗打開時，初始化畫布
   useEffect(() => {
     if (showSignaturePad) {
@@ -1068,34 +1334,58 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
   // 載入使用者的累積分享天數
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('[loadShareData] 無 userId，跳過載入');
+      return;
+    }
 
     const loadShareData = async () => {
       try {
         const docRef = doc(db, 'users', userId, 'dailyStory', 'stats');
         const docSnap = await getDoc(docRef);
+        const today = new Date().toISOString().split('T')[0];
+
         if (docSnap.exists()) {
           const data = docSnap.data();
+          console.log('[loadShareData] 載入成功:', {
+            userId,
+            totalShareDays: data.totalShareDays,
+            lastShareDate: data.lastShareDate,
+            today,
+            isSameDay: data.lastShareDate === today
+          });
           setTotalShareDays(data.totalShareDays || 0);
           // 檢查今天是否已分享
-          const today = new Date().toISOString().split('T')[0];
           if (data.lastShareDate === today) {
             setTodayShared(true);
+            console.log('[loadShareData] 今天已分享過');
+          } else {
+            setTodayShared(false);
+            console.log('[loadShareData] 今天還沒分享，lastShareDate:', data.lastShareDate, '!== today:', today);
           }
+        } else {
+          console.log('[loadShareData] 無資料，首次使用，userId:', userId);
+          setTotalShareDays(0);
+          setTodayShared(false);
         }
       } catch (error) {
-        console.error('載入分享資料失敗:', error);
+        console.error('[loadShareData] 載入分享資料失敗:', error);
       }
     };
 
     loadShareData();
   }, [userId]);
 
-  // 記錄分享並更新累積天數
+  // 記錄分享並更新累積天數（每天有分享就 +1，一天只算一次）
   const recordShare = async () => {
-    if (!userId || todayShared) return;
+    if (!userId) {
+      console.log('[recordShare] 無 userId，跳過記錄');
+      return;
+    }
 
     const today = new Date().toISOString().split('T')[0];
+    console.log('[recordShare] 開始記錄分享, userId:', userId, 'today:', today, 'todayShared:', todayShared);
+
     try {
       const docRef = doc(db, 'users', userId, 'dailyStory', 'stats');
       const docSnap = await getDoc(docRef);
@@ -1105,17 +1395,23 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
       if (docSnap.exists()) {
         const data = docSnap.data();
+        console.log('[recordShare] 現有資料:', data);
+
         // 如果今天還沒分享，累積天數 +1
         if (data.lastShareDate !== today) {
           newTotal = (data.totalShareDays || 0) + 1;
           shareHistory = data.shareHistory || [];
           shareHistory.push(today);
+          console.log('[recordShare] 今天首次分享，天數 +1 =', newTotal);
         } else {
+          // 今天已經分享過，不增加天數
           newTotal = data.totalShareDays || 1;
           shareHistory = data.shareHistory || [];
+          console.log('[recordShare] 今天已分享過，保持天數 =', newTotal);
         }
       } else {
         shareHistory = [today];
+        console.log('[recordShare] 首次分享，初始化為 Day 1');
       }
 
       await setDoc(docRef, {
@@ -1125,10 +1421,11 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
         updatedAt: Timestamp.now()
       });
 
+      console.log('[recordShare] 寫入成功, newTotal:', newTotal);
       setTotalShareDays(newTotal);
       setTodayShared(true);
     } catch (error) {
-      console.error('記錄分享失敗:', error);
+      console.error('[recordShare] 記錄分享失敗:', error);
     }
   };
 
@@ -1136,55 +1433,91 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
   const handleDownload = async () => {
     if (!storyRef.current) return;
 
-    // 暫時關閉編輯模式以隱藏框線
-    const wasEditing = isEditingLayout;
-    if (wasEditing) setIsEditingLayout(false);
-
     setIsGenerating(true);
     try {
       // 等待 DOM 更新
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
 
-      const canvas = await html2canvas(storyRef.current, {
+      // 使用 html2canvas 截圖（最簡配置）
+      const outputCanvas = await html2canvas(storyRef.current, {
         scale: 2,
-        backgroundColor: null,
         useCORS: true,
         allowTaint: true,
+        backgroundColor: null,
       });
 
-      // 檢測是否為 iOS
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      console.log('[handleDownload] canvas:', outputCanvas.width, 'x', outputCanvas.height);
 
-      if (isIOS) {
-        // iOS: 開新視窗顯示圖片，讓用戶長按存到相簿
-        const dataUrl = canvas.toDataURL('image/png');
+      // 檢測平台
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
+      const isMobile = isIOS || isAndroid;
+
+      if (isMobile) {
+        // 手機：開新視窗顯示圖片，讓用戶長按存到相簿
+        const dataUrl = finalCanvas.toDataURL('image/png', 1.0);
         const newWindow = window.open('', '_blank');
         if (newWindow) {
           newWindow.document.write(`
             <!DOCTYPE html>
             <html>
             <head>
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
               <title>每日金句</title>
               <style>
-                body { margin: 0; padding: 20px; background: #0f172a; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
-                img { max-width: 100%; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-                p { color: #94a3b8; font-family: system-ui; text-align: center; margin-top: 20px; font-size: 14px; }
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                  background: #0f172a;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  min-height: 100vh;
+                  padding: 20px;
+                }
+                .container {
+                  width: 100%;
+                  max-width: 400px;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                }
+                img {
+                  width: 100%;
+                  border-radius: 16px;
+                  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                }
+                .hint {
+                  color: #94a3b8;
+                  font-family: system-ui, -apple-system, sans-serif;
+                  text-align: center;
+                  margin-top: 24px;
+                  font-size: 15px;
+                  line-height: 1.6;
+                }
+                .hint strong {
+                  color: #a78bfa;
+                }
               </style>
             </head>
             <body>
-              <img src="${dataUrl}" alt="每日金句" />
-              <p>👆 長按圖片 → 「加入照片」存到相簿</p>
+              <div class="container">
+                <img src="${dataUrl}" alt="每日金句" />
+                <p class="hint">
+                  👆 <strong>長按圖片</strong> → 選擇「${isIOS ? '加入照片' : '儲存圖片'}」<br>
+                  即可存到相簿
+                </p>
+              </div>
             </body>
             </html>
           `);
           newWindow.document.close();
         }
       } else {
-        // 其他平台：直接下載
+        // 桌面平台：直接下載
         const link = document.createElement('a');
         link.download = `ultra-advisor-daily-${new Date().toISOString().split('T')[0]}.png`;
-        link.href = canvas.toDataURL('image/png');
+        link.href = outputCanvas.toDataURL('image/png', 1.0);
         link.click();
       }
 
@@ -1195,8 +1528,6 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
       alert('生成圖片失敗，請稍後再試');
     } finally {
       setIsGenerating(false);
-      // 恢復編輯模式
-      if (wasEditing) setIsEditingLayout(true);
     }
   };
 
@@ -1204,99 +1535,129 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
   const handleShare = async () => {
     if (!storyRef.current) return;
 
-    // 暫時關閉編輯模式以隱藏框線
-    const wasEditing = isEditingLayout;
-    if (wasEditing) setIsEditingLayout(false);
-
     setIsGenerating(true);
     try {
       // 等待 DOM 更新
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
 
-      const canvas = await html2canvas(storyRef.current, {
+      // 使用 html2canvas 截圖（最簡配置）
+      const outputCanvas = await html2canvas(storyRef.current, {
         scale: 2,
-        backgroundColor: null,
         useCORS: true,
         allowTaint: true,
+        backgroundColor: null,
       });
 
+      console.log('[handleShare] canvas:', outputCanvas.width, 'x', outputCanvas.height);
+
+      // 轉為 blob
       const blob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((b) => resolve(b!), 'image/png');
+        outputCanvas.toBlob((b) => resolve(b!), 'image/png', 1.0);
       });
 
       // 使用時間戳確保每次都是新檔案
       const timestamp = Date.now();
       const file = new File([blob], `daily-quote-${timestamp}.png`, { type: 'image/png' });
 
-      // 檢查是否支援 Web Share API（含檔案分享）
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: '每日金句',
-          text: `「${displayQuoteText}」— Ultra Advisor 💼`,
-        });
-        // 記錄分享
-        await recordShare();
+      // 先記錄分享
+      console.log('[handleShare] 準備記錄分享...');
+      await recordShare();
+      console.log('[handleShare] 記錄分享完成');
+
+      // 通用的 fallback 函數：開啟圖片頁面
+      const openFallbackPage = () => {
+        const dataUrl = outputCanvas.toDataURL('image/png');
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          newWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>分享到 IG 限時動態</title>
+              <style>
+                body { margin: 0; padding: 20px; background: #0f172a; display: flex; flex-direction: column; align-items: center; min-height: 100vh; font-family: system-ui; }
+                img { max-width: 100%; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 20px; }
+                .steps { color: #e2e8f0; text-align: left; padding: 20px; background: #1e293b; border-radius: 12px; max-width: 300px; }
+                .steps h3 { color: #a855f7; margin-top: 0; }
+                .steps ol { padding-left: 20px; line-height: 1.8; }
+                .steps li { margin-bottom: 8px; }
+                .highlight { color: #f59e0b; font-weight: bold; }
+              </style>
+            </head>
+            <body>
+              <img src="${dataUrl}" alt="每日金句" />
+              <div class="steps">
+                <h3>📱 分享到 IG 限時動態</h3>
+                <ol>
+                  <li><span class="highlight">長按圖片</span> → 儲存圖片</li>
+                  <li>開啟 <span class="highlight">Instagram</span></li>
+                  <li>點擊 <span class="highlight">+</span> → 限時動態</li>
+                  <li>從相簿選擇此圖片</li>
+                  <li>發布！🎉</li>
+                </ol>
+              </div>
+            </body>
+            </html>
+          `);
+          newWindow.document.close();
+        } else {
+          // 彈出視窗被封鎖，改用下載方式
+          console.log('[handleShare] window.open 被封鎖，改用下載');
+          const link = document.createElement('a');
+          link.download = `daily-quote-${Date.now()}.png`;
+          link.href = dataUrl;
+          link.click();
+        }
+      };
+
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isChrome = /CriOS|Chrome/.test(navigator.userAgent);
+      const isIOSChrome = isIOS && isChrome;
+
+      // iOS Chrome 的 Web Share API 有問題，直接使用 fallback
+      if (isIOSChrome) {
+        console.log('[handleShare] iOS Chrome 偵測到，使用 fallback');
+        openFallbackPage();
+      } else if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        // 檢查是否支援 Web Share API（含檔案分享）
+        try {
+          await navigator.share({
+            files: [file],
+            title: '每日金句',
+            text: `「${displayQuoteText}」— Ultra Advisor 💼`,
+          });
+        } catch (shareError: any) {
+          // 用戶取消分享不算錯誤
+          if (shareError.name === 'AbortError') {
+            console.log('[handleShare] 用戶取消分享');
+          } else {
+            console.error('[handleShare] Web Share 失敗，使用 fallback:', shareError);
+            // Web Share 失敗時使用 fallback
+            if (isIOS || /Android/.test(navigator.userAgent)) {
+              openFallbackPage();
+            } else {
+              handleDownload();
+            }
+          }
+        }
       } else {
         // 不支援 Web Share API，提供替代方案
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         const isAndroid = /Android/.test(navigator.userAgent);
 
         if (isIOS || isAndroid) {
-          // 手機：開啟圖片頁面，引導用戶手動分享到 IG
-          const dataUrl = canvas.toDataURL('image/png');
-          const newWindow = window.open('', '_blank');
-          if (newWindow) {
-            newWindow.document.write(`
-              <!DOCTYPE html>
-              <html>
-              <head>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>分享到 IG 限時動態</title>
-                <style>
-                  body { margin: 0; padding: 20px; background: #0f172a; display: flex; flex-direction: column; align-items: center; min-height: 100vh; font-family: system-ui; }
-                  img { max-width: 100%; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 20px; }
-                  .steps { color: #e2e8f0; text-align: left; padding: 20px; background: #1e293b; border-radius: 12px; max-width: 300px; }
-                  .steps h3 { color: #a855f7; margin-top: 0; }
-                  .steps ol { padding-left: 20px; line-height: 1.8; }
-                  .steps li { margin-bottom: 8px; }
-                  .highlight { color: #f59e0b; font-weight: bold; }
-                </style>
-              </head>
-              <body>
-                <img src="${dataUrl}" alt="每日金句" />
-                <div class="steps">
-                  <h3>📱 分享到 IG 限時動態</h3>
-                  <ol>
-                    <li><span class="highlight">長按圖片</span> → 儲存圖片</li>
-                    <li>開啟 <span class="highlight">Instagram</span></li>
-                    <li>點擊 <span class="highlight">+</span> → 限時動態</li>
-                    <li>從相簿選擇此圖片</li>
-                    <li>發布！🎉</li>
-                  </ol>
-                </div>
-              </body>
-              </html>
-            `);
-            newWindow.document.close();
-          }
-          // 記錄分享
-          await recordShare();
+          openFallbackPage();
         } else {
           // 桌面：直接下載
           handleDownload();
         }
       }
     } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        console.error('分享失敗:', error);
-        // 改用下載
-        handleDownload();
-      }
+      console.error('[handleShare] 整體失敗:', error);
+      // 出錯時嘗試下載
+      handleDownload();
     } finally {
       setIsGenerating(false);
-      // 恢復編輯模式
-      if (wasEditing) setIsEditingLayout(true);
     }
   };
 
@@ -1319,13 +1680,16 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
           className="relative rounded-xl p-4 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform border border-white/10"
           onClick={() => setShowStoryPreview(true)}
         >
-          {/* 風景背景（灰階） */}
+          {/* 風景背景（套用濾鏡） */}
           <div
-            className="absolute inset-0 bg-cover bg-center grayscale"
-            style={{ backgroundImage: `url(${displayBg.imageUrl})` }}
+            className="absolute inset-0 bg-cover bg-center pointer-events-none"
+            style={{
+              backgroundImage: `url(${displayBg.imageUrl})`,
+              filter: FILTER_STYLES[filterStyle].css
+            }}
           />
           {/* 暗化遮罩 */}
-          <div className="absolute inset-0 bg-black/60" />
+          <div className="absolute inset-0 bg-black/60 pointer-events-none" />
 
           {/* 內容 */}
           <div className="relative z-10 text-center">
@@ -1350,17 +1714,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
         {/* 快速分享按鈕 */}
         <div className="flex gap-2 mt-3">
-          {/* 隨機換一組按鈕 */}
-          <button
-            onClick={handleShuffle}
-            className="flex items-center justify-center gap-1 py-2 px-3
-                     bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold
-                     rounded-lg transition-all"
-            title="隨機換一組文案和背景"
-          >
-            <RefreshCw size={14} />
-          </button>
-          {/* 如果有自訂，顯示重置按鈕 */}
+          {/* 如果有自訂，顯示重置按鈕 - 放最左邊 */}
           {(customQuote || customBg) && (
             <button
               onClick={handleResetToToday}
@@ -1372,19 +1726,24 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
               <Calendar size={14} />
             </button>
           )}
+          {/* 隨機換一組按鈕 */}
           <button
-            onClick={handleDownload}
-            disabled={isGenerating}
+            onClick={handleShuffle}
+            className="flex items-center justify-center gap-1 py-2 px-3
+                     bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold
+                     rounded-lg transition-all"
+            title="隨機換一組文案和背景"
+          >
+            <RefreshCw size={14} />
+          </button>
+          <button
+            onClick={() => setShowStoryPreview(true)}
             className="flex-1 flex items-center justify-center gap-2 py-2 px-3
                      bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold
-                     rounded-lg transition-all disabled:opacity-50"
+                     rounded-lg transition-all"
           >
-            {isGenerating ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Download size={14} />
-            )}
-            下載圖片
+            <Edit3 size={14} />
+            進入編輯
           </button>
           <button
             onClick={handleShare}
@@ -1403,57 +1762,122 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
         </div>
       </div>
 
-      {/* ===== 市場快訊區塊（精簡版） ===== */}
-      <div className="mt-3 pt-3 border-t dark:border-slate-800 border-slate-200">
-        <div className="flex items-center gap-1.5 mb-2">
-          <Activity size={12} className="text-blue-400" />
-          <h3 className="text-[10px] font-bold dark:text-white text-slate-900 uppercase tracking-wider">市場快訊</h3>
-          <span className="ml-auto text-[9px] text-slate-500">2026</span>
-        </div>
-
-        <div className="grid grid-cols-4 gap-1.5">
-          <div className="bg-red-900/20 border border-red-500/20 rounded p-1.5 text-center">
-            <div className="text-sm font-black text-red-400">3:48</div>
-            <div className="text-[8px] text-slate-500 font-bold">癌症時鐘</div>
-          </div>
-          <div className="bg-amber-900/20 border border-amber-500/20 rounded p-1.5 text-center">
-            <div className="text-sm font-black text-amber-400">15.8%</div>
-            <div className="text-[8px] text-slate-500 font-bold">醫療通膨</div>
-          </div>
-          <div className="bg-orange-900/20 border border-orange-500/20 rounded p-1.5 text-center">
-            <div className="text-sm font-black text-orange-400">2031</div>
-            <div className="text-[8px] text-slate-500 font-bold">勞保倒數</div>
-          </div>
-          <div className="bg-emerald-900/20 border border-emerald-500/20 rounded p-1.5 text-center">
-            <div className="text-sm font-black text-emerald-400">4.5%</div>
-            <div className="text-[8px] text-slate-500 font-bold">實質通膨</div>
-          </div>
-        </div>
-      </div>
-
-      {/* ===== Ultra Alliance 戰術據點（簡化版） ===== */}
-      <div className="mt-3 pt-3 border-t dark:border-slate-800 border-slate-200">
-        <a
-          href="/alliance"
-          className="flex items-center gap-2 p-2 rounded-lg dark:bg-slate-800/30 bg-slate-100
-                   border dark:border-slate-700/50 border-slate-200 hover:border-purple-500/30 transition-all group"
+      {/* ===== Threads 社群助理入口 ===== */}
+      <div className="mt-3">
+        <button
+          onClick={() => {
+            if (membership?.isPaid && onOpenThreadsAssistant) {
+              onOpenThreadsAssistant();
+            }
+          }}
+          className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
+            membership?.isPaid
+              ? 'dark:bg-gradient-to-r dark:from-purple-900/30 dark:to-blue-900/30 bg-gradient-to-r from-purple-50 to-blue-50 border-purple-500/30 hover:border-purple-400 cursor-pointer'
+              : 'dark:bg-slate-800/50 bg-slate-100 border-slate-700/50 cursor-not-allowed opacity-60'
+          }`}
         >
           <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-            <Handshake size={16} className="text-purple-400" />
+            <MessageCircle size={16} className="text-purple-400" />
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold dark:text-white text-slate-800">Ultra Alliance</span>
-              <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[8px] font-bold rounded">
-                NEW
-              </span>
-            </div>
-            <p className="text-[9px] text-slate-500 mt-0.5">探索附近合作據點，享專屬優惠</p>
+          <div className="flex-1 text-left">
+            <span className="text-xs font-bold dark:text-white text-slate-800 block">
+              Threads 社群助理
+            </span>
+            <span className="text-[10px] text-slate-500">
+              {membership?.isPaid ? 'AI 自動生成 & 一鍵發佈' : '升級付費會員解鎖'}
+            </span>
           </div>
-          <Navigation size={14} className="text-slate-400 group-hover:text-purple-400 transition-colors" />
-        </a>
+          {!membership?.isPaid && <Lock size={14} className="text-slate-500" />}
+          {membership?.isPaid && <Sparkles size={14} className="text-purple-400" />}
+        </button>
       </div>
 
+      {/* ===== Ultra Alliance 戰術據點 ===== */}
+      <div className="mt-3 pt-3 border-t dark:border-slate-800 border-slate-200">
+        {/* 標題列 */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-purple-500/20 flex items-center justify-center">
+              <Handshake size={12} className="text-purple-400" />
+            </div>
+            <span className="text-[11px] font-bold dark:text-white text-slate-800">Ultra Alliance</span>
+            <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[8px] font-bold rounded">
+              {nearbyPartners.length > 0 ? `${nearbyPartners.filter(p => p.isUltraPartner).length} 間合作` : 'NEW'}
+            </span>
+          </div>
+          <a
+            href="/alliance"
+            className="text-[9px] text-purple-400 hover:text-purple-300 transition-colors"
+          >
+            了解更多 →
+          </a>
+        </div>
+
+        {/* 店家列表 */}
+        {(() => {
+          const displayPartners = userLocation && nearbyPartners.length > 0
+            ? nearbyPartners.slice(0, 2)
+            : MOCK_PARTNERS
+                .sort((a, b) => {
+                  if (a.isUltraPartner && !b.isUltraPartner) return -1;
+                  if (!a.isUltraPartner && b.isUltraPartner) return 1;
+                  return b.rating - a.rating;
+                })
+                .slice(0, 2)
+                .map(p => ({ ...p, distance: 0 }));
+
+          return (
+            <div className="space-y-1.5">
+              {displayPartners.map((partner) => (
+                <div
+                  key={partner.id}
+                  className="flex items-center gap-2 p-2 rounded-lg dark:bg-slate-800/30 bg-slate-50
+                           border dark:border-slate-700/50 border-slate-200 hover:border-purple-500/30 transition-all"
+                >
+                  <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 relative">
+                    <img src={partner.image} alt={partner.name} className="w-full h-full object-cover" />
+                    {partner.isUltraPartner && (
+                      <div className="absolute top-0 right-0 w-4 h-4 bg-purple-500 rounded-bl-lg flex items-center justify-center">
+                        <Check size={8} className="text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[10px] font-bold dark:text-white text-slate-800 truncate block">{partner.name}</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {userLocation && partner.distance > 0 && (
+                        <span className="text-[8px] text-slate-500 flex items-center gap-0.5">
+                          <Navigation size={7} /> {formatDistance(partner.distance)}
+                        </span>
+                      )}
+                      {partner.isUltraPartner ? (
+                        <span className="text-[8px] text-purple-400 bg-purple-500/20 px-1 py-0.5 rounded">{partner.offer.title}</span>
+                      ) : (
+                        <span className="text-[8px] text-amber-400">★ {partner.rating}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-0.5 flex-shrink-0">
+                    {partner.features.quiet && <Volume2 size={10} className="text-slate-500" />}
+                    {partner.features.power && <Zap size={10} className="text-amber-500" />}
+                    {partner.features.parking && <ParkingCircle size={10} className="text-blue-500" />}
+                  </div>
+                </div>
+              ))}
+              <button
+                onClick={requestLocation}
+                disabled={isLocating}
+                className="w-full flex items-center justify-center gap-1 py-1 text-[8px]
+                         text-slate-500 hover:text-purple-400 transition-colors disabled:opacity-50"
+              >
+                {isLocating ? <><Loader2 size={9} className="animate-spin" /> 定位中...</>
+                  : userLocation ? <><RefreshCw size={9} /> 重新定位</>
+                  : <><MapPin size={9} /> 開啟定位查看距離</>}
+              </button>
+            </div>
+          );
+        })()}
+      </div>
 
       {/* ===== 限時動態預覽彈窗 ===== */}
       {showStoryPreview && (
@@ -1475,10 +1899,13 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
               className={`aspect-[9/16] rounded-3xl overflow-hidden bg-gradient-to-br ${displayBg.fallbackGradient}
                          flex flex-col items-center justify-center p-8 relative`}
             >
-              {/* 風景背景（灰階） */}
+              {/* 風景背景（套用濾鏡） */}
               <div
-                className="absolute inset-0 bg-cover bg-center grayscale"
-                style={{ backgroundImage: `url(${displayBg.imageUrl})` }}
+                className="absolute inset-0 bg-cover bg-center"
+                style={{
+                  backgroundImage: `url(${displayBg.imageUrl})`,
+                  filter: FILTER_STYLES[filterStyle].css
+                }}
               />
               {/* 暗化遮罩 */}
               <div className="absolute inset-0 bg-black/50" />
@@ -1487,8 +1914,8 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
               {layoutStyle === 'center' && (
                 <>
                   {/* 累積天數徽章 */}
-                  <div className="absolute top-6 right-6 bg-black/40 px-3 py-1.5 rounded-full z-10">
-                    <span className="text-white text-xs font-bold">
+                  <div className="absolute top-6 right-6 z-10">
+                    <span className="text-white text-xs font-bold drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
                       Day {totalShareDays + (todayShared ? 0 : 1)}
                     </span>
                   </div>
@@ -1497,76 +1924,65 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                   <div className="relative z-10 text-center max-w-[280px] px-4">
                     <Quote size={36} className="text-white/30 mx-auto mb-4" />
                     <p
-                      className={`text-white font-black text-lg leading-relaxed drop-shadow-lg ${FONT_STYLES[fontStyle].className}`}
-                      style={{ fontFamily: FONT_STYLES[fontStyle].fontFamily }}
+                      className={`text-white font-black leading-relaxed drop-shadow-lg ${FONT_STYLES[fontStyle].className}`}
+                      style={{
+                        fontFamily: FONT_STYLES[fontStyle].fontFamily,
+                        fontSize: `${18 * quoteFontSize / 100}px`,
+                      }}
                     >
-                      {displayQuoteText}
+                      {formatQuoteWithLineBreaks(displayQuoteText)}
                     </p>
                   </div>
 
-                  {/* 底部資訊 - 顧問資訊 + 品牌 + QR Code */}
-                  <div className="absolute bottom-6 left-5 right-5 flex items-center justify-between z-10">
-                    {/* 左側：顧問頭貼 + 名字 + 日期 */}
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-blue-500 flex-shrink-0 relative">
-                        {/* Fallback 文字（z-index 較低，會被圖片覆蓋） */}
-                        <div className="absolute inset-0 flex items-center justify-center z-0">
-                          <span className="text-white font-bold text-lg">
-                            {(userDisplayName || '顧')[0]}
-                          </span>
-                        </div>
-                        {/* 頭貼圖片（z-index 較高，會覆蓋文字） */}
-                        {(avatarBase64 || isValidImageUrl(userPhotoURL)) && (
-                          <img
-                            src={avatarBase64 || userPhotoURL}
-                            alt={userDisplayName || '顧問'}
-                            className="absolute inset-0 w-full h-full object-cover z-10"
-                            crossOrigin="anonymous"
-                            onError={(e) => {
-                              // 圖片載入失敗時隱藏，露出下面的文字
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        )}
-                      </div>
-                      <div className="flex flex-col">
-                        <span
-                          className="text-white font-bold text-sm"
-                          style={{ fontFamily: NAME_FONT_STYLES[nameFontStyle].fontFamily }}
-                        >
-                          {userDisplayName || '財務顧問'}
-                        </span>
-                        <span className="text-white/50 text-[10px] flex items-center gap-1">
-                          <Calendar size={10} />
-                          {todayDate}
+                  {/* 底部左側：顧問頭貼 + 名字 + 日期（獨立定位避免 flexbox justify-between 問題） */}
+                  <div className="absolute bottom-6 left-5 z-10 flex items-center gap-2">
+                    <div className={`${getAvatarSizeConfig().size} rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-blue-500 flex-shrink-0 relative`}>
+                      {/* Fallback 文字（z-index 較低，會被圖片覆蓋） */}
+                      <div className="absolute inset-0 flex items-center justify-center z-0">
+                        <span className={`text-white font-bold ${getAvatarSizeConfig().text}`}>
+                          {(userDisplayName || '顧')[0]}
                         </span>
                       </div>
+                      {/* 頭貼圖片（z-index 較高，會覆蓋文字） */}
+                      {(avatarBase64 || isValidImageUrl(userPhotoURL)) && (
+                        <img
+                          src={avatarBase64 || userPhotoURL}
+                          alt={userDisplayName || '顧問'}
+                          className="absolute inset-0 w-full h-full object-cover z-10"
+                          crossOrigin="anonymous"
+                          onError={(e) => {
+                            // 圖片載入失敗時隱藏，露出下面的文字
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      )}
                     </div>
-
-                    {/* 中間：品牌浮水印 */}
-                    <div className="flex items-center gap-1">
-                      <img
-                        src="/logo.png"
-                        alt="Ultra Advisor"
-                        className="w-4 h-4 object-contain"
-                      />
-                      <span className="text-[10px] font-bold">
-                        <span className="text-red-500">Ultra</span>
-                        <span className="text-blue-400"> Advisor</span>
+                    <div className="flex flex-col">
+                      <span
+                        className={`text-white font-bold ${getAvatarSizeConfig().nameText}`}
+                        style={{ fontFamily: NAME_FONT_STYLES[nameFontStyle].fontFamily }}
+                      >
+                        {userDisplayName || '財務顧問'}
+                      </span>
+                      <span className="text-white/50 text-[10px] flex items-center gap-1">
+                        <Calendar size={10} />
+                        {todayDate}
                       </span>
                     </div>
+                  </div>
 
-                    {/* 右側：QR Code */}
-                    <div className="flex flex-col items-center">
-                      <div className="bg-white p-1 rounded-lg">
-                        <img
-                          src={userLineQrCode || `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://ultra-advisor.tw&bgcolor=ffffff&color=000000&margin=0`}
-                          alt="QR Code"
-                          className="w-11 h-11 rounded"
-                          crossOrigin="anonymous"
-                        />
-                      </div>
-                    </div>
+                  {/* 底部右側：品牌浮水印（獨立定位） */}
+                  <div className="absolute bottom-6 right-5 z-10 flex items-center gap-1">
+                    <img
+                      src="/logo.png"
+                      alt="Ultra Advisor"
+                      className="w-4 h-4 object-contain"
+                      style={{ width: 16, height: 16, minWidth: 16, minHeight: 16 }}
+                    />
+                    <span className="text-[10px] font-bold leading-none" style={{ lineHeight: 1 }}>
+                      <span className="text-red-500">Ultra</span>
+                      <span className="text-blue-400"> Advisor</span>
+                    </span>
                   </div>
 
                   {/* 簽名（置中下方，品牌上方） */}
@@ -1585,133 +2001,102 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
               {/* ========== IG 風格左對齊排版 ========== */}
               {layoutStyle === 'left' && (
                 <>
-                  {/* 累積天數徽章 - 可拖拉 */}
-                  <Rnd
-                    position={{ x: igDayBadgePos.x, y: igDayBadgePos.y }}
-                    onDragStop={(e, d) => setIgDayBadgePos({ x: d.x, y: d.y })}
-                    bounds="parent"
-                    enableResizing={false}
-                    disableDragging={!isEditingLayout}
-                    className={`z-30 ${isEditingLayout ? 'cursor-move' : ''}`}
-                    style={{
-                      border: isEditingLayout ? '2px dashed rgba(168, 85, 247, 0.6)' : 'none',
-                      borderRadius: isEditingLayout ? '9999px' : '0',
-                    }}
-                  >
-                    <div className="bg-black/40 px-3 py-1.5 rounded-full">
-                      <span className="text-white text-xs font-bold whitespace-nowrap">
-                        Day {totalShareDays + (todayShared ? 0 : 1)}
-                      </span>
-                    </div>
-                  </Rnd>
+                  {/* 累積天數徽章 */}
+                  <div className="absolute top-6 right-6 z-10">
+                    <span className="text-white text-xs font-bold drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+                      Day {totalShareDays + (todayShared ? 0 : 1)}
+                    </span>
+                  </div>
 
-                  {/* 編輯模式提示 */}
-                  {isEditingLayout && (
-                    <div className="absolute top-6 left-6 bg-purple-600/90 px-3 py-1.5 rounded-full z-30">
-                      <span className="text-white text-xs font-bold">✏️ 拖拉調整</span>
-                    </div>
-                  )}
-
-                  {/* 黃色大標題 - 可拖拉+縮放 */}
-                  <Rnd
-                    position={{ x: igTitlePos.x, y: igTitlePos.y }}
-                    size={{ width: igTitleSize.width, height: igTitleSize.height }}
-                    onDragStop={(e, d) => setIgTitlePos({ x: d.x, y: d.y })}
-                    onResizeStop={(e, direction, ref, delta, position) => {
-                      setIgTitleSize({ width: ref.offsetWidth, height: 'auto' });
-                      setIgTitlePos(position);
-                    }}
-                    bounds="parent"
-                    enableResizing={isEditingLayout ? { right: true, left: true } : false}
-                    disableDragging={!isEditingLayout}
-                    minWidth={150}
-                    maxWidth={320}
-                    className={`z-10 ${isEditingLayout ? 'cursor-move' : ''}`}
-                    style={{
-                      border: isEditingLayout ? '2px dashed rgba(168, 85, 247, 0.6)' : 'none',
-                      borderRadius: isEditingLayout ? '8px' : '0',
-                      padding: isEditingLayout ? '4px' : '0',
-                    }}
+                  {/* 黃色大標題 */}
+                  <div
+                    className="absolute z-10"
+                    style={{ left: igTitlePos.x, top: igTitlePos.y, maxWidth: 280 }}
                   >
                     <h2
-                      className={`text-amber-400 font-black text-xl leading-tight drop-shadow-lg ${FONT_STYLES[fontStyle].className}`}
-                      style={{ fontFamily: FONT_STYLES[fontStyle].fontFamily }}
+                      className={`text-amber-400 font-black leading-tight drop-shadow-lg ${FONT_STYLES[fontStyle].className}`}
+                      style={{
+                        fontFamily: FONT_STYLES[fontStyle].fontFamily,
+                        fontSize: `${20 * quoteFontSize / 100}px`,
+                      }}
                     >
                       「{displayIGQuote.title}」
                     </h2>
-                  </Rnd>
+                  </div>
 
-                  {/* 白色內文 - 可拖拉+縮放 */}
-                  <Rnd
-                    position={{ x: igContentPos.x, y: igContentPos.y }}
-                    size={{ width: igContentSize.width, height: igContentSize.height }}
-                    onDragStop={(e, d) => setIgContentPos({ x: d.x, y: d.y })}
-                    onResizeStop={(e, direction, ref, delta, position) => {
-                      setIgContentSize({ width: ref.offsetWidth, height: 'auto' });
-                      setIgContentPos(position);
-                    }}
-                    bounds="parent"
-                    enableResizing={isEditingLayout ? { right: true, left: true } : false}
-                    disableDragging={!isEditingLayout}
-                    minWidth={150}
-                    maxWidth={320}
-                    className={`z-10 ${isEditingLayout ? 'cursor-move' : ''}`}
-                    style={{
-                      border: isEditingLayout ? '2px dashed rgba(168, 85, 247, 0.6)' : 'none',
-                      borderRadius: isEditingLayout ? '8px' : '0',
-                      padding: isEditingLayout ? '4px' : '0',
-                    }}
+                  {/* 白色內文 */}
+                  <div
+                    className="absolute z-10"
+                    style={{ left: igContentPos.x, top: igContentPos.y, maxWidth: 280 }}
                   >
                     <div className="border-l-2 border-white/40 pl-4 space-y-2">
                       {displayIGQuote.lines.map((line, i) => (
                         <p
                           key={i}
-                          className={`text-white text-sm leading-relaxed drop-shadow-md ${FONT_STYLES[fontStyle].className}`}
-                          style={{ fontFamily: FONT_STYLES[fontStyle].fontFamily }}
+                          className={`text-white leading-relaxed drop-shadow-md ${FONT_STYLES[fontStyle].className}`}
+                          style={{
+                            fontFamily: FONT_STYLES[fontStyle].fontFamily,
+                            fontSize: `${14 * quoteFontSize / 100}px`,
+                          }}
                         >
                           {line}
                         </p>
                       ))}
                     </div>
-                  </Rnd>
-
-                  {/* 左下角網址 */}
-                  <div className="absolute bottom-6 left-4 z-10">
-                    <span className="text-white/50 text-[10px] font-medium whitespace-nowrap">
-                      ultra-advisor.tw
-                    </span>
                   </div>
 
-                  {/* 底部中間：品牌浮水印 */}
-                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
-                    <div className="flex items-center gap-1">
-                      <img
-                        src="/logo.png"
-                        alt="Ultra Advisor"
-                        className="w-4 h-4 object-contain"
-                      />
-                      <span className="text-[10px] font-bold whitespace-nowrap">
-                        <span className="text-red-500">Ultra</span>
-                        <span className="text-blue-400"> Advisor</span>
+                  {/* 底部左側：顧問頭貼 + 名字（獨立定位） */}
+                  <div className="absolute bottom-6 left-4 z-10 flex items-center gap-2">
+                    <div className={`${getAvatarSizeConfig().size} rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-blue-500 flex-shrink-0 relative`}>
+                      {/* Fallback 文字 */}
+                      <div className="absolute inset-0 flex items-center justify-center z-0">
+                        <span className={`text-white font-bold ${getAvatarSizeConfig().text}`}>
+                          {(userDisplayName || '顧')[0]}
+                        </span>
+                      </div>
+                      {/* 頭貼圖片 */}
+                      {(avatarBase64 || isValidImageUrl(userPhotoURL)) && (
+                        <img
+                          src={avatarBase64 || userPhotoURL}
+                          alt={userDisplayName || '顧問'}
+                          className="absolute inset-0 w-full h-full object-cover z-10"
+                          crossOrigin="anonymous"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div className="flex flex-col">
+                      <span
+                        className={`text-white font-bold ${getAvatarSizeConfig().nameText}`}
+                        style={{ fontFamily: NAME_FONT_STYLES[nameFontStyle].fontFamily }}
+                      >
+                        {userDisplayName || '財務顧問'}
+                      </span>
+                      <span className="text-white/50 text-[10px]">
+                        ultra-advisor.tw
                       </span>
                     </div>
                   </div>
 
-                  {/* 右下角 QR Code */}
-                  <div className="absolute bottom-4 right-4 z-10">
-                    <div className="bg-white p-1 rounded-lg">
-                      <img
-                        src={userLineQrCode || `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://ultra-advisor.tw&bgcolor=ffffff&color=000000&margin=0`}
-                        alt="QR Code"
-                        className="w-10 h-10 rounded"
-                        crossOrigin="anonymous"
-                      />
-                    </div>
+                  {/* 底部右側：品牌浮水印（獨立定位） */}
+                  <div className="absolute bottom-6 right-4 z-10 flex items-center gap-1">
+                    <img
+                      src="/logo.png"
+                      alt="Ultra Advisor"
+                      className="w-4 h-4 object-contain"
+                      style={{ width: 16, height: 16, minWidth: 16, minHeight: 16 }}
+                    />
+                    <span className="text-[10px] font-bold whitespace-nowrap leading-none" style={{ lineHeight: 1 }}>
+                      <span className="text-red-500">Ultra</span>
+                      <span className="text-blue-400"> Advisor</span>
+                    </span>
                   </div>
 
-                  {/* 簽名（品牌浮水印上方） */}
+                  {/* 簽名（底部資訊上方） */}
                   {signatureDataUrl && (
-                    <div className="absolute bottom-14 left-1/2 -translate-x-1/2 z-10">
+                    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10">
                       <img
                         src={signatureDataUrl}
                         alt="簽名"
@@ -1725,105 +2110,59 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
               {/* ========== 雜誌風格排版 ========== */}
               {layoutStyle === 'magazine' && (
                 <>
-                  {/* 累積天數徽章 - 可拖拉 */}
-                  <Rnd
-                    position={{ x: magazineDayBadgePos.x, y: magazineDayBadgePos.y }}
-                    onDragStop={(e, d) => setMagazineDayBadgePos({ x: d.x, y: d.y })}
-                    bounds="parent"
-                    enableResizing={false}
-                    disableDragging={!isEditingLayout}
-                    className={`z-30 ${isEditingLayout ? 'cursor-move' : ''}`}
-                    style={{
-                      border: isEditingLayout ? '2px dashed rgba(168, 85, 247, 0.6)' : 'none',
-                      borderRadius: isEditingLayout ? '9999px' : '0',
-                    }}
-                  >
-                    <div className="bg-black/40 px-3 py-1.5 rounded-full">
-                      <span className="text-white text-xs font-bold whitespace-nowrap">
-                        Day {totalShareDays + (todayShared ? 0 : 1)}
-                      </span>
-                    </div>
-                  </Rnd>
+                  {/* 累積天數徽章 */}
+                  <div className="absolute top-6 right-6 z-10">
+                    <span className="text-white text-xs font-bold drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+                      Day {totalShareDays + (todayShared ? 0 : 1)}
+                    </span>
+                  </div>
 
-                  {/* 編輯模式提示 */}
-                  {isEditingLayout && (
-                    <div className="absolute top-6 left-6 bg-purple-600/90 px-3 py-1.5 rounded-full z-30">
-                      <span className="text-white text-xs font-bold">✏️ 拖拉調整</span>
-                    </div>
-                  )}
-
-                  {/* 頂部大標題區 - 可拖拉+縮放 */}
-                  <Rnd
-                    position={{ x: magazineTitlePos.x, y: magazineTitlePos.y }}
-                    size={{ width: magazineTitleSize.width, height: magazineTitleSize.height }}
-                    onDragStop={(e, d) => setMagazineTitlePos({ x: d.x, y: d.y })}
-                    onResizeStop={(e, direction, ref, delta, position) => {
-                      setMagazineTitleSize({ width: ref.offsetWidth, height: 'auto' });
-                      setMagazineTitlePos(position);
-                    }}
-                    bounds="parent"
-                    enableResizing={isEditingLayout ? { right: true, left: true } : false}
-                    disableDragging={!isEditingLayout}
-                    minWidth={150}
-                    maxWidth={320}
-                    className={`z-10 ${isEditingLayout ? 'cursor-move' : ''}`}
-                    style={{
-                      border: isEditingLayout ? '2px dashed rgba(168, 85, 247, 0.6)' : 'none',
-                      borderRadius: isEditingLayout ? '8px' : '0',
-                      padding: isEditingLayout ? '4px' : '0',
-                    }}
+                  {/* 頂部大標題區 */}
+                  <div
+                    className="absolute z-10"
+                    style={{ left: magazineTitlePos.x, top: magazineTitlePos.y, maxWidth: 280 }}
                   >
                     <div className="px-2">
                       <h1
-                        className={`text-white font-black text-xl leading-tight drop-shadow-lg ${FONT_STYLES[fontStyle].className}`}
-                        style={{ fontFamily: FONT_STYLES[fontStyle].fontFamily }}
+                        className={`text-white font-black leading-tight drop-shadow-lg ${FONT_STYLES[fontStyle].className}`}
+                        style={{
+                          fontFamily: FONT_STYLES[fontStyle].fontFamily,
+                          fontSize: `${20 * quoteFontSize / 100}px`,
+                        }}
                       >
                         {displayIGQuote.title}
                       </h1>
                       <div className="w-12 h-1 bg-amber-400 mt-3" />
                     </div>
-                  </Rnd>
+                  </div>
 
-                  {/* 中間內容區 - 可拖拉+縮放 */}
-                  <Rnd
-                    position={{ x: magazineContentPos.x, y: magazineContentPos.y }}
-                    size={{ width: magazineContentSize.width, height: magazineContentSize.height }}
-                    onDragStop={(e, d) => setMagazineContentPos({ x: d.x, y: d.y })}
-                    onResizeStop={(e, direction, ref, delta, position) => {
-                      setMagazineContentSize({ width: ref.offsetWidth, height: 'auto' });
-                      setMagazineContentPos(position);
-                    }}
-                    bounds="parent"
-                    enableResizing={isEditingLayout ? { right: true, left: true } : false}
-                    disableDragging={!isEditingLayout}
-                    minWidth={150}
-                    maxWidth={320}
-                    className={`z-10 ${isEditingLayout ? 'cursor-move' : ''}`}
-                    style={{
-                      border: isEditingLayout ? '2px dashed rgba(168, 85, 247, 0.6)' : 'none',
-                      borderRadius: isEditingLayout ? '8px' : '0',
-                      padding: isEditingLayout ? '4px' : '0',
-                    }}
+                  {/* 中間內容區 */}
+                  <div
+                    className="absolute z-10"
+                    style={{ left: magazineContentPos.x, top: magazineContentPos.y, maxWidth: 280 }}
                   >
                     <div className="px-2 space-y-2">
                       {displayIGQuote.lines.map((line, i) => (
                         <p
                           key={i}
-                          className={`text-white/90 text-sm leading-relaxed drop-shadow-md ${FONT_STYLES[fontStyle].className}`}
-                          style={{ fontFamily: FONT_STYLES[fontStyle].fontFamily }}
+                          className={`text-white/90 leading-relaxed drop-shadow-md ${FONT_STYLES[fontStyle].className}`}
+                          style={{
+                            fontFamily: FONT_STYLES[fontStyle].fontFamily,
+                            fontSize: `${14 * quoteFontSize / 100}px`,
+                          }}
                         >
                           {line}
                         </p>
                       ))}
                     </div>
-                  </Rnd>
+                  </div>
 
                   {/* 左側：顧問資訊 */}
                   <div className="absolute bottom-5 left-4 z-10">
                     <div className="flex items-center gap-2">
-                      <div className="w-11 h-11 rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-blue-500 flex-shrink-0 relative border-2 border-white/30">
+                      <div className={`${getAvatarSizeConfig().size} rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-blue-500 flex-shrink-0 relative border-2 border-white/30`}>
                         <div className="absolute inset-0 flex items-center justify-center z-0">
-                          <span className="text-white font-bold text-lg">
+                          <span className={`text-white font-bold ${getAvatarSizeConfig().text}`}>
                             {(userDisplayName || '顧')[0]}
                           </span>
                         </div>
@@ -1841,7 +2180,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                       </div>
                       <div className="flex flex-col">
                         <span
-                          className="text-white font-bold text-sm whitespace-nowrap"
+                          className={`text-white font-bold ${getAvatarSizeConfig().nameText} whitespace-nowrap`}
                           style={{ fontFamily: NAME_FONT_STYLES[nameFontStyle].fontFamily }}
                         >
                           {userDisplayName || '財務顧問'}
@@ -1860,23 +2199,12 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                         src="/logo.png"
                         alt="Ultra Advisor"
                         className="w-4 h-4 object-contain"
+                        style={{ width: 16, height: 16, minWidth: 16, minHeight: 16 }}
                       />
-                      <span className="text-[10px] font-bold whitespace-nowrap">
+                      <span className="text-[10px] font-bold whitespace-nowrap leading-none" style={{ lineHeight: 1 }}>
                         <span className="text-red-500">Ultra</span>
                         <span className="text-blue-400"> Advisor</span>
                       </span>
-                    </div>
-                  </div>
-
-                  {/* 右側：QR Code */}
-                  <div className="absolute bottom-4 right-4 z-10">
-                    <div className="bg-white p-1 rounded-lg">
-                      <img
-                        src={userLineQrCode || `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://ultra-advisor.tw&bgcolor=ffffff&color=000000&margin=0`}
-                        alt="QR Code"
-                        className="w-11 h-11 rounded"
-                        crossOrigin="anonymous"
-                      />
                     </div>
                   </div>
 
@@ -1897,8 +2225,8 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
               {layoutStyle === 'card' && (
                 <>
                   {/* 累積天數徽章 */}
-                  <div className="absolute top-6 right-6 bg-black/40 px-3 py-1.5 rounded-full z-10">
-                    <span className="text-white text-xs font-bold">
+                  <div className="absolute top-6 right-6 z-10">
+                    <span className="text-white text-xs font-bold drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
                       Day {totalShareDays + (todayShared ? 0 : 1)}
                     </span>
                   </div>
@@ -1912,12 +2240,13 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
                       {/* 金句內容 */}
                       <p
-                        className={`text-white font-bold leading-relaxed mb-4 ${
-                          displayQuoteText.length > 50 ? 'text-base' : 'text-lg'
-                        } ${FONT_STYLES[fontStyle].className}`}
-                        style={{ fontFamily: FONT_STYLES[fontStyle].fontFamily }}
+                        className={`text-white font-bold leading-relaxed mb-4 ${FONT_STYLES[fontStyle].className}`}
+                        style={{
+                          fontFamily: FONT_STYLES[fontStyle].fontFamily,
+                          fontSize: `${(displayQuoteText.length > 50 ? 16 : 18) * quoteFontSize / 100}px`,
+                        }}
                       >
-                        {displayQuoteText}
+                        {formatQuoteWithLineBreaks(displayQuoteText)}
                       </p>
 
                       {/* 簽名（卡片內） */}
@@ -1934,13 +2263,13 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                       {/* 分隔線 */}
                       <div className="w-full h-px bg-white/20 my-4" />
 
-                      {/* 底部資訊 */}
-                      <div className="flex items-center justify-between">
+                      {/* 底部資訊（用 relative + 兩個 absolute 避免 justify-between 問題） */}
+                      <div className="relative w-full h-10">
                         {/* 左側：顧問資訊 */}
-                        <div className="flex items-center gap-2">
-                          <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-blue-500 flex-shrink-0 relative">
+                        <div className="absolute left-0 top-0 flex items-center gap-2">
+                          <div className={`${getAvatarSizeConfig().size} rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-blue-500 flex-shrink-0 relative`}>
                             <div className="absolute inset-0 flex items-center justify-center z-0">
-                              <span className="text-white font-bold text-sm">
+                              <span className={`text-white font-bold ${getAvatarSizeConfig().text}`}>
                                 {(userDisplayName || '顧')[0]}
                               </span>
                             </div>
@@ -1958,7 +2287,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                           </div>
                           <div className="flex flex-col">
                             <span
-                              className="text-white font-bold text-xs"
+                              className={`text-white font-bold ${getAvatarSizeConfig().nameText}`}
                               style={{ fontFamily: NAME_FONT_STYLES[nameFontStyle].fontFamily }}
                             >
                               {userDisplayName || '財務顧問'}
@@ -1969,27 +2298,18 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                           </div>
                         </div>
 
-                        {/* 中間：品牌浮水印 */}
-                        <div className="flex items-center gap-1">
+                        {/* 右側：品牌浮水印 */}
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1">
                           <img
                             src="/logo.png"
                             alt="Ultra Advisor"
                             className="w-4 h-4 object-contain"
+                            style={{ width: 16, height: 16, minWidth: 16, minHeight: 16 }}
                           />
-                          <span className="text-[10px] font-bold">
+                          <span className="text-[10px] font-bold leading-none" style={{ lineHeight: 1 }}>
                             <span className="text-red-500">Ultra</span>
                             <span className="text-blue-400"> Advisor</span>
                           </span>
-                        </div>
-
-                        {/* 右側：QR Code */}
-                        <div className="bg-white p-1 rounded-lg">
-                          <img
-                            src={userLineQrCode || `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://ultra-advisor.tw&bgcolor=ffffff&color=000000&margin=0`}
-                            alt="QR Code"
-                            className="w-10 h-10 rounded"
-                            crossOrigin="anonymous"
-                          />
                         </div>
                       </div>
                     </div>
@@ -2000,6 +2320,18 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
             {/* 隨機切換 & 進階設定按鈕 */}
             <div className="flex gap-2 mt-4">
+              {/* 回到今日按鈕 - 放最左邊 */}
+              {(customQuote || customBg || selectedCustomBgIndex !== null) && (
+                <button
+                  onClick={handleResetToToday}
+                  className="flex items-center justify-center gap-2 py-2.5 px-3
+                           bg-slate-800 text-white font-bold rounded-xl
+                           hover:bg-slate-700 transition-all"
+                  title="重置為今日預設"
+                >
+                  <Calendar size={16} />
+                </button>
+              )}
               <button
                 onClick={handleShuffle}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5
@@ -2018,35 +2350,10 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                 <Settings size={16} />
                 進階設定
               </button>
-              {(customQuote || customBg || selectedCustomBgIndex !== null) && (
-                <button
-                  onClick={handleResetToToday}
-                  className="flex items-center justify-center gap-2 py-2.5 px-3
-                           bg-slate-800 text-white font-bold rounded-xl
-                           hover:bg-slate-700 transition-all"
-                  title="重置為今日預設"
-                >
-                  <Calendar size={16} />
-                </button>
-              )}
             </div>
 
             {/* 分享按鈕 */}
             <div className="flex gap-3 mt-3">
-              <button
-                onClick={handleDownload}
-                disabled={isGenerating}
-                className="flex-1 flex items-center justify-center gap-2 py-3
-                         bg-white text-slate-900 font-bold rounded-xl
-                         hover:bg-slate-100 transition-all disabled:opacity-50"
-              >
-                {isGenerating ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Download size={18} />
-                )}
-                下載圖片
-              </button>
               <button
                 onClick={handleShare}
                 disabled={isGenerating}
@@ -2140,47 +2447,38 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                     </div>
 
                     {/* IG/雜誌風格：編輯位置按鈕 + 重置按鈕 */}
-                    {(layoutStyle === 'left' || layoutStyle === 'magazine') && (
-                      <div className="flex gap-2 mt-2">
+                    {/* 字體大小調整滑桿 */}
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-slate-400 text-[10px] font-bold">字體大小</span>
+                        <span className="text-purple-400 text-[10px] font-bold">{quoteFontSize}%</span>
+                      </div>
+                      <div className="flex items-center gap-2">
                         <button
-                          onClick={() => {
-                            setIsEditingLayout(!isEditingLayout);
-                            if (showAdvancedSettings) setShowAdvancedSettings(false);
-                          }}
-                          className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1
-                                     ${isEditingLayout
-                                       ? 'bg-amber-500 text-white'
-                                       : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                          onClick={() => setQuoteFontSize(Math.max(60, quoteFontSize - 10))}
+                          className="w-7 h-7 rounded-lg bg-slate-700 text-white text-sm font-bold hover:bg-slate-600 transition-all"
                         >
-                          <Edit3 size={12} />
-                          {isEditingLayout ? '完成編輯' : '拖拉調整'}
+                          -
                         </button>
+                        <input
+                          type="range"
+                          min="60"
+                          max="150"
+                          step="5"
+                          value={quoteFontSize}
+                          onChange={(e) => setQuoteFontSize(Number(e.target.value))}
+                          className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer
+                                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
+                                     [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500"
+                        />
                         <button
-                          onClick={() => {
-                            if (layoutStyle === 'magazine') {
-                              // 重置雜誌風格位置
-                              setMagazineTitlePos({ x: 24, y: 80 });
-                              setMagazineTitleSize({ width: 280, height: 'auto' });
-                              setMagazineContentPos({ x: 24, y: 180 });
-                              setMagazineContentSize({ width: 280, height: 'auto' });
-                              setMagazineDayBadgePos({ x: 270, y: 24 });
-                            } else if (layoutStyle === 'left') {
-                              // 重置 IG 風格位置
-                              setIgDayBadgePos({ x: 270, y: 20 });
-                              setIgTitlePos({ x: 16, y: 180 });
-                              setIgTitleSize({ width: 280, height: 'auto' });
-                              setIgContentPos({ x: 16, y: 300 });
-                              setIgContentSize({ width: 280, height: 'auto' });
-                            }
-                          }}
-                          className="px-3 py-2 rounded-lg text-[10px] font-bold transition-all
-                                     bg-slate-700 text-slate-300 hover:bg-slate-600 flex items-center justify-center gap-1"
+                          onClick={() => setQuoteFontSize(Math.min(150, quoteFontSize + 10))}
+                          className="w-7 h-7 rounded-lg bg-slate-700 text-white text-sm font-bold hover:bg-slate-600 transition-all"
                         >
-                          <RefreshCw size={12} />
-                          重置
+                          +
                         </button>
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   {/* 文案設定 - 根據排版風格顯示不同編輯區 */}
@@ -2383,7 +2681,8 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                           >
                             <img
                               src={bg.dataUrl}
-                              className="w-full h-full object-cover grayscale"
+                              className="w-full h-full object-cover"
+                              style={{ filter: FILTER_STYLES[filterStyle].css }}
                               alt={`背景 ${index + 1}`}
                             />
                             <button
@@ -2413,6 +2712,53 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                         改用預設背景庫
                       </button>
                     )}
+                  </div>
+
+                  {/* 濾鏡選擇 */}
+                  <div>
+                    <label className="text-slate-400 text-[10px] font-bold mb-2 flex items-center gap-1">
+                      <Sparkles size={12} /> 背景濾鏡
+                    </label>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {(Object.keys(FILTER_STYLES) as FilterStyle[]).map((key) => (
+                        <button
+                          key={key}
+                          onClick={() => setFilterStyle(key)}
+                          className={`py-2 px-1 rounded-lg text-center transition-all ${
+                            filterStyle === key
+                              ? 'bg-purple-600 text-white ring-2 ring-purple-400'
+                              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                          }`}
+                        >
+                          <div className="text-base mb-0.5">{FILTER_STYLES[key].preview}</div>
+                          <div className="text-[9px] font-bold">{FILTER_STYLES[key].name}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 頭像大小設定 */}
+                  <div className="mt-4">
+                    <label className="text-slate-400 text-[10px] font-bold mb-2 flex items-center gap-1">
+                      <User size={12} /> 頭像大小
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['small', 'medium', 'large'] as const).map((size) => (
+                        <button
+                          key={size}
+                          onClick={() => setAvatarSize(size)}
+                          className={`py-2.5 rounded-lg text-center transition-all ${
+                            avatarSize === size
+                              ? 'bg-purple-600 text-white ring-2 ring-purple-400'
+                              : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                          }`}
+                        >
+                          <div className="text-[10px] font-bold">
+                            {size === 'small' ? '小' : size === 'medium' ? '中' : '大'}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {/* 手寫簽名 */}
@@ -2599,7 +2945,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 // ==========================================
 // 🧮 傲創計算機（簡化版）
 // ==========================================
-type CalcMode = 'mortgage' | 'credit' | 'smart' | 'irr';
+type CalcMode = 'mortgage' | 'credit' | 'smart' | 'irr' | 'dateCalc';
 
 const QuickCalculator = () => {
   const [mode, setMode] = useState<CalcMode>('mortgage');
@@ -2637,6 +2983,9 @@ const QuickCalculator = () => {
   const [totalPremium, setTotalPremium] = useState(1000000);
   const [maturityValue, setMaturityValue] = useState(1350000);
   const [irrYears, setIrrYears] = useState(10);
+
+  // ========== 日期計算 ==========
+  const [dateInput, setDateInput] = useState('');
 
   // 房貸計算 - 本息均攤
   const getMortgageEqualPayment = () => {
@@ -2689,6 +3038,87 @@ const QuickCalculator = () => {
   const getIrrResult = () => {
     if (totalPremium <= 0 || maturityValue <= 0 || irrYears <= 0) return "0.00";
     return ((Math.pow(maturityValue / totalPremium, 1 / irrYears) - 1) * 100).toFixed(2);
+  };
+
+  // 日期計算：解析輸入（支援西元/民國/各種格式）→ 算出距今幾年幾個月
+  const parseDateInput = (raw: string): Date | null => {
+    if (!raw.trim()) return null;
+    const s = raw.trim();
+
+    // 嘗試匹配各種格式
+    // 1. YYYY/MM/DD 或 YYYY-MM-DD 或 YYYY.MM.DD（西元）
+    let m = s.match(/^((?:19|20)\d{2})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+    if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+
+    // 2. 民國年：YYY/MM/DD 或 YYY-MM-DD 或 YYY.MM.DD（3位數字開頭，<200）
+    m = s.match(/^(\d{1,3})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+    if (m && parseInt(m[1]) < 200) {
+      return new Date(parseInt(m[1]) + 1911, parseInt(m[2]) - 1, parseInt(m[3]));
+    }
+
+    // 3. 民國 xxx年xx月xx日 / xxx年xx月
+    m = s.match(/^(?:民國)?(\d{1,3})年(\d{1,2})月(\d{1,2})日?$/);
+    if (m && parseInt(m[1]) < 200) {
+      return new Date(parseInt(m[1]) + 1911, parseInt(m[2]) - 1, parseInt(m[3]));
+    }
+
+    // 4. 西元 xxxx年xx月xx日
+    m = s.match(/^(?:西元)?((?:19|20)\d{2})年(\d{1,2})月(\d{1,2})日?$/);
+    if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+
+    // 5. 無分隔符 YYYYMMDD（如 19980510）
+    m = s.match(/^((?:19|20)\d{2})(\d{2})(\d{2})$/);
+    if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+
+    // 6. 無分隔符 民國 YYYMMDD 或 YYMMDD（如 870510、1140128）
+    m = s.match(/^(\d{2,3})(\d{2})(\d{2})$/);
+    if (m && parseInt(m[1]) < 200) {
+      return new Date(parseInt(m[1]) + 1911, parseInt(m[2]) - 1, parseInt(m[3]));
+    }
+
+    // 7. 直接嘗試 Date.parse
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return d;
+
+    return null;
+  };
+
+  const getDateCalcResult = () => {
+    const parsed = parseDateInput(dateInput);
+    if (!parsed || isNaN(parsed.getTime())) return null;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+
+    // 判斷方向
+    const isFuture = target > today;
+    const [from, to] = isFuture ? [today, target] : [target, today];
+
+    // 計算年月差
+    let years = to.getFullYear() - from.getFullYear();
+    let months = to.getMonth() - from.getMonth();
+    let days = to.getDate() - from.getDate();
+
+    if (days < 0) {
+      months -= 1;
+      // 取上個月的天數
+      const prevMonth = new Date(to.getFullYear(), to.getMonth(), 0);
+      days += prevMonth.getDate();
+    }
+    if (months < 0) {
+      years -= 1;
+      months += 12;
+    }
+
+    // 總月數
+    const totalMonths = years * 12 + months;
+    // 西元年
+    const ceYear = parsed.getFullYear();
+    // 民國年
+    const rocYear = ceYear - 1911;
+
+    return { years, months, days, totalMonths, isFuture, ceYear, rocYear, parsed };
   };
 
   // ========== 智能計算機邏輯 ==========
@@ -2816,12 +3246,13 @@ const QuickCalculator = () => {
       </div>
 
       {/* Mode Tabs - 兩排 */}
-      <div className="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl mb-4">
+      <div className="grid grid-cols-5 gap-1 bg-slate-950 p-1 rounded-xl mb-4">
         {[
           { id: 'mortgage' as CalcMode, label: '房貸', icon: Home },
           { id: 'credit' as CalcMode, label: '信貸', icon: Coins },
           { id: 'smart' as CalcMode, label: '計算機', icon: Calculator },
           { id: 'irr' as CalcMode, label: 'IRR', icon: TrendingUp },
+          { id: 'dateCalc' as CalcMode, label: '日期', icon: Calendar },
         ].map(m => (
           <button
             key={m.id}
@@ -3326,6 +3757,78 @@ const QuickCalculator = () => {
               淨回報：{formatMoney(maturityValue - totalPremium)} 元
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ========== 日期計算 ========== */}
+      {mode === 'dateCalc' && (
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10px] text-slate-500 font-bold uppercase mb-1 block">輸入日期</label>
+            <input
+              type="text"
+              value={dateInput}
+              onChange={e => setDateInput(e.target.value)}
+              placeholder="例：19980510 或 870510"
+              className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-white text-lg font-bold focus:border-purple-500 focus:outline-none"
+            />
+            <div className="text-[10px] text-slate-500 mt-1">
+              支援格式：19980510、870510、1998/5/10、87/5/10、民國87年5月10日
+            </div>
+          </div>
+
+          {(() => {
+            const result = getDateCalcResult();
+            if (!result) {
+              return dateInput.trim() ? (
+                <div className="bg-red-900/20 border border-red-500/20 rounded-xl p-4 text-center">
+                  <div className="text-red-400 text-sm">無法辨識日期格式，請重新輸入</div>
+                </div>
+              ) : null;
+            }
+
+            const { years, months, days, totalMonths, isFuture, ceYear, rocYear, parsed } = result;
+            const formattedDate = `${parsed.getFullYear()}/${parsed.getMonth() + 1}/${parsed.getDate()}`;
+            const rocFormatted = `民國 ${rocYear} 年 ${parsed.getMonth() + 1} 月 ${parsed.getDate()} 日`;
+
+            return (
+              <div className="space-y-3">
+                {/* 主結果 */}
+                <div className="bg-purple-900/20 border border-purple-500/20 rounded-xl p-4 text-center">
+                  <div className="text-slate-400 text-[10px] mb-1 uppercase tracking-wider">
+                    {isFuture ? '距離該日期還有' : '距今已經過'}
+                  </div>
+                  <div className="text-3xl font-black text-purple-400">
+                    {years > 0 && <span>{years}<span className="text-lg ml-0.5 mr-2">年</span></span>}
+                    {months > 0 && <span>{months}<span className="text-lg ml-0.5 mr-2">個月</span></span>}
+                    {days > 0 && <span>{days}<span className="text-lg ml-0.5">天</span></span>}
+                    {years === 0 && months === 0 && days === 0 && <span>就是今天</span>}
+                  </div>
+                  <div className="text-slate-500 text-[10px] mt-2">
+                    共 {totalMonths} 個月 {days > 0 ? `又 ${days} 天` : '整'}
+                  </div>
+                </div>
+
+                {/* 日期資訊 */}
+                <div className="bg-slate-800/50 rounded-xl p-4 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 text-xs">西元</span>
+                    <span className="text-white text-sm font-bold">{formattedDate}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 text-xs">民國</span>
+                    <span className="text-white text-sm font-bold">{rocFormatted}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 text-xs">星期</span>
+                    <span className="text-white text-sm font-bold">
+                      {['日', '一', '二', '三', '四', '五', '六'][parsed.getDay()]}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -4006,7 +4509,7 @@ const ClientList = ({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Users size={18} className="text-purple-400" />
-          <h3 className="text-sm font-black text-white uppercase tracking-wider">我的客戶</h3>
+          <h3 className="text-sm font-black text-white uppercase tracking-wider">我的規劃</h3>
           <span className="text-xs text-slate-500 ml-2">共 {clients.length} 位</span>
         </div>
         <button
@@ -4164,6 +4667,93 @@ const PaymentModal = ({
 };
 
 // ==========================================
+// 🔔 推播通知設定區塊（用於編輯資料 Modal）
+// ==========================================
+const PushNotificationSection = ({ userId }: { userId: string | null }) => {
+  const {
+    isSupported,
+    permission,
+    isSubscribed,
+    isLoading,
+    subscribe,
+    unsubscribe,
+  } = usePushNotifications(userId);
+
+  // 不支援推播或權限被拒絕
+  if (!isSupported || permission === 'denied') {
+    return (
+      <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-slate-700">
+            <BellOff size={20} className="text-slate-500" />
+          </div>
+          <div>
+            <h4 className="text-slate-400 font-medium">推播通知</h4>
+            <p className="text-slate-500 text-xs">
+              {!isSupported ? '您的瀏覽器不支援推播通知' : '通知權限已被封鎖，請在瀏覽器設定中開啟'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const handleToggle = async () => {
+    if (isSubscribed) {
+      await unsubscribe();
+    } else {
+      await subscribe();
+    }
+  };
+
+  return (
+    <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${isSubscribed ? 'bg-purple-600/20' : 'bg-slate-700'}`}>
+            {isSubscribed ? (
+              <Bell size={20} className="text-purple-400" />
+            ) : (
+              <BellOff size={20} className="text-slate-400" />
+            )}
+          </div>
+          <div>
+            <h4 className="text-white font-medium">推播通知</h4>
+            <p className="text-slate-500 text-xs">
+              {isSubscribed ? '已開啟 - 會收到新文章、系統通知' : '開啟後可收到重要通知'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleToggle}
+          disabled={isLoading}
+          className={`px-4 py-2 rounded-lg font-medium text-sm transition-all flex items-center gap-2 ${
+            isSubscribed
+              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              : 'bg-purple-600 text-white hover:bg-purple-500'
+          }`}
+        >
+          {isLoading ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : isSubscribed ? (
+            <>
+              <BellOff size={16} />
+              關閉
+            </>
+          ) : (
+            <>
+              <Bell size={16} />
+              開啟
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
 // ✏️ 編輯個人資料 Modal
 // ==========================================
 const EditProfileModal = ({
@@ -4182,9 +4772,7 @@ const EditProfileModal = ({
   const [formData, setFormData] = useState<ProfileData>(profileData);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadingQr, setUploadingQr] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const qrInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setFormData(profileData);
@@ -4205,25 +4793,6 @@ const EditProfileModal = ({
       alert('上傳失敗，請稍後再試');
     } finally {
       setUploading(false);
-    }
-  };
-
-  // LINE QR Code 上傳
-  const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    setUploadingQr(true);
-    try {
-      const storageRef = ref(storage, `qrcodes/${user.uid}/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
-      setFormData(prev => ({ ...prev, lineQrCode: downloadURL }));
-    } catch (error) {
-      console.error('QR Code upload failed:', error);
-      alert('上傳失敗，請稍後再試');
-    } finally {
-      setUploadingQr(false);
     }
   };
 
@@ -4375,50 +4944,6 @@ const EditProfileModal = ({
             </div>
           </div>
 
-          {/* LINE 網址（自動產生 QR Code） */}
-          <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
-            <label className="text-sm text-slate-400 font-bold mb-3 flex items-center gap-2">
-              <MessageCircle size={14} className="text-emerald-400" />
-              LINE 加好友連結（用於限動分享）
-            </label>
-            <div className="flex items-center gap-4">
-              {/* QR Code 預覽 */}
-              <div className="w-20 h-20 rounded-xl bg-white border border-slate-600 overflow-hidden flex items-center justify-center flex-shrink-0">
-                {formData.lineQrCode ? (
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(formData.lineQrCode)}&bgcolor=ffffff&color=000000&margin=5`}
-                    alt="LINE QR Code"
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <div className="text-center p-2">
-                    <MessageCircle size={24} className="text-slate-300 mx-auto mb-1" />
-                    <span className="text-[10px] text-slate-400">未設定</span>
-                  </div>
-                )}
-              </div>
-
-              {/* LINE 網址輸入 */}
-              <div className="flex-1">
-                <input
-                  type="url"
-                  value={formData.lineQrCode || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, lineQrCode: e.target.value }))}
-                  placeholder="https://line.me/ti/p/xxxxx"
-                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-lg
-                           text-white text-sm placeholder-slate-500
-                           focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
-                />
-                <p className="text-[10px] text-slate-500 mt-2">
-                  貼上你的 LINE 加好友網址，系統會自動產生 QR Code 顯示在限動圖卡上
-                </p>
-                <p className="text-[10px] text-emerald-400 mt-1">
-                  💡 可在 LINE App → 主頁 → 加入好友 → 邀請 → 複製連結
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Info */}
           <div className="p-4 bg-blue-900/20 border border-blue-500/20 rounded-xl">
             <div className="flex gap-3 items-start">
@@ -4429,6 +4954,9 @@ const EditProfileModal = ({
               </p>
             </div>
           </div>
+
+          {/* 🔔 推播通知設定 */}
+          <PushNotificationSection userId={user?.uid} />
         </div>
 
         {/* Footer */}
@@ -5013,9 +5541,11 @@ interface UltraWarRoomProps {
   user: any;
   onSelectClient: (client: any) => void;
   onLogout: () => void;
+  onNavigateToTool?: (toolId: string) => void;
+  onStartCheckup?: (clientId: string, clientName: string) => void;
 }
 
-const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLogout }) => {
+const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLogout, onNavigateToTool, onStartCheckup }) => {
   // 🆕 會員系統
   const { membership } = useMembership(user?.uid || null);
   const [showReferralEngine, setShowReferralEngine] = useState(false);
@@ -5090,6 +5620,18 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
   const [feedbackContent, setFeedbackContent] = useState('');
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+
+  // 🆕 保單健診系統
+  const [showInsuranceScanner, setShowInsuranceScanner] = useState(false);
+
+  // 🆕 客戶管理系統
+  const [showClientManager, setShowClientManager] = useState(false);
+
+  // 🆕 健診客戶選擇器
+  const [showCheckupClientSelector, setShowCheckupClientSelector] = useState(false);
+
+  // 🆕 Threads 社群助理
+  const [showThreadsAssistant, setShowThreadsAssistant] = useState(false);
 
   // 🆕 LOGO 五連點進入後台
   const [logoClickCount, setLogoClickCount] = useState(0);
@@ -5657,7 +6199,7 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
                 <span className="text-[10px] text-slate-500">({blogArticles.length} 篇)</span>
               </div>
 
-              {/* 最新文章 */}
+              {/* 最新文章（按發布日期排序）*/}
               {(() => {
                 const latestArticle = [...blogArticles].sort((a, b) => {
                   const dateDiff = new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime();
@@ -5705,6 +6247,7 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
                 </a>
               </div>
             </div>
+
           </div>
 
           {/* Market Data */}
@@ -5712,11 +6255,88 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
             userId={user?.uid}
             userDisplayName={profileData.displayName || user?.displayName}
             userPhotoURL={profileData.photoURL || user?.photoURL}
-            userLineQrCode={profileData.lineQrCode}
+            membership={membership}
+            onOpenThreadsAssistant={() => setShowThreadsAssistant(true)}
           />
 
           {/* Quick Calculator */}
           <QuickCalculator />
+        </div>
+
+        {/* 🆕 保單健診入口 */}
+        <div className="mb-6">
+          <button
+            onClick={() => {
+              if (membership?.isPaid) {
+                if (onStartCheckup) {
+                  setShowCheckupClientSelector(true);
+                } else if (onNavigateToTool) {
+                  onNavigateToTool('insurance_checkup');
+                } else {
+                  setShowInsuranceScanner(true);
+                }
+              } else {
+                handleOpenPayment(false);
+              }
+            }}
+            className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-purple-900/40 to-blue-900/40
+                       border border-purple-500/30 rounded-2xl hover:border-purple-400/50 transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-600/30 rounded-xl flex items-center justify-center">
+                <ShieldAlert size={20} className="text-purple-400" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-sm font-black text-white">保單健診系統</h3>
+                <p className="text-[11px] text-slate-400">上傳 / 輸入保單，AI 辨識 + 缺口分析報告</p>
+              </div>
+            </div>
+            {membership?.isPaid ? (
+              <span className="text-xs text-purple-400 font-bold group-hover:text-purple-300 transition-colors">
+                開啟 →
+              </span>
+            ) : (
+              <div className="flex items-center gap-1 text-xs text-slate-500">
+                <Lock size={14} />
+                <span>付費會員專屬</span>
+              </div>
+            )}
+          </button>
+        </div>
+
+        {/* 🆕 客戶管理入口 */}
+        <div className="mb-6">
+          <button
+            onClick={() => {
+              if (membership?.isPaid) {
+                setShowClientManager(true);
+              } else {
+                handleOpenPayment(false);
+              }
+            }}
+            className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-emerald-900/40 to-teal-900/40
+                       border border-emerald-500/30 rounded-2xl hover:border-emerald-400/50 transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-600/30 rounded-xl flex items-center justify-center">
+                <Users size={20} className="text-emerald-400" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-sm font-black text-white">客戶管理系統</h3>
+                <p className="text-[11px] text-slate-400">管理客戶資料、檢視保單關聯</p>
+              </div>
+            </div>
+            {membership?.isPaid ? (
+              <span className="text-xs text-emerald-400 font-bold group-hover:text-emerald-300 transition-colors">
+                開啟 →
+              </span>
+            ) : (
+              <div className="flex items-center gap-1 text-xs text-slate-500">
+                <Lock size={14} />
+                <span>付費會員專屬</span>
+              </div>
+            )}
+          </button>
         </div>
 
         {/* Bottom Row: Client List */}
@@ -5804,6 +6424,49 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
         isOpen={showPWAInstall}
         onClose={() => setShowPWAInstall(false)}
       />
+
+      {/* 🆕 保單健診系統 Modal */}
+      {showInsuranceScanner && (
+        <InsurancePolicyScanner
+          isOpen={showInsuranceScanner}
+          onClose={() => setShowInsuranceScanner(false)}
+          user={user}
+          clients={clients}
+        />
+      )}
+
+      {/* 🆕 客戶管理系統 Modal */}
+      {showClientManager && (
+        <ClientManager
+          isOpen={showClientManager}
+          onClose={() => setShowClientManager(false)}
+          user={user}
+          clients={clients}
+        />
+      )}
+
+      {/* 🆕 健診客戶選擇器 Modal */}
+      {showCheckupClientSelector && user?.uid && (
+        <CheckupClientSelector
+          userId={user.uid}
+          onClientSelected={(clientId, clientName) => {
+            setShowCheckupClientSelector(false);
+            if (onStartCheckup) {
+              onStartCheckup(clientId, clientName);
+            }
+          }}
+          onCancel={() => setShowCheckupClientSelector(false)}
+        />
+      )}
+
+      {/* 🆕 Threads 社群助理 Modal */}
+      {showThreadsAssistant && user?.uid && (
+        <ThreadsAssistant
+          isOpen={showThreadsAssistant}
+          onClose={() => setShowThreadsAssistant(false)}
+          userId={user.uid}
+        />
+      )}
 
       {/* 🆕 功能建議 Modal */}
       {showFeedback && (
