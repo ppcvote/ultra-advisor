@@ -100,6 +100,8 @@ import { article as article53 } from './articles/53-mortgage-joint-application-2
 import { article as article54 } from './articles/54-taiwan-gdp-surpass-japan-korea-2026';
 // 文章 55：傲創聯盟 創客島嶼生態鏈
 import { article as article55 } from './articles/55-ultra-alliance-maker-island-ecosystem-2026';
+// 文章 56：GLP-1 減重藥美國訴訟警示
+import { article as article56 } from './articles/56-glp1-drug-lawsuit-taiwan-warning-2026';
 
 // ============ 匯出文章陣列 ============
 export const blogArticles: BlogArticle[] = [
@@ -158,6 +160,7 @@ export const blogArticles: BlogArticle[] = [
   article53,
   article54,
   article55,
+  article56,
 ];
 
 // ============ 匯出輔助函數 ============
