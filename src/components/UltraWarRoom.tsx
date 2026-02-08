@@ -54,8 +54,8 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 // 📴 離線同步（暫時停用以排查任務系統問題）
 // import { useOfflineSync } from '../hooks/useOfflineSync';
 
-// 🆕 任務看板
-import MissionCard from './MissionCard';
+// 🆕 任務系統
+import { useMissions } from '../hooks/useMissions';
 import PWAInstallModal from './PWAInstallModal';
 import InsurancePolicyScanner from './InsurancePolicyScanner';
 import ClientManager from './ClientManager';
@@ -360,7 +360,11 @@ const ProfileCard = ({
   onEditProfile,
   onChangePassword,
   onOpenReferral,
-  onOpenPayment
+  onOpenPayment,
+  currentMission,
+  allMissionsCompleted,
+  missionLoading,
+  onMissionClick
 }: {
   user: any;
   profileData: ProfileData;
@@ -369,6 +373,10 @@ const ProfileCard = ({
   onChangePassword: () => void;
   onOpenReferral: () => void;
   onOpenPayment: (isReferral: boolean) => void;
+  currentMission: any;
+  allMissionsCompleted: boolean;
+  missionLoading: boolean;
+  onMissionClick: () => void;
 }) => {
   return (
     <div className="dark:bg-slate-900/50 bg-white border dark:border-slate-800 border-slate-200 rounded-2xl p-6 
@@ -482,20 +490,53 @@ const ProfileCard = ({
         </button>
       </div>
 
-      {/* 🆕 UA 推薦引擎按鈕 */}
-      <button
-        onClick={onOpenReferral}
-        className="w-full mt-3 flex items-center justify-center gap-2 py-2.5
-                 bg-purple-600/10 border border-purple-500/30 rounded-xl
-                 text-purple-400 text-sm font-bold hover:bg-purple-600/20 transition-all"
-      >
-        <Users size={14} /> UA 推薦引擎
-        {membership?.points > 0 && (
-          <span className="bg-purple-500/30 text-purple-300 text-xs px-2 py-0.5 rounded-full">
-            {membership.points} UA
-          </span>
-        )}
-      </button>
+      {/* 🆕 UA 推薦引擎 + 每日任務按鈕（並排） */}
+      <div className="flex gap-2 mt-3">
+        <button
+          onClick={onOpenReferral}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5
+                   bg-purple-600/10 border border-purple-500/30 rounded-xl
+                   text-purple-400 text-sm font-bold hover:bg-purple-600/20 transition-all"
+        >
+          <Users size={14} />
+          <span className="hidden sm:inline">UA 推薦引擎</span>
+          <span className="sm:hidden">推薦</span>
+          {membership?.points > 0 && (
+            <span className="bg-purple-500/30 text-purple-300 text-[10px] px-1.5 py-0.5 rounded-full">
+              {membership.points}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={onMissionClick}
+          disabled={missionLoading}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            allMissionsCompleted
+              ? 'bg-emerald-600/10 border border-emerald-500/30 text-emerald-400'
+              : currentMission
+              ? 'bg-amber-600/10 border border-amber-500/30 text-amber-400 hover:bg-amber-600/20'
+              : 'bg-slate-800 border border-slate-700 text-slate-400'
+          }`}
+        >
+          {missionLoading ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : allMissionsCompleted ? (
+            <Check size={14} />
+          ) : (
+            <Zap size={14} />
+          )}
+          {allMissionsCompleted
+            ? '已完成'
+            : currentMission
+            ? `${currentMission.title.slice(0, 4)}...`
+            : '無任務'}
+          {currentMission && !allMissionsCompleted && (
+            <span className="bg-amber-500/30 text-amber-300 text-[10px] px-1.5 py-0.5 rounded-full">
+              +{currentMission.points}
+            </span>
+          )}
+        </button>
+      </div>
 
       {/* 🆕 升級按鈕（非 founder/paid 顯示） */}
       {membership && !membership.isPaid && (
@@ -2948,6 +2989,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 type CalcMode = 'mortgage' | 'credit' | 'smart' | 'irr' | 'dateCalc';
 
 const QuickCalculator = () => {
+  const [isExpanded, setIsExpanded] = useState(false); // 收折狀態
   const [mode, setMode] = useState<CalcMode>('mortgage');
 
   // ========== 房貸試算 ==========
@@ -3222,31 +3264,45 @@ const QuickCalculator = () => {
   const formatMoney = (val: number) => val.toLocaleString('zh-TW');
 
   return (
-    <div className="dark:bg-slate-900/50 bg-white border dark:border-slate-800 border-slate-200 rounded-2xl p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className={`dark:bg-slate-900/50 bg-white border dark:border-slate-800 border-slate-200 rounded-2xl transition-all duration-200 ${isExpanded ? 'p-4' : 'p-3'}`}>
+      {/* 標題列 - 可點擊收折 */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between"
+      >
         <div className="flex items-center gap-2">
           <Calculator size={18} className="text-amber-400" />
           <h3 className="text-sm font-black dark:text-white text-slate-900 uppercase tracking-wider">傲創計算機</h3>
         </div>
-        <a
-          href="/calculator"
-          onClick={() => {
-            // 儲存當前計算數據到 localStorage，讓完整版可以讀取
-            localStorage.setItem('ua_calculator_data', JSON.stringify({
-              mode,
-              mortgage: { amount: mortgageAmount, rate: mortgageRate, years: mortgageYears, method: mortgageMethod },
-              credit: { amount: creditAmount, rate: creditRate, years: creditYears },
-              irr: { totalPremium, maturityValue, years: irrYears }
-            }));
-          }}
-          className="text-[10px] text-blue-400 hover:text-blue-300 font-bold"
-        >
-          完整版 →
-        </a>
-      </div>
+        <div className="flex items-center gap-3">
+          <a
+            href="/calculator"
+            onClick={(e) => {
+              e.stopPropagation();
+              // 儲存當前計算數據到 localStorage，讓完整版可以讀取
+              localStorage.setItem('ua_calculator_data', JSON.stringify({
+                mode,
+                mortgage: { amount: mortgageAmount, rate: mortgageRate, years: mortgageYears, method: mortgageMethod },
+                credit: { amount: creditAmount, rate: creditRate, years: creditYears },
+                irr: { totalPremium, maturityValue, years: irrYears }
+              }));
+            }}
+            className="text-[10px] text-blue-400 hover:text-blue-300 font-bold"
+          >
+            完整版 →
+          </a>
+          <ChevronDown
+            size={16}
+            className={`text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+          />
+        </div>
+      </button>
 
-      {/* Mode Tabs - 兩排 */}
-      <div className="grid grid-cols-5 gap-1 bg-slate-950 p-1 rounded-xl mb-4">
+      {/* 可收折內容 */}
+      {isExpanded && (
+        <div className="mt-4">
+          {/* Mode Tabs - 兩排 */}
+          <div className="grid grid-cols-5 gap-1 bg-slate-950 p-1 rounded-xl mb-4">
         {[
           { id: 'mortgage' as CalcMode, label: '房貸', icon: Home },
           { id: 'credit' as CalcMode, label: '信貸', icon: Coins },
@@ -4472,6 +4528,8 @@ const QuickCalculator = () => {
           </div>
         </div>
       )}
+        </div>
+      )}
     </div>
   );
 };
@@ -5551,6 +5609,9 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
   const [showReferralEngine, setShowReferralEngine] = useState(false);
   const [showPWAInstall, setShowPWAInstall] = useState(false);
 
+  // 🆕 任務系統
+  const { currentMission, allCompleted: allMissionsCompleted, loading: missionLoading, completeMission } = useMissions();
+
   // 🔔 推播通知
   const pushNotifications = usePushNotifications(user?.uid || null);
 
@@ -6164,7 +6225,7 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* Top Row: Profile + Market Data + Calculator */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6">
-          {/* Profile Card + Mission Card */}
+          {/* Profile Card + 知識庫 */}
           <div className="flex flex-col gap-4">
             <ProfileCard
               user={user}
@@ -6174,77 +6235,102 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
               onChangePassword={() => setShowChangePassword(true)}
               onOpenReferral={() => setShowReferralEngine(true)}
               onOpenPayment={handleOpenPayment}
-            />
-            {/* 🆕 任務卡片 */}
-            <MissionCard
-              onOpenModal={(modalName) => {
-                if (modalName === 'editProfile') setShowEditProfile(true);
-              }}
-              onNavigate={(path) => {
-                // 站內跳轉處理
-                if (path === '/clients' || path === 'clients') {
-                  // 滾動到客戶列表
-                  document.getElementById('client-list')?.scrollIntoView({ behavior: 'smooth' });
+              currentMission={currentMission}
+              allMissionsCompleted={allMissionsCompleted}
+              missionLoading={missionLoading}
+              onMissionClick={async () => {
+                if (!currentMission) return;
+                // 根據任務類型執行對應操作
+                if (currentMission.linkType === 'modal' && currentMission.linkTarget === 'editProfile') {
+                  setShowEditProfile(true);
+                } else if (currentMission.linkType === 'pwa') {
+                  setShowPWAInstall(true);
+                } else if (currentMission.linkType === 'external' && currentMission.linkTarget) {
+                  window.open(currentMission.linkTarget, '_blank');
+                } else if (currentMission.linkType === 'internal' && currentMission.linkTarget) {
+                  if (currentMission.linkTarget === '/clients' || currentMission.linkTarget === 'clients') {
+                    document.getElementById('client-list')?.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }
+                // 嘗試完成任務
+                try {
+                  await completeMission(currentMission.id);
+                } catch (e) {
+                  console.log('Mission completion pending');
                 }
               }}
-              onOpenPWAInstall={() => setShowPWAInstall(true)}
             />
 
-            {/* 🆕 知識庫快捷區塊 - flex-1 讓它填滿剩餘空間與右側卡片底部對齊 */}
-            <div className="flex-1 flex flex-col justify-end bg-slate-800/50 backdrop-blur-sm rounded-xl p-3 border border-slate-700/50">
+            {/* 🆕 知識庫快捷區塊 - 顯示最新 4 篇文章 */}
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-4 border border-slate-700/50">
               {/* 標題 */}
-              <div className="flex items-center gap-2 mb-2">
-                <BookOpen size={14} className="text-slate-400" />
-                <span className="text-sm font-medium text-slate-300">知識庫</span>
-                <span className="text-[10px] text-slate-500">({blogArticles.length} 篇)</span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <BookOpen size={16} className="text-purple-400" />
+                  <span className="text-sm font-bold text-slate-200">知識庫</span>
+                  <span className="text-[10px] text-slate-500">({blogArticles.length} 篇)</span>
+                </div>
+                <a
+                  href="/blog"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                >
+                  更多 <ExternalLink size={10} />
+                </a>
               </div>
 
-              {/* 最新文章（按發布日期排序）*/}
-              {(() => {
-                const latestArticle = [...blogArticles].sort((a, b) => {
-                  const dateDiff = new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime();
-                  if (dateDiff !== 0) return dateDiff;
-                  return parseInt(b.id) - parseInt(a.id); // 同日期時，id 大的優先
-                })[0];
-                return (
-                  <a
-                    href={`/blog/${latestArticle.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block mb-2 p-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-colors group"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] text-emerald-400 font-bold">NEW</span>
-                      <span className="text-[10px] text-slate-500">{latestArticle.readTime} 分鐘</span>
-                    </div>
-                    <p className="text-xs text-slate-300 group-hover:text-white line-clamp-1 font-medium">
-                      {latestArticle.title}
-                    </p>
-                  </a>
-                );
-              })()}
+              {/* 最新 4 篇文章 */}
+              <div className="space-y-2">
+                {(() => {
+                  const latestArticles = [...blogArticles]
+                    .sort((a, b) => {
+                      const dateDiff = new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime();
+                      if (dateDiff !== 0) return dateDiff;
+                      return parseInt(b.id) - parseInt(a.id);
+                    })
+                    .slice(0, 4);
+
+                  return latestArticles.map((article, index) => (
+                    <a
+                      key={article.id}
+                      href={`/blog/${article.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`block p-2 rounded-lg transition-colors group ${
+                        index === 0
+                          ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20'
+                          : 'bg-slate-700/30 hover:bg-slate-700/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {index === 0 && (
+                          <span className="text-[10px] text-emerald-400 font-bold shrink-0">NEW</span>
+                        )}
+                        <p className={`text-xs line-clamp-1 flex-1 ${
+                          index === 0 ? 'text-slate-200 font-medium' : 'text-slate-400'
+                        } group-hover:text-white`}>
+                          {article.title}
+                        </p>
+                        <span className="text-[10px] text-slate-500 shrink-0">{article.readTime}分</span>
+                      </div>
+                    </a>
+                  ));
+                })()}
+              </div>
 
               {/* 按鈕列 */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700/50">
                 <button
                   onClick={() => {
                     const randomArticle = blogArticles[Math.floor(Math.random() * blogArticles.length)];
                     window.open(`/blog/${randomArticle.slug}`, '_blank');
                   }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg transition-colors group"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg transition-colors group"
                 >
                   <RefreshCw size={12} className="text-purple-400" />
-                  <span className="text-[11px] text-purple-300 group-hover:text-purple-200">隨機</span>
+                  <span className="text-xs text-purple-300 group-hover:text-purple-200">隨機一篇</span>
                 </button>
-                <a
-                  href="/blog"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg transition-colors group"
-                >
-                  <ExternalLink size={12} className="text-slate-400" />
-                  <span className="text-[11px] text-slate-400 group-hover:text-slate-300">更多文章...</span>
-                </a>
               </div>
             </div>
 

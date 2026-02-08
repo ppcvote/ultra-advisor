@@ -15,6 +15,8 @@
     "logs": "firebase functions:log"
   },
   "dependencies": {
+    "@google-cloud/vision": "^4.3.0",
+    "@google/generative-ai": "^0.24.1",
     "axios": "^1.6.0",
     "dotenv": "^16.0.0",
     "firebase-admin": "^12.0.0",

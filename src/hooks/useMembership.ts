@@ -30,6 +30,7 @@ export const ALL_TOOLS = [
   'pension',        // 退休缺口
   'tax',            // 稅務傳承
   'free_dashboard', // 自由組合
+  'insurance_checkup', // 保單健診
 ];
 
 // 工具名稱對照表（用於顯示和記錄）
@@ -46,6 +47,7 @@ export const TOOL_NAMES: Record<string, string> = {
   pension: '退休缺口試算',
   tax: '稅務傳承專案',
   free_dashboard: '自由組合戰情室',
+  insurance_checkup: '保單健診系統',
 };
 
 // 會員等級類型（新增 referral_trial）

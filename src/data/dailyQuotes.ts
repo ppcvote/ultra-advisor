@@ -11,9 +11,9 @@ export interface DailyQuote {
   text: string;
 }
 
-// 財商思維金句（30-50 字）
+// 財商思維金句（共 200 句）
 export const dailyQuotes: DailyQuote[] = [
-  // ========== 現金流思維 ==========
+  // ========== 現金流思維 (1-25) ==========
   { text: "窮人買負債以為是資產，富人買資產創造現金流。差別不在收入多少，而在錢流向哪裡。" },
   { text: "薪水是用時間換錢，被動收入是用錢賺錢。真正的財務自由，是讓錢為你工作。" },
   { text: "月薪 10 萬但月光，不如月薪 5 萬但每月存下 2 萬。財富是留下來的，不是賺來的。" },
@@ -22,8 +22,25 @@ export const dailyQuotes: DailyQuote[] = [
   { text: "先支付自己，再支付帳單。這個簡單的順序改變，是富人和窮人最大的差別。" },
   { text: "你的收入有天花板，但你的資產沒有。停止追求更高薪水，開始累積能增值的資產。" },
   { text: "一份工作只能給你一份收入，但一個系統可以給你無限收入。建立系統，而不是找工作。" },
+  { text: "現金流是企業的血液，也是個人財務的命脈。沒有現金流，再多資產也是紙上富貴。" },
+  { text: "真正的財富不是你賺多少，而是你留下多少。存錢的能力，決定你財富的高度。" },
+  { text: "主動收入讓你活著，被動收入讓你活得自由。兩者都要有，但比例要對。" },
+  { text: "收入-儲蓄=支出，而不是收入-支出=儲蓄。這個公式的順序，決定了你的財務命運。" },
+  { text: "錢會流向會管理它的人。學習理財，就是學習讓錢聽你的話。" },
+  { text: "不要為了省小錢而花大時間，也不要為了賺大錢而冒大險。時間和風險都有成本。" },
+  { text: "每一塊錢都是你的員工，讓它們去為你工作。閒置的錢，是沒有生產力的員工。" },
+  { text: "窮人存錢是為了花掉，富人存錢是為了投資。存錢的目的不同，結果天差地遠。" },
+  { text: "你不理財，財不理你。但過度理財，時間成本也很高。找到平衡點最重要。" },
+  { text: "財務健康的指標不是收入，是淨資產。收入高但負債高，其實很脆弱。" },
+  { text: "緊急預備金不是投資，是保險。留 3-6 個月生活費，讓你有底氣說不。" },
+  { text: "月光族不是賺太少，是花太多。控制支出比增加收入更容易，也更有效。" },
+  { text: "富人買入會增值的東西，窮人買入會貶值的東西。你的購物清單透露了你的未來。" },
+  { text: "財務自由的人不是不工作，是可以選擇要不要工作。選擇權，才是真正的自由。" },
+  { text: "存錢是為了有選擇，不是為了當守財奴。該花的要花，不該花的要狠心省。" },
+  { text: "現金流量表比資產負債表重要。有資產但沒現金流，關鍵時刻會很狼狽。" },
+  { text: "被動收入的起步很慢，但一旦建立，會像雪球一樣越滾越大。耐心是關鍵。" },
 
-  // ========== 複利思維 ==========
+  // ========== 複利思維 (26-50) ==========
   { text: "複利的威力不在報酬率，而在時間。早開始 10 年，勝過晚開始卻投入 2 倍本金。" },
   { text: "每月投入 5000 元，年化 7%，30 年後是 600 萬。複利不是魔法，是紀律加時間。" },
   { text: "愛因斯坦說複利是世界第八大奇蹟。理解的人賺取它，不理解的人支付它。你是哪一種？" },
@@ -32,8 +49,25 @@ export const dailyQuotes: DailyQuote[] = [
   { text: "股神巴菲特 99% 的財富是 50 歲後才累積的。複利的爆發力，需要時間醞釀。" },
   { text: "每天進步 1%，一年後你會強 37 倍。複利不只適用於金錢，也適用於能力和人脈。" },
   { text: "通膨也是複利，每年 3% 的通膨，24 年後你的錢只剩一半購買力。不投資就是慢性虧損。" },
+  { text: "複利的敵人是中斷。停止投資一年，可能要多投資三年才能追回來。" },
+  { text: "72 法則：用 72 除以年報酬率，就是資產翻倍的年數。7% 報酬率，約 10 年翻倍。" },
+  { text: "複利的魔力在於「利滾利」。第一年賺的利息，第二年也會產生利息。" },
+  { text: "年輕人最大的資產是時間，最大的敵人是拖延。早開始一年，退休時多好幾百萬。" },
+  { text: "複利需要耐心。前 10 年看不出差別，20 年後差距明顯，30 年後天差地遠。" },
+  { text: "不要小看每天省下的 100 元。一年是 36500，投資 30 年後可能變成 300 萬。" },
+  { text: "負債的複利比投資的複利可怕。信用卡 15% 的利率，5 年就讓債務翻倍。" },
+  { text: "複利是窮人翻身的工具，也是富人保富的秘密。關鍵是要讓它為你工作。" },
+  { text: "投資報酬率差 2%，30 年後財富差一倍。不要小看看似微小的差異。" },
+  { text: "複利讓時間成為你的朋友。但如果你負債，時間就是你的敵人。" },
+  { text: "最好的投資時機是十年前，其次是現在。不要讓完美主義阻止你開始。" },
+  { text: "複利需要三個條件：本金、報酬率、時間。三者缺一不可，但時間最重要。" },
+  { text: "定期定額的精髓不是擇時，是利用時間的力量。持續投入，讓複利發威。" },
+  { text: "複利的前期很無聊，後期很驚人。大多數人在無聊期就放棄了。" },
+  { text: "巴菲特說：人生就像滾雪球，重要的是找到很濕的雪和很長的坡。" },
+  { text: "複利的奇蹟不是一夜暴富，是二十年後的財務自由。急不得，也等得起。" },
+  { text: "年輕時的一萬元，比中年時的十萬元更有價值。因為它有更多時間複利。" },
 
-  // ========== 風險思維 ==========
+  // ========== 風險思維 (51-75) ==========
   { text: "投資最大的風險不是虧錢，是你不知道自己在做什麼。無知才是真正的風險。" },
   { text: "分散投資不是買很多標的，是買不相關的標的。全部買科技股不叫分散，叫集中。" },
   { text: "意外和明天，你不知道哪個先來。保險不是消費，是給家人的一份承諾。" },
@@ -42,8 +76,25 @@ export const dailyQuotes: DailyQuote[] = [
   { text: "投資第一條規則：不要虧錢。第二條規則：記住第一條。本金沒了，複利也沒用。" },
   { text: "風險管理的第一步是承認風險存在。自以為穩賺不賠的人，往往賠得最慘。" },
   { text: "高報酬必然伴隨高風險。如果有人告訴你低風險高報酬，他不是在騙你，就是他自己也被騙了。" },
+  { text: "風險不是波動，是本金永久損失的可能性。好公司股價下跌是機會，不是風險。" },
+  { text: "集中投資可以讓你致富，也可以讓你破產。分散投資讓你慢慢富，但不會一夕窮。" },
+  { text: "投資前先問：最壞的情況我能承受嗎？如果不能，就不要投。" },
+  { text: "槓桿是雙面刃。賺的時候翻倍，賠的時候也翻倍。新手不要碰。" },
+  { text: "風險和報酬是連體嬰。想要高報酬又零風險，不如去買樂透。" },
+  { text: "投資最大的風險是你以為沒有風險。過度自信是虧損的開始。" },
+  { text: "市場會獎勵承擔風險的人，但懲罰不懂管理風險的人。學會管理，而不是逃避。" },
+  { text: "永遠不要把所有雞蛋放在同一個籃子裡。但也不要分散到連自己都搞不清楚。" },
+  { text: "止損不是認輸，是保護本金的智慧。活著才有機會，輸光就什麼都沒了。" },
+  { text: "波動是投資的成本，不是風險。真正的風險是買錯東西或買錯價格。" },
+  { text: "風險評估要看最壞情況，不是最可能情況。黑天鵝事件不常發生，但發生就是災難。" },
+  { text: "投資組合要能讓你晚上睡得著。如果睡不著，表示風險太高了。" },
+  { text: "對抗風險最好的方法是知識，不是逃避。學越多，風險越低。" },
+  { text: "短期風險可以用時間化解，長期風險只能用策略規避。知道你面對的是哪種風險。" },
+  { text: "保險是轉移風險的工具。花小錢買大保障，是最划算的風險管理。" },
+  { text: "投資不是賭博。賭博靠運氣，投資靠知識和紀律。" },
+  { text: "風險承受度會隨年齡改變。年輕時可以積極，年長時要保守。資產配置要跟著調整。" },
 
-  // ========== 稅務思維 ==========
+  // ========== 稅務思維 (76-100) ==========
   { text: "合法節稅是你的權利，不是逃稅。不懂稅法的人，多繳的稅可能比投資虧的還多。" },
   { text: "遺產稅最高 20%，贈與稅每年有 244 萬免稅額。及早規劃，可以省下一棟房子。" },
   { text: "買保險不是為了理賠，是為了稅務效率和資產保全。這是富人都知道的秘密。" },
@@ -52,8 +103,25 @@ export const dailyQuotes: DailyQuote[] = [
   { text: "退休金領取方式不同，稅負也不同。多想一步，多領幾十萬。這就是財商的價值。" },
   { text: "很多人一輩子努力賺錢，卻在傳承時被政府分走一大塊。提早規劃，才是完整的理財。" },
   { text: "稅是賺錢最大的成本之一。認真學稅法的人，會發現原來錢可以少繳這麼多。" },
+  { text: "節稅規劃要趁早，不是等到報稅前才想。很多方法需要提前一整年佈局。" },
+  { text: "富人不是不繳稅，是用合法方式少繳稅。這叫稅務規劃，不叫逃漏稅。" },
+  { text: "保險給付免所得稅、免遺產稅。善用這個特性，可以省下大筆稅金。" },
+  { text: "夫妻所得分開或合併申報，結果可能差很多。多算一下，選對有利的方式。" },
+  { text: "捐贈可以節稅，但要捐對地方。不是所有捐贈都能列舉扣除。" },
+  { text: "海外所得每年有 670 萬免稅額。超過的部分，記得誠實申報。" },
+  { text: "房地合一稅自住優惠 400 萬免稅。符合條件的人，一定要善用這個福利。" },
+  { text: "贈與稅每年每人 244 萬免稅額，夫妻加起來 488 萬。長期規劃，可以大量節稅。" },
+  { text: "退休金一次領還是月領，稅務效果大不同。選錯方式，可能多繳幾十萬稅。" },
+  { text: "投資海外基金和台股，稅務處理不同。了解差異，選擇對你最有利的方式。" },
+  { text: "列舉扣除額超過標準扣除額才划算。每年檢視一下，不要讓權益睡著。" },
+  { text: "遺產規劃不只是分財產，更是稅務規劃。提早做，子孫受益大。" },
+  { text: "薪資所得稅率最高 40%，但資本利得稅率可能更低。這就是富人的秘密。" },
+  { text: "稅法每年都在變。去年的節稅方式，今年可能不適用。要持續更新知識。" },
+  { text: "借款利息在某些情況下可以扣稅。善用這個規則，可以降低實質利率。" },
+  { text: "健保補充保費是隱形的稅。股利超過門檻就要繳，記得把這個成本算進去。" },
+  { text: "節稅和逃稅只有一線之隔。合法節稅要做，違法逃稅碰不得。" },
 
-  // ========== 消費思維 ==========
+  // ========== 消費思維 (101-125) ==========
   { text: "買東西前問自己：這是需要還是想要？一個簡單的問題，可以省下一半的開銷。" },
   { text: "信用卡分期 12 期，年利率其實是 14.8%，不是 0%。免利率只是話術。" },
   { text: "如果你買不起兩個，你就買不起一個。用現金能買得起的東西，才是你真正買得起的。" },
@@ -62,8 +130,25 @@ export const dailyQuotes: DailyQuote[] = [
   { text: "最好的投資往往不是買什麼，而是不買什麼。克制慾望也是一種財商。" },
   { text: "奢侈品讓你看起來有錢，資產讓你真的有錢。選擇展示財富，還是累積財富？" },
   { text: "延遲享樂不是不享樂，是先讓資產替你享樂。等到被動收入超過支出，想買什麼都行。" },
+  { text: "消費前等 24 小時再決定。衝動購物是財富的殺手，冷靜一下往往就不想買了。" },
+  { text: "便宜沒好貨，但貴也不一定好。買東西看性價比，不是看價格或品牌。" },
+  { text: "月收入的 50% 用於必需、30% 用於想要、20% 用於儲蓄。這是最簡單的預算法則。" },
+  { text: "買入前問自己：五年後這東西還在嗎？還有用嗎？如果不是，三思而後行。" },
+  { text: "價格和價值是兩回事。折扣品不一定划算，全價品不一定貴。" },
+  { text: "購物滿足感很短暫，存款帶來的安全感更持久。選擇短期快樂還是長期安心？" },
+  { text: "維護成本往往比購買成本高。買車、買房之前，先算算養得起嗎。" },
+  { text: "訂閱制是新型態的吸金術。每個月 199 看起來不多，十幾個訂閱加起來很驚人。" },
+  { text: "二手市場是寶藏。很多東西用過一次就跟新的一樣，但價格只要一半。" },
+  { text: "消費是為了生活，不是生活是為了消費。搞清楚主從關係很重要。" },
+  { text: "真正的省錢是不買，不是買便宜。打折時買不需要的東西，不是省錢是浪費。" },
+  { text: "品質比數量重要。買一件好的穿十年，比買十件差的穿一年划算。" },
+  { text: "消費要符合你的價值觀。把錢花在對你真正重要的事上，其他的都可以省。" },
+  { text: "外食一頓 200 元，自己煮只要 50 元。一個月差 4500 元，一年超過 5 萬。" },
+  { text: "信用卡紅利和回饋很誘人，但如果因此多買，反而虧大了。" },
+  { text: "消費升級要配合收入升級。收入不變卻消費升級，就是在吃老本。" },
+  { text: "最貴的東西往往是免費的。免費試用、免費贈品，背後都有成本。" },
 
-  // ========== 投資思維 ==========
+  // ========== 投資思維 (126-150) ==========
   { text: "投資最好的時機是十年前，其次是現在。與其等待完美時機，不如現在就開始。" },
   { text: "定期定額不是最佳策略，但是最能堅持的策略。能堅持的策略，就是最好的策略。" },
   { text: "追高殺低是人性，但違反人性才能賺錢。投資賺的不是聰明錢，是紀律錢。" },
@@ -72,8 +157,25 @@ export const dailyQuotes: DailyQuote[] = [
   { text: "投資不是比誰賺得多，是比誰活得久。留在市場裡，時間會獎勵你。" },
   { text: "價格是你付出的，價值是你得到的。便宜的東西可能很貴，貴的東西可能很便宜。" },
   { text: "分散投資是承認自己不知道哪個會漲。這不是弱點，是智慧。" },
+  { text: "投資要看長期，不要被短期波動嚇到。股市長期向上，但短期什麼都可能發生。" },
+  { text: "買進時多花的功夫，會在賣出時省下很多煩惱。研究越深入，持有越安心。" },
+  { text: "投資最重要的是本金安全，其次才是報酬率。守得住才賺得到。" },
+  { text: "不懂的東西不要投。這不是保守，是保護自己。" },
+  { text: "市場先生有時候很瘋狂。利用他的瘋狂，而不是被他影響。" },
+  { text: "好公司不等於好股票，好股票要看買的價格。再好的公司，買太貴也會虧。" },
+  { text: "投資最難的不是選股，是抱住。很多人買對了股票，但沒有抱到賺錢。" },
+  { text: "現金也是一種資產配置。適當的現金部位，讓你有機會在低點加碼。" },
+  { text: "投資是科學也是藝術。學習分析是科學，控制情緒是藝術。" },
+  { text: "長期投資不是買了不管，是買了繼續追蹤。公司基本面變了，策略也要跟著變。" },
+  { text: "市場永遠是對的。如果你虧錢了，是你錯了，不是市場錯了。" },
+  { text: "投資的目的是讓錢為你工作，不是讓你為錢工作。方向搞清楚很重要。" },
+  { text: "單押一檔是賭博，分散配置是投資。你是在投資，還是在賭博？" },
+  { text: "ETF 是最適合一般人的投資工具。低成本、分散風險、長期績效佳。" },
+  { text: "投資不需要聰明，需要紀律。最簡單的策略，持續執行，就能打敗大多數人。" },
+  { text: "市場下跌時是最好的學習機會。因為這時候你會認真看待風險。" },
+  { text: "投資是馬拉松，不是百米賽跑。跑太快的人，往往跑不完全程。" },
 
-  // ========== 退休思維 ==========
+  // ========== 退休思維 (151-175) ==========
   { text: "勞保 + 勞退只能替代 40% 的薪水。如果退休想維持生活品質，剩下的 60% 要自己準備。" },
   { text: "退休規劃最大的敵人不是報酬率，是通膨。現在的 1000 萬，30 年後只剩一半購買力。" },
   { text: "60 歲退休活到 90 歲，要準備 30 年的生活費。長壽不是福氣，是風險。要準備好。" },
@@ -82,8 +184,25 @@ export const dailyQuotes: DailyQuote[] = [
   { text: "靠政府不如靠自己。勞保可能破產，但你自己存的錢不會背叛你。" },
   { text: "很多人退休後最後悔的事，是沒有早點開始存錢。時間是站在年輕人這邊的。" },
   { text: "退休金不是存多少的問題，是能花多久的問題。計算清楚，才能安心退休。" },
+  { text: "退休後的醫療支出往往被低估。健康險和醫療險，年輕時就要買好。" },
+  { text: "4% 法則：退休金乘以 4%，就是每年可以花的錢。想年花 80 萬，要準備 2000 萬。" },
+  { text: "退休規劃要考慮通膨。今天的 100 萬，20 年後可能只相當於今天的 60 萬。" },
+  { text: "提早退休很美好，但要確保錢夠用。不然提早退休會變成提早焦慮。" },
+  { text: "退休後收入減少，但時間變多。如何有意義地度過，比存多少錢更重要。" },
+  { text: "房子可以是退休資產。以房養老或換小屋，都是可行的選項。" },
+  { text: "退休金的配置要更保守。年輕時可以承受波動，退休後承受不起。" },
+  { text: "健康是退休最大的資產。沒有健康，再多退休金也享受不到。" },
+  { text: "退休前的最後 10 年是關鍵期。這段時間的理財決策，影響退休品質。" },
+  { text: "退休後還要工作不是失敗。重點是有選擇的自由，而不是被迫工作。" },
+  { text: "夫妻退休規劃要一起做。兩個人的退休金需求，不是一個人的兩倍。" },
+  { text: "退休金要定期檢視，不是設定了就不管。市場變化、法規變化，策略也要跟著調整。" },
+  { text: "年金險可以對沖長壽風險。活越久領越多，不怕錢花光。" },
+  { text: "退休後的開銷不一定比工作時少。旅遊、興趣、孝親，都需要錢。" },
+  { text: "勞退自提 6% 有稅務優惠。等於政府補貼你存退休金，不用白不用。" },
+  { text: "退休是人生的第三階段。第一階段學習，第二階段工作，第三階段享受。要好好規劃。" },
+  { text: "最好的退休計畫是不需要完全依賴退休金的計畫。有其他收入來源更安心。" },
 
-  // ========== 心態思維 ==========
+  // ========== 心態思維 (176-200) ==========
   { text: "財務自由的第一步不是賺更多錢，是改變對錢的看法。心態對了，錢就來了。" },
   { text: "窮人說「我買不起」，富人問「我怎麼買得起」。一個放棄思考，一個開始思考。" },
   { text: "學校教你成為好員工，但沒教你成為老闆或投資人。財商要靠自己學。" },
@@ -92,13 +211,28 @@ export const dailyQuotes: DailyQuote[] = [
   { text: "財商高的人不一定收入高，但一定存得下錢。因為他們知道錢該流向哪裡。" },
   { text: "抱怨薪水太低的時間，拿來學習投資理財，幾年後結果會完全不同。" },
   { text: "很多人工作幾十年還是月光，不是賺太少，是財商太低。這是可以改變的。" },
+  { text: "金錢是中性的，它放大你原本的樣子。好人有錢做更多好事，壞人有錢做更多壞事。" },
+  { text: "理財不是數學問題，是心理問題。知道和做到之間，隔著人性。" },
+  { text: "投資自己是報酬率最高的投資。技能提升，收入就會提升。" },
+  { text: "對金錢的焦慮，往往來自對金錢的無知。學得越多，越不焦慮。" },
+  { text: "不要讓金錢定義你，要讓你定義金錢的用途。錢是工具，不是目的。" },
+  { text: "比較是快樂的小偷。專注於自己的財務目標，不要被別人的消費帶著走。" },
+  { text: "財富自由不是不工作，是可以做自己想做的工作。這是本質的差別。" },
+  { text: "成功的投資人都很無聊。因為他們只做最簡單、最有效的事。" },
+  { text: "恐懼和貪婪是投資最大的敵人。學會控制情緒，就贏了一半。" },
+  { text: "理財是一輩子的事。不是賺到第一桶金就結束，而是才剛開始。" },
+  { text: "錢解決不了所有問題，但沒錢會製造很多問題。先把基本功打好。" },
+  { text: "財商教育應該從小開始。你怎麼教孩子看待金錢，會影響他一輩子。" },
+  { text: "耐心是投資最重要的品質。大多數人都太急了，所以大多數人都賠錢。" },
+  { text: "投資是一場和自己的賽跑，不是和別人比較。專注於自己的目標就好。" },
+  { text: "錯過機會不可怕，可怕的是亂抓機會。寧願錯過，也不要做錯。" },
+  { text: "財務成功沒有捷徑。慢慢來，比較快。" },
+  { text: "開始永遠不嫌晚，但越早開始越好。今天是你剩餘人生中最年輕的一天。" },
 ];
 
-// 底圖配置（使用 Unsplash 風景照，灰階處理）
-// 圖片會在元件中套用 grayscale filter
-// 共 90 張背景圖，確保每天都有不同的視覺體驗
+// 底圖配置（使用 Unsplash 風景照，共 200 張）
 export const storyBackgrounds = [
-  // ========== 山脈系列 (1-15) ==========
+  // ========== 山脈系列 (1-25) ==========
   { id: 1, imageUrl: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
   { id: 2, imageUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
   { id: 3, imageUrl: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
@@ -114,93 +248,205 @@ export const storyBackgrounds = [
   { id: 13, imageUrl: "https://images.unsplash.com/photo-1445363692815-ebcd599f7621?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
   { id: 14, imageUrl: "https://images.unsplash.com/photo-1464278533981-50106e6176b1?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
   { id: 15, imageUrl: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 16, imageUrl: "https://images.unsplash.com/photo-1464278533981-50106e6176b1?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 17, imageUrl: "https://images.unsplash.com/photo-1477346611705-65d1883cee1e?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 18, imageUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 19, imageUrl: "https://images.unsplash.com/photo-1449825598015-eb92e5d2c0f7?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 20, imageUrl: "https://images.unsplash.com/photo-1484910292437-025e5d13ce87?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 21, imageUrl: "https://images.unsplash.com/photo-1508193638397-1c4234db14d8?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 22, imageUrl: "https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 23, imageUrl: "https://images.unsplash.com/photo-1464278533981-50106e6176b1?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 24, imageUrl: "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 25, imageUrl: "https://images.unsplash.com/photo-1536431311719-398b6704d4cc?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
 
-  // ========== 海洋系列 (16-30) ==========
-  { id: 16, imageUrl: "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
-  { id: 17, imageUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
-  { id: 18, imageUrl: "https://images.unsplash.com/photo-1476673160081-cf065607f449?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 19, imageUrl: "https://images.unsplash.com/photo-1484291470158-b8f8d608850d?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
-  { id: 20, imageUrl: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
-  { id: 21, imageUrl: "https://images.unsplash.com/photo-1439405326854-014607f694d7?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
-  { id: 22, imageUrl: "https://images.unsplash.com/photo-1468581264429-2548ef9eb732?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 23, imageUrl: "https://images.unsplash.com/photo-1471922694854-ff1b63b20054?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
-  { id: 24, imageUrl: "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
-  { id: 25, imageUrl: "https://images.unsplash.com/photo-1515238152791-8216bfdf89a7?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
-  { id: 26, imageUrl: "https://images.unsplash.com/photo-1489914099268-1dad649f76bf?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 27, imageUrl: "https://images.unsplash.com/photo-1499002238440-d264edd596ec?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
-  { id: 28, imageUrl: "https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
-  { id: 29, imageUrl: "https://images.unsplash.com/photo-1520942702018-0862200e6873?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
-  { id: 30, imageUrl: "https://images.unsplash.com/photo-1494791368093-85217fbbf8de?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  // ========== 海洋系列 (26-50) ==========
+  { id: 26, imageUrl: "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 27, imageUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 28, imageUrl: "https://images.unsplash.com/photo-1476673160081-cf065607f449?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 29, imageUrl: "https://images.unsplash.com/photo-1484291470158-b8f8d608850d?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 30, imageUrl: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 31, imageUrl: "https://images.unsplash.com/photo-1439405326854-014607f694d7?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 32, imageUrl: "https://images.unsplash.com/photo-1468581264429-2548ef9eb732?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 33, imageUrl: "https://images.unsplash.com/photo-1471922694854-ff1b63b20054?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 34, imageUrl: "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 35, imageUrl: "https://images.unsplash.com/photo-1515238152791-8216bfdf89a7?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 36, imageUrl: "https://images.unsplash.com/photo-1489914099268-1dad649f76bf?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 37, imageUrl: "https://images.unsplash.com/photo-1499002238440-d264edd596ec?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 38, imageUrl: "https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 39, imageUrl: "https://images.unsplash.com/photo-1520942702018-0862200e6873?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 40, imageUrl: "https://images.unsplash.com/photo-1494791368093-85217fbbf8de?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 41, imageUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 42, imageUrl: "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 43, imageUrl: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 44, imageUrl: "https://images.unsplash.com/photo-1454391304352-2bf4678b1a7a?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 45, imageUrl: "https://images.unsplash.com/photo-1468581264429-2548ef9eb732?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 46, imageUrl: "https://images.unsplash.com/photo-1471922694854-ff1b63b20054?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 47, imageUrl: "https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 48, imageUrl: "https://images.unsplash.com/photo-1504701954957-2010ec3bcec1?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 49, imageUrl: "https://images.unsplash.com/photo-1517483000871-1dbf64a6e1c6?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 50, imageUrl: "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
 
-  // ========== 森林系列 (31-45) ==========
-  { id: 31, imageUrl: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
-  { id: 32, imageUrl: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
-  { id: 33, imageUrl: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 34, imageUrl: "https://images.unsplash.com/photo-1425913397330-cf8af2ff40a1?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
-  { id: 35, imageUrl: "https://images.unsplash.com/photo-1476362174823-3a23f4aa6d76?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
-  { id: 36, imageUrl: "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
-  { id: 37, imageUrl: "https://images.unsplash.com/photo-1440581572325-0bea30075d9d?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 38, imageUrl: "https://images.unsplash.com/photo-1518173946687-a4c036bc8ce3?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
-  { id: 39, imageUrl: "https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
-  { id: 40, imageUrl: "https://images.unsplash.com/photo-1503435824048-a799a3a84bf7?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
-  { id: 41, imageUrl: "https://images.unsplash.com/photo-1476231682828-37e571bc172f?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 42, imageUrl: "https://images.unsplash.com/photo-1431794062232-2a99a5431c6c?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
-  { id: 43, imageUrl: "https://images.unsplash.com/photo-1507041957456-9c397ce39c97?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
-  { id: 44, imageUrl: "https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
-  { id: 45, imageUrl: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  // ========== 森林系列 (51-75) ==========
+  { id: 51, imageUrl: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 52, imageUrl: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 53, imageUrl: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 54, imageUrl: "https://images.unsplash.com/photo-1425913397330-cf8af2ff40a1?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 55, imageUrl: "https://images.unsplash.com/photo-1476362174823-3a23f4aa6d76?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 56, imageUrl: "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 57, imageUrl: "https://images.unsplash.com/photo-1440581572325-0bea30075d9d?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 58, imageUrl: "https://images.unsplash.com/photo-1518173946687-a4c036bc8ce3?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 59, imageUrl: "https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 60, imageUrl: "https://images.unsplash.com/photo-1503435824048-a799a3a84bf7?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 61, imageUrl: "https://images.unsplash.com/photo-1476231682828-37e571bc172f?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 62, imageUrl: "https://images.unsplash.com/photo-1431794062232-2a99a5431c6c?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 63, imageUrl: "https://images.unsplash.com/photo-1507041957456-9c397ce39c97?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 64, imageUrl: "https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 65, imageUrl: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 66, imageUrl: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 67, imageUrl: "https://images.unsplash.com/photo-1476362174823-3a23f4aa6d76?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 68, imageUrl: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 69, imageUrl: "https://images.unsplash.com/photo-1518173946687-a4c036bc8ce3?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 70, imageUrl: "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 71, imageUrl: "https://images.unsplash.com/photo-1440581572325-0bea30075d9d?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 72, imageUrl: "https://images.unsplash.com/photo-1425913397330-cf8af2ff40a1?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 73, imageUrl: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 74, imageUrl: "https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 75, imageUrl: "https://images.unsplash.com/photo-1476231682828-37e571bc172f?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
 
-  // ========== 沙漠 & 日落系列 (46-55) ==========
-  { id: 46, imageUrl: "https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
-  { id: 47, imageUrl: "https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
-  { id: 48, imageUrl: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 49, imageUrl: "https://images.unsplash.com/photo-1495107334309-fcf20504a5ab?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
-  { id: 50, imageUrl: "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 51, imageUrl: "https://images.unsplash.com/photo-1504701954957-2010ec3bcec1?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
-  { id: 52, imageUrl: "https://images.unsplash.com/photo-1499346030926-9a72daac6c63?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 53, imageUrl: "https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
-  { id: 54, imageUrl: "https://images.unsplash.com/photo-1506259091721-347e791bab0f?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 55, imageUrl: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  // ========== 沙漠 & 日落系列 (76-100) ==========
+  { id: 76, imageUrl: "https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 77, imageUrl: "https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 78, imageUrl: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 79, imageUrl: "https://images.unsplash.com/photo-1495107334309-fcf20504a5ab?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 80, imageUrl: "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 81, imageUrl: "https://images.unsplash.com/photo-1504701954957-2010ec3bcec1?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 82, imageUrl: "https://images.unsplash.com/photo-1499346030926-9a72daac6c63?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 83, imageUrl: "https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 84, imageUrl: "https://images.unsplash.com/photo-1506259091721-347e791bab0f?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 85, imageUrl: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 86, imageUrl: "https://images.unsplash.com/photo-1472120435266-53107fd0c44a?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 87, imageUrl: "https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 88, imageUrl: "https://images.unsplash.com/photo-1495107334309-fcf20504a5ab?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 89, imageUrl: "https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 90, imageUrl: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 91, imageUrl: "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 92, imageUrl: "https://images.unsplash.com/photo-1499346030926-9a72daac6c63?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 93, imageUrl: "https://images.unsplash.com/photo-1504701954957-2010ec3bcec1?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 94, imageUrl: "https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 95, imageUrl: "https://images.unsplash.com/photo-1506259091721-347e791bab0f?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 96, imageUrl: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 97, imageUrl: "https://images.unsplash.com/photo-1472120435266-53107fd0c44a?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 98, imageUrl: "https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 99, imageUrl: "https://images.unsplash.com/photo-1495107334309-fcf20504a5ab?w=800&q=80", fallbackGradient: "from-zinc-900 via-stone-800 to-zinc-800" },
+  { id: 100, imageUrl: "https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
 
-  // ========== 湖泊 & 河流系列 (56-65) ==========
-  { id: 56, imageUrl: "https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
-  { id: 57, imageUrl: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
-  { id: 58, imageUrl: "https://images.unsplash.com/photo-1482192505345-5655af888cc4?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
-  { id: 59, imageUrl: "https://images.unsplash.com/photo-1433838552652-f9a46b332c40?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
-  { id: 60, imageUrl: "https://images.unsplash.com/photo-1437622368342-7a3d73a34c8f?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
-  { id: 61, imageUrl: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
-  { id: 62, imageUrl: "https://images.unsplash.com/photo-1414609245224-afa02bfb3fda?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
-  { id: 63, imageUrl: "https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
-  { id: 64, imageUrl: "https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
-  { id: 65, imageUrl: "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  // ========== 湖泊 & 河流系列 (101-125) ==========
+  { id: 101, imageUrl: "https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 102, imageUrl: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 103, imageUrl: "https://images.unsplash.com/photo-1482192505345-5655af888cc4?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 104, imageUrl: "https://images.unsplash.com/photo-1433838552652-f9a46b332c40?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 105, imageUrl: "https://images.unsplash.com/photo-1437622368342-7a3d73a34c8f?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 106, imageUrl: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 107, imageUrl: "https://images.unsplash.com/photo-1414609245224-afa02bfb3fda?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 108, imageUrl: "https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 109, imageUrl: "https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 110, imageUrl: "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 111, imageUrl: "https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 112, imageUrl: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 113, imageUrl: "https://images.unsplash.com/photo-1482192505345-5655af888cc4?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 114, imageUrl: "https://images.unsplash.com/photo-1433838552652-f9a46b332c40?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 115, imageUrl: "https://images.unsplash.com/photo-1437622368342-7a3d73a34c8f?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 116, imageUrl: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 117, imageUrl: "https://images.unsplash.com/photo-1414609245224-afa02bfb3fda?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 118, imageUrl: "https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 119, imageUrl: "https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 120, imageUrl: "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 121, imageUrl: "https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 122, imageUrl: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 123, imageUrl: "https://images.unsplash.com/photo-1482192505345-5655af888cc4?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
+  { id: 124, imageUrl: "https://images.unsplash.com/photo-1433838552652-f9a46b332c40?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 125, imageUrl: "https://images.unsplash.com/photo-1437622368342-7a3d73a34c8f?w=800&q=80", fallbackGradient: "from-slate-800 via-gray-800 to-slate-900" },
 
-  // ========== 雲 & 天空系列 (66-75) ==========
-  { id: 66, imageUrl: "https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
-  { id: 67, imageUrl: "https://images.unsplash.com/photo-1517483000871-1dbf64a6e1c6?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
-  { id: 68, imageUrl: "https://images.unsplash.com/photo-1500740516770-92bd004b996e?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 69, imageUrl: "https://images.unsplash.com/photo-1463947628408-f8581a2f4aca?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
-  { id: 70, imageUrl: "https://images.unsplash.com/photo-1505533321630-975218a5f66f?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 71, imageUrl: "https://images.unsplash.com/photo-1504253163759-c23fccaebb55?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
-  { id: 72, imageUrl: "https://images.unsplash.com/photo-1517495306984-f84210f9daa8?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 73, imageUrl: "https://images.unsplash.com/photo-1498496294664-d9372eb521f3?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
-  { id: 74, imageUrl: "https://images.unsplash.com/photo-1436891620584-47fd0e565afb?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
-  { id: 75, imageUrl: "https://images.unsplash.com/photo-1499956827185-0d63ee78a910?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  // ========== 雲 & 天空系列 (126-150) ==========
+  { id: 126, imageUrl: "https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 127, imageUrl: "https://images.unsplash.com/photo-1517483000871-1dbf64a6e1c6?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 128, imageUrl: "https://images.unsplash.com/photo-1500740516770-92bd004b996e?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 129, imageUrl: "https://images.unsplash.com/photo-1463947628408-f8581a2f4aca?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 130, imageUrl: "https://images.unsplash.com/photo-1505533321630-975218a5f66f?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 131, imageUrl: "https://images.unsplash.com/photo-1504253163759-c23fccaebb55?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 132, imageUrl: "https://images.unsplash.com/photo-1517495306984-f84210f9daa8?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 133, imageUrl: "https://images.unsplash.com/photo-1498496294664-d9372eb521f3?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 134, imageUrl: "https://images.unsplash.com/photo-1436891620584-47fd0e565afb?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 135, imageUrl: "https://images.unsplash.com/photo-1499956827185-0d63ee78a910?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 136, imageUrl: "https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 137, imageUrl: "https://images.unsplash.com/photo-1517483000871-1dbf64a6e1c6?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 138, imageUrl: "https://images.unsplash.com/photo-1500740516770-92bd004b996e?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 139, imageUrl: "https://images.unsplash.com/photo-1463947628408-f8581a2f4aca?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 140, imageUrl: "https://images.unsplash.com/photo-1505533321630-975218a5f66f?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 141, imageUrl: "https://images.unsplash.com/photo-1504253163759-c23fccaebb55?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 142, imageUrl: "https://images.unsplash.com/photo-1517495306984-f84210f9daa8?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 143, imageUrl: "https://images.unsplash.com/photo-1498496294664-d9372eb521f3?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 144, imageUrl: "https://images.unsplash.com/photo-1436891620584-47fd0e565afb?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 145, imageUrl: "https://images.unsplash.com/photo-1499956827185-0d63ee78a910?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 146, imageUrl: "https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 147, imageUrl: "https://images.unsplash.com/photo-1517483000871-1dbf64a6e1c6?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 148, imageUrl: "https://images.unsplash.com/photo-1500740516770-92bd004b996e?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 149, imageUrl: "https://images.unsplash.com/photo-1463947628408-f8581a2f4aca?w=800&q=80", fallbackGradient: "from-gray-800 via-slate-900 to-gray-900" },
+  { id: 150, imageUrl: "https://images.unsplash.com/photo-1505533321630-975218a5f66f?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
 
-  // ========== 星空 & 夜景系列 (76-90) ==========
-  { id: 76, imageUrl: "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
-  { id: 77, imageUrl: "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
-  { id: 78, imageUrl: "https://images.unsplash.com/photo-1475274047050-1d0c0975c63e?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
-  { id: 79, imageUrl: "https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
-  { id: 80, imageUrl: "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
-  { id: 81, imageUrl: "https://images.unsplash.com/photo-1502899576159-f224dc2349fa?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
-  { id: 82, imageUrl: "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
-  { id: 83, imageUrl: "https://images.unsplash.com/photo-1489549132488-d00b7eee80f1?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
-  { id: 84, imageUrl: "https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
-  { id: 85, imageUrl: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
-  { id: 86, imageUrl: "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
-  { id: 87, imageUrl: "https://images.unsplash.com/photo-1468276311594-df7cb65d8df6?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
-  { id: 88, imageUrl: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
-  { id: 89, imageUrl: "https://images.unsplash.com/photo-1465101162946-4377e57745c3?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
-  { id: 90, imageUrl: "https://images.unsplash.com/photo-1509773896068-7fd415d91e2e?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+  // ========== 星空 & 夜景系列 (151-175) ==========
+  { id: 151, imageUrl: "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 152, imageUrl: "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 153, imageUrl: "https://images.unsplash.com/photo-1475274047050-1d0c0975c63e?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+  { id: 154, imageUrl: "https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 155, imageUrl: "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+  { id: 156, imageUrl: "https://images.unsplash.com/photo-1502899576159-f224dc2349fa?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 157, imageUrl: "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+  { id: 158, imageUrl: "https://images.unsplash.com/photo-1489549132488-d00b7eee80f1?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 159, imageUrl: "https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+  { id: 160, imageUrl: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 161, imageUrl: "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+  { id: 162, imageUrl: "https://images.unsplash.com/photo-1468276311594-df7cb65d8df6?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 163, imageUrl: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+  { id: 164, imageUrl: "https://images.unsplash.com/photo-1465101162946-4377e57745c3?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 165, imageUrl: "https://images.unsplash.com/photo-1509773896068-7fd415d91e2e?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+  { id: 166, imageUrl: "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 167, imageUrl: "https://images.unsplash.com/photo-1475274047050-1d0c0975c63e?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+  { id: 168, imageUrl: "https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 169, imageUrl: "https://images.unsplash.com/photo-1502899576159-f224dc2349fa?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+  { id: 170, imageUrl: "https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 171, imageUrl: "https://images.unsplash.com/photo-1489549132488-d00b7eee80f1?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+  { id: 172, imageUrl: "https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 173, imageUrl: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+  { id: 174, imageUrl: "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=800&q=80", fallbackGradient: "from-slate-950 via-gray-900 to-slate-900" },
+  { id: 175, imageUrl: "https://images.unsplash.com/photo-1468276311594-df7cb65d8df6?w=800&q=80", fallbackGradient: "from-slate-950 via-slate-900 to-gray-900" },
+
+  // ========== 城市 & 建築系列 (176-200) ==========
+  { id: 176, imageUrl: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 177, imageUrl: "https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 178, imageUrl: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 179, imageUrl: "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 180, imageUrl: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 181, imageUrl: "https://images.unsplash.com/photo-1444723121867-7a241cacace9?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 182, imageUrl: "https://images.unsplash.com/photo-1486299267070-83823f5448dd?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 183, imageUrl: "https://images.unsplash.com/photo-1470219556762-1771e7f9427d?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 184, imageUrl: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 185, imageUrl: "https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 186, imageUrl: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 187, imageUrl: "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 188, imageUrl: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 189, imageUrl: "https://images.unsplash.com/photo-1444723121867-7a241cacace9?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 190, imageUrl: "https://images.unsplash.com/photo-1486299267070-83823f5448dd?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 191, imageUrl: "https://images.unsplash.com/photo-1470219556762-1771e7f9427d?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 192, imageUrl: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 193, imageUrl: "https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 194, imageUrl: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 195, imageUrl: "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 196, imageUrl: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 197, imageUrl: "https://images.unsplash.com/photo-1444723121867-7a241cacace9?w=800&q=80", fallbackGradient: "from-slate-900 via-slate-800 to-zinc-900" },
+  { id: 198, imageUrl: "https://images.unsplash.com/photo-1486299267070-83823f5448dd?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
+  { id: 199, imageUrl: "https://images.unsplash.com/photo-1470219556762-1771e7f9427d?w=800&q=80", fallbackGradient: "from-slate-900 via-zinc-800 to-slate-800" },
+  { id: 200, imageUrl: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&q=80", fallbackGradient: "from-gray-900 via-slate-800 to-gray-800" },
 ];
 
 /**
@@ -248,937 +494,153 @@ export const getRandomBackground = () => {
 };
 
 // ==========================================
-// IG 風格專用文案（標題 + 分段內文）
+// IG 風格專用金句（有標題 + 分段內容）
 // ==========================================
 export interface IGStyleQuote {
-  title: string;      // 黃色大標題
-  lines: string[];    // 白色分段內文
+  title: string;    // 大標題（吸引注意）
+  lines: string[];  // 分段內容（3-5 點）
 }
 
 export const igStyleQuotes: IGStyleQuote[] = [
-  // ========== 最低標準思維 ==========
   {
-    title: "你的人生，其實一直在用『最低標準』過日子",
+    title: "有錢人不告訴你的秘密",
     lines: [
-      "你有沒有發現",
-      "你的人生",
-      "好像一直都在「剛剛好就好」",
-      "不求更好",
-      "只求不要出事"
+      "他們買資產，不買負債",
+      "他們讓錢為自己工作",
+      "他們投資自己的腦袋",
+      "他們延遲享樂，先苦後甜",
     ]
   },
   {
-    title: "為什麼你總是『差一點』就成功？",
+    title: "月薪3萬也能存到錢",
     lines: [
-      "差一點存到錢",
-      "差一點升遷",
-      "差一點達標",
-      "因為你的目標",
-      "一直都是『差不多就好』"
+      "先存再花，不是花剩才存",
+      "記帳找出隱形支出",
+      "拿鐵因子每月省3000+",
+      "定期定額養成投資習慣",
     ]
   },
-  // ========== 現金流思維 ==========
   {
-    title: "窮人和富人的差別，只有一個",
+    title: "退休前你該知道的事",
     lines: [
-      "窮人買負債以為是資產",
-      "富人買資產創造現金流",
-      "差別不在收入多少",
-      "而在錢流向哪裡"
+      "勞保+勞退只夠40%替代率",
+      "通膨每年吃掉3%購買力",
+      "60歲退休要準備30年生活費",
+      "越早開始，壓力越小",
     ]
   },
   {
-    title: "為什麼月薪十萬還是月光？",
+    title: "投資新手常犯的錯",
     lines: [
-      "月薪 10 萬但月光",
-      "不如月薪 5 萬但每月存下 2 萬",
-      "財富是留下來的",
-      "不是賺來的"
+      "追高殺低，買在最高點",
+      "聽明牌，不做功課",
+      "短線進出，手續費吃掉獲利",
+      "沒有停損，小虧變大虧",
     ]
   },
   {
-    title: "真正的財務自由，不是賺很多錢",
+    title: "財務自由的定義",
     lines: [
-      "財務自由的定義",
-      "是被動收入大於生活支出",
-      "達到這個門檻",
-      "你就自由了"
+      "不是賺很多錢",
+      "而是被動收入 > 生活支出",
+      "有選擇工作的自由",
+      "時間真正屬於自己",
     ]
   },
   {
-    title: "一個簡單的順序改變，讓你變有錢",
+    title: "複利的威力",
     lines: [
-      "先支付自己",
-      "再支付帳單",
-      "這個簡單的順序改變",
-      "是富人和窮人最大的差別"
+      "每月5000，年化7%",
+      "10年後：86萬",
+      "20年後：260萬",
+      "30年後：600萬",
     ]
   },
-  // ========== 複利思維 ==========
   {
-    title: "複利的威力，不在報酬率",
+    title: "信用卡的陷阱",
     lines: [
-      "複利的威力不在報酬率",
-      "而在時間",
-      "早開始 10 年",
-      "勝過晚開始卻投入 2 倍本金"
+      "分期0利率？年利率其實14.8%",
+      "最低應繳？剩餘金額照算利息",
+      "循環利息？複利讓債務翻倍",
+      "用現金買得起，才是真買得起",
     ]
   },
   {
-    title: "愛因斯坦說這是世界第八大奇蹟",
+    title: "節稅不是逃稅",
     lines: [
-      "複利是世界第八大奇蹟",
-      "理解的人賺取它",
-      "不理解的人支付它",
-      "你是哪一種？"
+      "贈與稅每年244萬免稅額",
+      "保險給付免所得稅",
+      "自住房地合一400萬免稅",
+      "提早規劃，合法少繳很多",
     ]
   },
   {
-    title: "巴菲特 99% 的財富，是 50 歲後才有的",
+    title: "ETF 適合你嗎？",
     lines: [
-      "股神巴菲特",
-      "99% 的財富是 50 歲後才累積的",
-      "複利的爆發力",
-      "需要時間醞釀"
+      "低成本，管理費只要0.2%",
+      "分散風險，一次買進多檔股票",
+      "不用選股，追蹤指數即可",
+      "長期持有，打敗大多數基金",
     ]
   },
   {
-    title: "不投資，就是慢性虧損",
+    title: "保險的正確觀念",
     lines: [
-      "通膨也是複利",
-      "每年 3% 的通膨",
-      "24 年後你的錢",
-      "只剩一半購買力"
+      "保障優先，儲蓄其次",
+      "先保大風險，再保小風險",
+      "保費不超過收入10%",
+      "定期險CP值最高",
     ]
   },
-  // ========== 風險思維 ==========
   {
-    title: "投資最大的風險，不是虧錢",
+    title: "買房前要想清楚",
     lines: [
-      "投資最大的風險",
-      "是你不知道自己在做什麼",
-      "無知",
-      "才是真正的風險"
+      "頭期款至少要準備3成",
+      "月付金不超過收入1/3",
+      "維護成本每年約房價1-2%",
+      "買房不是終點，是另一個起點",
     ]
   },
   {
-    title: "分散投資，你可能做錯了",
+    title: "存錢的正確順序",
     lines: [
-      "分散投資",
-      "不是買很多標的",
-      "是買不相關的標的",
-      "全部買科技股不叫分散"
+      "1. 緊急預備金（3-6個月）",
+      "2. 保險（轉移風險）",
+      "3. 投資（讓錢長大）",
+      "4. 消費（享受人生）",
     ]
   },
   {
-    title: "意外和明天，你不知道哪個先來",
+    title: "窮人 vs 富人思維",
     lines: [
-      "意外和明天",
-      "你不知道哪個先來",
-      "保險不是消費",
-      "是給家人的一份承諾"
+      "窮人：我買不起",
+      "富人：我怎麼買得起？",
+      "窮人：錢是用來花的",
+      "富人：錢是用來生錢的",
     ]
   },
   {
-    title: "為什麼 99% 的人做不到？",
+    title: "時間比金錢重要",
     lines: [
-      "別人恐懼時貪婪",
-      "別人貪婪時恐懼",
-      "聽起來簡單",
-      "但 99% 的人做不到"
+      "25歲開始投資",
+      "比35歲開始投入2倍本金還多",
+      "時間是複利最強催化劑",
+      "今天開始，永遠不嫌晚",
     ]
   },
-  // ========== 退休思維 ==========
   {
-    title: "勞保 + 勞退，只能替代 40% 薪水",
+    title: "理財的本質",
     lines: [
-      "勞保加勞退",
-      "只能替代 40% 的薪水",
-      "如果退休想維持生活品質",
-      "剩下的 60% 要自己準備"
+      "不是省吃儉用",
+      "不是投機暴富",
+      "而是有計畫地",
+      "讓錢為你工作",
     ]
   },
-  {
-    title: "長壽不是福氣，是風險",
-    lines: [
-      "60 歲退休活到 90 歲",
-      "要準備 30 年的生活費",
-      "長壽不是福氣",
-      "是風險，要準備好"
-    ]
-  },
-  {
-    title: "靠政府不如靠自己",
-    lines: [
-      "勞保可能破產",
-      "但你自己存的錢",
-      "不會背叛你",
-      "靠政府不如靠自己"
-    ]
-  },
-  // ========== 稅務思維 ==========
-  {
-    title: "合法節稅是你的權利",
-    lines: [
-      "合法節稅是你的權利",
-      "不是逃稅",
-      "不懂稅法的人",
-      "多繳的稅可能比投資虧的還多"
-    ]
-  },
-  {
-    title: "及早規劃，可以省下一棟房子",
-    lines: [
-      "遺產稅最高 20%",
-      "贈與稅每年有 244 萬免稅額",
-      "及早規劃",
-      "可以省下一棟房子"
-    ]
-  },
-  // ========== 消費思維 ==========
-  {
-    title: "一個簡單問題，省下一半開銷",
-    lines: [
-      "買東西前問自己",
-      "這是需要還是想要？",
-      "一個簡單的問題",
-      "可以省下一半的開銷"
-    ]
-  },
-  {
-    title: "拿鐵因子：小錢不小",
-    lines: [
-      "每天一杯 150 元的咖啡",
-      "30 年是 164 萬",
-      "小錢不小",
-      "習慣會吃掉你的財富"
-    ]
-  },
-  {
-    title: "你買的車，是資產還是負債？",
-    lines: [
-      "富人買資產",
-      "窮人買負債",
-      "中產階級買以為是資產的負債",
-      "你買的車是哪一種？"
-    ]
-  },
-  // ========== 心態思維 ==========
-  {
-    title: "財務自由的第一步",
-    lines: [
-      "財務自由的第一步",
-      "不是賺更多錢",
-      "是改變對錢的看法",
-      "心態對了，錢就來了"
-    ]
-  },
-  {
-    title: "窮人說『我買不起』",
-    lines: [
-      "窮人說「我買不起」",
-      "富人問「我怎麼買得起」",
-      "一個放棄思考",
-      "一個開始思考"
-    ]
-  },
-  {
-    title: "學校沒教你的事",
-    lines: [
-      "學校教你成為好員工",
-      "但沒教你成為老闆或投資人",
-      "財商",
-      "要靠自己學"
-    ]
-  },
-  {
-    title: "抱怨薪水低的時間，拿來學投資",
-    lines: [
-      "抱怨薪水太低的時間",
-      "拿來學習投資理財",
-      "幾年後",
-      "結果會完全不同"
-    ]
-  },
-  // ========== 投資思維 ==========
-  {
-    title: "投資最好的時機",
-    lines: [
-      "投資最好的時機是十年前",
-      "其次是現在",
-      "與其等待完美時機",
-      "不如現在就開始"
-    ]
-  },
-  {
-    title: "能堅持的策略，就是最好的策略",
-    lines: [
-      "定期定額不是最佳策略",
-      "但是最能堅持的策略",
-      "能堅持的策略",
-      "就是最好的策略"
-    ]
-  },
-  {
-    title: "如果你不願意持有一支股票十年",
-    lines: [
-      "如果你不願意持有一支股票十年",
-      "就不要考慮持有十分鐘",
-      "頻繁交易",
-      "只會貢獻手續費"
-    ]
-  },
-  {
-    title: "投資不是比誰賺得多",
-    lines: [
-      "投資不是比誰賺得多",
-      "是比誰活得久",
-      "留在市場裡",
-      "時間會獎勵你"
-    ]
-  },
-  // ========== 房貸思維 ==========
-  {
-    title: "房貸不是負擔，是槓桿",
-    lines: [
-      "有錢人借錢買資產",
-      "窮人存錢買負債",
-      "房貸是銀行給你的",
-      "最便宜的資金"
-    ]
-  },
-  {
-    title: "提前還房貸，真的划算嗎？",
-    lines: [
-      "房貸利率 2%",
-      "投資報酬率 7%",
-      "提前還款",
-      "可能讓你少賺 5%"
-    ]
-  },
-  {
-    title: "買房不是終點，是起點",
-    lines: [
-      "很多人買了房",
-      "就停止理財規劃",
-      "其實買房之後",
-      "才是資產配置的開始"
-    ]
-  },
-  {
-    title: "租房 vs 買房，沒有標準答案",
-    lines: [
-      "租房不一定是幫房東繳房貸",
-      "買房不一定是最好的投資",
-      "關鍵是",
-      "你的錢有沒有在增值"
-    ]
-  },
-  // ========== 保險思維 ==========
-  {
-    title: "保險不是買心安，是買保障",
-    lines: [
-      "很多人買了保險",
-      "卻不知道自己買了什麼",
-      "保險是轉嫁風險",
-      "不是投資工具"
-    ]
-  },
-  {
-    title: "你的保險，保障夠嗎？",
-    lines: [
-      "壽險保額建議",
-      "是年收入的 10 倍",
-      "你的保額",
-      "夠家人生活幾年？"
-    ]
-  },
-  {
-    title: "醫療險，不是有就好",
-    lines: [
-      "住院一天自費可能上萬",
-      "你的醫療險",
-      "日額夠不夠？",
-      "實支實付有沒有？"
-    ]
-  },
-  {
-    title: "保險要趁年輕買",
-    lines: [
-      "25 歲買和 35 歲買",
-      "保費可能差一倍",
-      "而且年紀越大",
-      "體況越難通過"
-    ]
-  },
-  {
-    title: "儲蓄險不是存錢的好方法",
-    lines: [
-      "儲蓄險報酬率 2%",
-      "定存利率也差不多",
-      "但流動性",
-      "差很多"
-    ]
-  },
-  // ========== 債務思維 ==========
-  {
-    title: "不是所有的債都是壞債",
-    lines: [
-      "壞債：消費性貸款",
-      "好債：投資性貸款",
-      "關鍵是",
-      "借來的錢有沒有在賺錢"
-    ]
-  },
-  {
-    title: "信用卡循環利息，是財務殺手",
-    lines: [
-      "循環利息年利率 15%",
-      "10 萬塊一年變 11.5 萬",
-      "這是合法的",
-      "高利貸"
-    ]
-  },
-  {
-    title: "先還高利率的債",
-    lines: [
-      "信用卡 15%",
-      "信貸 5%",
-      "房貸 2%",
-      "先還利率最高的"
-    ]
-  },
-  {
-    title: "借錢投資，你準備好了嗎？",
-    lines: [
-      "借錢投資是雙面刃",
-      "賺的時候賺更多",
-      "賠的時候",
-      "連本金都沒了"
-    ]
-  },
-  // ========== 存錢思維 ==========
-  {
-    title: "存錢的第一步，是記帳",
-    lines: [
-      "你不知道錢花去哪",
-      "怎麼知道哪裡可以省？",
-      "記帳不是為了省錢",
-      "是為了了解自己"
-    ]
-  },
-  {
-    title: "六個罐子理財法",
-    lines: [
-      "生活必需 55%",
-      "財務自由 10%",
-      "教育學習 10%",
-      "長期儲蓄 10%"
-    ]
-  },
-  {
-    title: "緊急預備金，你有嗎？",
-    lines: [
-      "建議存 3-6 個月生活費",
-      "放在隨時可以領的地方",
-      "這筆錢不是用來投資",
-      "是用來保命"
-    ]
-  },
-  {
-    title: "自動轉帳，強迫儲蓄",
-    lines: [
-      "發薪日自動轉存",
-      "剩下的才是可花的錢",
-      "看不到的錢",
-      "就不會想花"
-    ]
-  },
-  {
-    title: "存錢不是目的，增值才是",
-    lines: [
-      "存 100 萬放定存",
-      "10 年後購買力剩 70 萬",
-      "存錢之後",
-      "要讓錢去工作"
-    ]
-  },
-  // ========== 理財觀念 ==========
-  {
-    title: "理財不是有錢人的事",
-    lines: [
-      "越沒錢",
-      "越需要理財",
-      "因為你沒有",
-      "犯錯的本錢"
-    ]
-  },
-  {
-    title: "不要把雞蛋放在同一個籃子",
-    lines: [
-      "但也不要放太多籃子",
-      "3-5 個標的就夠了",
-      "太分散",
-      "報酬也會被稀釋"
-    ]
-  },
-  {
-    title: "投資自己，報酬率最高",
-    lines: [
-      "學一個新技能",
-      "薪水可能多 20%",
-      "這個報酬率",
-      "股票做不到"
-    ]
-  },
-  {
-    title: "時間是最寶貴的資產",
-    lines: [
-      "年輕時用時間換錢",
-      "中年後用錢換時間",
-      "但很多人",
-      "一輩子都在用時間換錢"
-    ]
-  },
-  {
-    title: "別人的建議，聽聽就好",
-    lines: [
-      "每個人的情況不同",
-      "適合別人的不一定適合你",
-      "理財這件事",
-      "要自己做功課"
-    ]
-  },
-  // ========== 股票思維 ==========
-  {
-    title: "股票不是賭博",
-    lines: [
-      "賭博是零和遊戲",
-      "股票是參與企業成長",
-      "長期持有好公司",
-      "是最穩的投資"
-    ]
-  },
-  {
-    title: "不要試圖預測市場",
-    lines: [
-      "沒有人能準確預測",
-      "連巴菲特都做不到",
-      "與其預測",
-      "不如長期持有"
-    ]
-  },
-  {
-    title: "股災是機會，不是災難",
-    lines: [
-      "好公司打折賣",
-      "你應該高興才對",
-      "股災",
-      "是財富重新分配的時刻"
-    ]
-  },
-  {
-    title: "ETF 是懶人的好朋友",
-    lines: [
-      "不會選股沒關係",
-      "買整個市場就好",
-      "0050、006208",
-      "都是好選擇"
-    ]
-  },
-  {
-    title: "股息不是白賺的",
-    lines: [
-      "配息會從股價扣除",
-      "左手換右手而已",
-      "重點是",
-      "公司有沒有持續成長"
-    ]
-  },
-  // ========== 基金思維 ==========
-  {
-    title: "基金的手續費，比你想的貴",
-    lines: [
-      "申購手續費 1.5%",
-      "管理費每年 1.5%",
-      "10 年下來",
-      "吃掉你 20% 報酬"
-    ]
-  },
-  {
-    title: "過去績效不代表未來",
-    lines: [
-      "去年漲 50% 的基金",
-      "今年可能跌 30%",
-      "不要追高",
-      "要看長期表現"
-    ]
-  },
-  // ========== 人生階段理財 ==========
-  {
-    title: "20 歲：最重要的是學習",
-    lines: [
-      "這時候本金小",
-      "投資報酬有限",
-      "投資自己",
-      "才是最好的投資"
-    ]
-  },
-  {
-    title: "30 歲：該認真理財了",
-    lines: [
-      "收入穩定了",
-      "支出也增加了",
-      "這時候不開始",
-      "以後會很辛苦"
-    ]
-  },
-  {
-    title: "40 歲：要開始保守一點",
-    lines: [
-      "離退休越來越近",
-      "承受風險的能力降低",
-      "穩定比報酬",
-      "更重要"
-    ]
-  },
-  {
-    title: "50 歲：退休倒數計時",
-    lines: [
-      "檢視你的退休金準備",
-      "還差多少？",
-      "還有 10-15 年",
-      "可以補足缺口"
-    ]
-  },
-  // ========== 家庭理財 ==========
-  {
-    title: "結婚前，先談錢",
-    lines: [
-      "金錢觀不合",
-      "是離婚的主因之一",
-      "婚前談清楚",
-      "婚後少吵架"
-    ]
-  },
-  {
-    title: "生小孩的財務準備",
-    lines: [
-      "一個小孩養到大",
-      "至少 500 萬",
-      "這還不包括",
-      "你的生活品質下降"
-    ]
-  },
-  {
-    title: "教育基金，越早準備越輕鬆",
-    lines: [
-      "18 年後要用的錢",
-      "現在開始存",
-      "每月 5000",
-      "就能存到 100 萬"
-    ]
-  },
-  {
-    title: "家庭保障缺口，算過了嗎？",
-    lines: [
-      "如果你明天走了",
-      "家人可以撐多久？",
-      "這個數字",
-      "就是你需要的保額"
-    ]
-  },
-  // ========== 職場理財 ==========
-  {
-    title: "薪水不是唯一的收入",
-    lines: [
-      "正職、副業、投資",
-      "三管齊下",
-      "才能",
-      "加速財務自由"
-    ]
-  },
-  {
-    title: "跳槽是加薪最快的方式",
-    lines: [
-      "內部調薪 3-5%",
-      "跳槽加薪 20-30%",
-      "忠誠度",
-      "不會讓你變有錢"
-    ]
-  },
-  {
-    title: "年終獎金的正確用法",
-    lines: [
-      "不是拿來花掉",
-      "是拿來投資",
-      "每年投入年終",
-      "10 年後差距很大"
-    ]
-  },
-  {
-    title: "勞退自提，有人在意嗎？",
-    lines: [
-      "自提 6% 可以節稅",
-      "等於加薪 6%",
-      "而且還有保證收益",
-      "為什麼不做？"
-    ]
-  },
-  // ========== 心理財商 ==========
-  {
-    title: "恐懼和貪婪，是投資的敵人",
-    lines: [
-      "漲的時候怕錯過",
-      "跌的時候怕套牢",
-      "情緒化操作",
-      "是虧錢的主因"
-    ]
-  },
-  {
-    title: "慢慢變富，才是正道",
-    lines: [
-      "想要快速致富",
-      "通常會快速變窮",
-      "財富累積",
-      "沒有捷徑"
-    ]
-  },
-  {
-    title: "別跟風投資",
-    lines: [
-      "大家都在買的時候",
-      "通常已經太貴了",
-      "跟風的下場",
-      "就是被割韭菜"
-    ]
-  },
-  {
-    title: "認賠是一種能力",
-    lines: [
-      "死抱著虧損的股票",
-      "只會越虧越多",
-      "停損",
-      "是為了保護本金"
-    ]
-  },
-  {
-    title: "不要借錢給朋友",
-    lines: [
-      "借出去的錢",
-      "要有回不來的準備",
-      "如果回不來",
-      "你失去的是錢和朋友"
-    ]
-  },
-  // ========== 數字思維 ==========
-  {
-    title: "72 法則：錢多久翻倍？",
-    lines: [
-      "72 ÷ 報酬率 = 翻倍年數",
-      "7% 報酬率",
-      "大約 10 年翻倍",
-      "複利的力量"
-    ]
-  },
-  {
-    title: "4% 法則：退休要存多少？",
-    lines: [
-      "年支出 ÷ 4%",
-      "就是你需要的退休金",
-      "年花 60 萬",
-      "需要存 1500 萬"
-    ]
-  },
-  {
-    title: "50/30/20 法則",
-    lines: [
-      "50% 必要支出",
-      "30% 想要支出",
-      "20% 儲蓄投資",
-      "簡單的理財比例"
-    ]
-  },
-  // ========== 消費陷阱 ==========
-  {
-    title: "分期付款的陷阱",
-    lines: [
-      "0 利率不是真的 0 成本",
-      "商品價格已經加上去了",
-      "分期",
-      "只會讓你買更多"
-    ]
-  },
-  {
-    title: "訂閱服務正在吃掉你的錢",
-    lines: [
-      "Netflix、Spotify、健身房",
-      "每個月幾百塊",
-      "一年下來",
-      "可能好幾萬"
-    ]
-  },
-  {
-    title: "特價不是省錢，是花錢",
-    lines: [
-      "買一送一",
-      "第二件 5 折",
-      "如果你本來不需要",
-      "就是多花錢"
-    ]
-  },
-  {
-    title: "炫耀性消費，最愚蠢",
-    lines: [
-      "買名牌讓別人覺得你有錢",
-      "但你的戶頭",
-      "只有你自己知道",
-      "有多空"
-    ]
-  },
-  // ========== 致富心態 ==========
-  {
-    title: "富人思考的是機會成本",
-    lines: [
-      "花 1 萬買包包",
-      "就是少了 1 萬投資",
-      "10 年後",
-      "那 1 萬可能變 2 萬"
-    ]
-  },
-  {
-    title: "有錢人的時間比較貴",
-    lines: [
-      "花 3 小時省 500 元",
-      "時薪 166 元",
-      "你的時間",
-      "值這個價嗎？"
-    ]
-  },
-  {
-    title: "窮人買彩券，富人買股票",
-    lines: [
-      "彩券中獎率百萬分之一",
-      "股票長期報酬率 7%",
-      "你選擇",
-      "希望還是機率？"
-    ]
-  },
-  {
-    title: "先有收入，才談被動收入",
-    lines: [
-      "很多人想靠被動收入",
-      "卻沒有主動收入",
-      "被動收入",
-      "是主動收入累積來的"
-    ]
-  },
-  // ========== 理財迷思 ==========
-  {
-    title: "高報酬一定高風險？",
-    lines: [
-      "不一定",
-      "有時候是資訊不對稱",
-      "學習",
-      "可以降低風險"
-    ]
-  },
-  {
-    title: "保本的投資最安全？",
-    lines: [
-      "保本保的是名目金額",
-      "不是購買力",
-      "通膨會讓你的錢",
-      "越來越不值錢"
-    ]
-  },
-  {
-    title: "投資要看長線？",
-    lines: [
-      "長線不是買了就不管",
-      "是定期檢視、適時調整",
-      "被動投資",
-      "不是被動不管"
-    ]
-  },
-  {
-    title: "專家說的一定對？",
-    lines: [
-      "專家也常常看錯",
-      "2008 年沒人預測到金融海嘯",
-      "專家的話",
-      "參考就好"
-    ]
-  },
-  // ========== 台灣特色 ==========
-  {
-    title: "台灣人最愛的投資：房地產",
-    lines: [
-      "有土斯有財",
-      "但房價已經這麼高",
-      "年輕人買得起嗎？",
-      "要重新思考"
-    ]
-  },
-  {
-    title: "台股的殖利率，世界前幾名",
-    lines: [
-      "台股平均殖利率 4%",
-      "比定存高很多",
-      "存股領息",
-      "是不錯的選擇"
-    ]
-  },
-  {
-    title: "健保不是萬能的",
-    lines: [
-      "很多項目要自費",
-      "新藥、新技術都不便宜",
-      "醫療險",
-      "還是要買"
-    ]
-  },
-  {
-    title: "台灣的通膨，比你感覺的高",
-    lines: [
-      "官方數字 2-3%",
-      "但房租、學費、醫療",
-      "漲幅都超過這個數字",
-      "實質購買力在下降"
-    ]
-  },
-  // ========== 財商金句 ==========
-  {
-    title: "錢不是萬能，沒錢萬萬不能",
-    lines: [
-      "錢不能買到快樂",
-      "但沒錢會很不快樂",
-      "理財不是為了變有錢",
-      "是為了有選擇的自由"
-    ]
-  },
-  {
-    title: "最好的投資，是現在開始",
-    lines: [
-      "不是等到有錢再開始",
-      "是從現在開始累積",
-      "1000 元也可以投資",
-      "重點是養成習慣"
-    ]
-  },
-  {
-    title: "財商決定你的人生高度",
-    lines: [
-      "同樣的薪水",
-      "不同的財商",
-      "10 年後",
-      "財富差距可能 10 倍"
-    ]
-  }
 ];
 
 /**
- * 根據日期取得當天的 IG 風格文案
+ * 根據日期取得當天的 IG 風格金句
  */
 export const getTodayIGQuote = (date: Date = new Date()): IGStyleQuote => {
   const dateStr = date.toISOString().split('T')[0];
@@ -1188,7 +650,7 @@ export const getTodayIGQuote = (date: Date = new Date()): IGStyleQuote => {
 };
 
 /**
- * 隨機取得一組 IG 風格文案
+ * 隨機取得一個 IG 風格金句
  */
 export const getRandomIGQuote = (): IGStyleQuote => {
   const index = Math.floor(Math.random() * igStyleQuotes.length);

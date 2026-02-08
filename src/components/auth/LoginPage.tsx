@@ -163,17 +163,17 @@ const LoginForm = ({ onSuccess }: { onSuccess: () => void }) => {
   const [error, setError] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
 
-  // 🆕 讀取記住的帳號密碼
+  // 🆕 讀取記住的帳號（僅記住 email，不儲存密碼）
+  // 安全修復：移除密碼儲存功能，Base64 不是加密，容易被竊取
   useEffect(() => {
     const savedEmail = localStorage.getItem('ua_saved_email');
-    const savedPassword = localStorage.getItem('ua_saved_password');
     const savedRemember = localStorage.getItem('ua_remember_me');
+
+    // 清除舊版本可能儲存的密碼（安全修復）
+    localStorage.removeItem('ua_saved_password');
 
     if (savedRemember === 'true' && savedEmail) {
       setEmail(savedEmail);
-      if (savedPassword) {
-        setPassword(atob(savedPassword)); // 簡單解碼
-      }
       setRememberMe(true);
     }
   }, []);
@@ -186,14 +186,12 @@ const LoginForm = ({ onSuccess }: { onSuccess: () => void }) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
 
-      // 🆕 儲存或清除記住的帳號密碼
+      // 🆕 儲存或清除記住的帳號（僅 email，不儲存密碼）
       if (rememberMe) {
         localStorage.setItem('ua_saved_email', email);
-        localStorage.setItem('ua_saved_password', btoa(password)); // 簡單編碼
         localStorage.setItem('ua_remember_me', 'true');
       } else {
         localStorage.removeItem('ua_saved_email');
-        localStorage.removeItem('ua_saved_password');
         localStorage.removeItem('ua_remember_me');
       }
 
@@ -496,11 +494,9 @@ export function LoginPage({ user, onLoginSuccess }: LoginPageProps) {
               <div className="mt-6 text-center">
                 <p className="text-slate-500 text-sm">
                   還沒有帳號？
-                  <a 
-                    href="https://lin.ee/RFE8A5A" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300 font-bold ml-2 
+                  <a
+                    href="/register"
+                    className="text-blue-400 hover:text-blue-300 font-bold ml-2
                              hover:underline transition-colors">
                     免費試用 7 天 →
                   </a>

@@ -58,6 +58,7 @@ const articleMetadata: Record<string, { title: string; category: string; descrip
   'taiwan-gdp-surpass-japan-korea-2026': { title: '台灣人均GDP超越日韓！23年來首次，你的錢包有感嗎？', category: 'investment', description: '台灣人均GDP達37,827美元，超越日本和韓國，亞洲排名第四。但薪水有跟上嗎？' },
   'ultra-alliance-maker-island-ecosystem-2026': { title: '傲創聯盟：打造財務顧問的「創客島嶼生態鏈」', category: 'sales', description: '傲創聯盟串聯線下優質場所，為財務顧問打造專屬商務與生活圈。' },
   'glp1-drug-lawsuit-taiwan-warning-2026': { title: '美國爆發 GLP-1 減重藥集體訴訟：猛健樂、瘦瘦筆在台氾濫，你該知道的真相', category: 'investment', description: '美國法院受理數千起 Ozempic、Mounjaro 傷害訴訟，指控引發胃輕癱等嚴重副作用。台灣卻有人濫用，這篇告訴你真相。' },
+  'dopamine-success-vs-scrolling-2026': { title: '成交的多巴胺 vs 滑手機的多巴胺：你在用哪一種方式消耗人生？', category: 'sales', description: '同樣是多巴胺，成交帶來的快樂和滑手機的快樂完全不同。員工用滑手機打發時間，老闆用成交創造價值。這篇告訴你如何戒掉垃圾快樂，擁抱真正的成就感。' },
 };
 
 // 分類對應的 OG 圖片

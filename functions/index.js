@@ -54,6 +54,41 @@ const APP_LOGIN_URL = functions.config().app?.login_url || 'https://ultra-adviso
 // ==========================================
 
 /**
+ * 🔒 驗證是否為管理員（使用 Firestore admins collection）
+ * 移除硬編碼郵件，改用資料庫驗證
+ * @param {string} uid - 用戶 UID
+ * @returns {Promise<boolean>} 是否為管理員
+ */
+async function isAdmin(uid) {
+  if (!uid) return false;
+  try {
+    const adminDoc = await db.collection('admins').doc(uid).get();
+    return adminDoc.exists;
+  } catch (error) {
+    console.error('Admin verification error:', error);
+    return false;
+  }
+}
+
+/**
+ * 🔒 驗證管理員權限（用於 Callable Functions）
+ * @param {Object} context - Firebase Functions context
+ * @throws {functions.https.HttpsError} 如果驗證失敗
+ */
+async function verifyAdminAccess(context) {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', '請先登入');
+  }
+
+  const isUserAdmin = await isAdmin(context.auth.uid);
+  if (!isUserAdmin) {
+    throw new functions.https.HttpsError('permission-denied', '無管理員權限');
+  }
+
+  return true;
+}
+
+/**
  * 🔒 Rate Limiting - 防止惡意註冊攻擊
  * 同一 IP 每小時最多 5 次註冊嘗試
  */
@@ -295,6 +330,119 @@ async function recordRegistrationAttempt(lineUserId, success = false, email = nu
     lastAttempt: now.toMillis(),
     attemptsToday
   });
+}
+
+// ==========================================
+// 🆕 UltraCloud 路由函數
+// ==========================================
+const ULTRACLOUD_WEBHOOK_URL = 'https://ultracloud-delta.vercel.app/api/webhook';
+
+/**
+ * 判斷是否應該路由到 UltraCloud
+ * - 檔案類型訊息（file, image, video, audio）
+ * - 群組/聊天室的檔案訊息
+ * - 特定指令（找 xxx、檔案列表、幫助）
+ */
+function shouldRouteToUltraCloud(event) {
+  console.log('=== UltraCloud Route Check ===');
+  console.log('event.type:', event.type);
+
+  if (event.type !== 'message') {
+    console.log('Not a message event, skip UltraCloud');
+    return false;
+  }
+
+  const message = event.message;
+  const source = event.source;
+
+  console.log('message.type:', message.type);
+  console.log('source.type:', source.type);
+  console.log('source.groupId:', source.groupId);
+  console.log('source.roomId:', source.roomId);
+
+  // 檔案類型訊息 → 轉給 UltraCloud
+  if (['file', 'image', 'video', 'audio'].includes(message.type)) {
+    console.log('File type detected');
+    // 只有群組或聊天室的檔案才轉發（1對1私訊不轉發）
+    if (source.type === 'group' || source.type === 'room') {
+      console.log('>>> ROUTING TO ULTRACLOUD: file in group/room');
+      return true;
+    } else {
+      console.log('Not in group/room, skip');
+    }
+  }
+
+  // 文字指令 → 轉給 UltraCloud
+  if (message.type === 'text') {
+    const text = message.text.trim();
+    console.log('Text message:', text);
+    // 群組/聊天室中的 UltraCloud 指令
+    if (source.type === 'group' || source.type === 'room') {
+      if (text.startsWith('找 ') || text.startsWith('找') ||
+          text.startsWith('檔案列表') || text === '列表' ||
+          text === '幫助' || text === 'help' || text === '?') {
+        console.log('>>> ROUTING TO ULTRACLOUD: command in group/room');
+        return true;
+      }
+    }
+  }
+
+  console.log('Not routing to UltraCloud');
+  return false;
+}
+
+/**
+ * 轉發事件到 UltraCloud
+ * 對於檔案類型，會先下載檔案內容再轉發
+ */
+async function forwardToUltraCloud(event) {
+  try {
+    const message = event.message;
+    let payload = { events: [event] };
+
+    // 如果是檔案類型，先下載內容
+    if (['file', 'image', 'video', 'audio'].includes(message?.type)) {
+      console.log('Downloading file content before forwarding...');
+
+      try {
+        // 從 LINE 下載檔案
+        const response = await axios.get(
+          `https://api-data.line.me/v2/bot/message/${message.id}/content`,
+          {
+            headers: {
+              'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
+            },
+            responseType: 'arraybuffer',
+            timeout: 30000
+          }
+        );
+
+        // 轉成 base64
+        const base64Content = Buffer.from(response.data).toString('base64');
+        console.log('File downloaded, size:', response.data.length, 'bytes');
+
+        // 加入檔案內容到 payload
+        payload.fileContent = base64Content;
+        payload.fileSize = response.data.length;
+      } catch (downloadError) {
+        console.error('Failed to download file:', downloadError.message);
+        // 繼續轉發，讓 UltraCloud 處理錯誤
+      }
+    }
+
+    await axios.post(ULTRACLOUD_WEBHOOK_URL, payload, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      timeout: 55000, // 55 秒 timeout（Vercel 函數最長 60 秒）
+      maxContentLength: 50 * 1024 * 1024, // 50MB
+      maxBodyLength: 50 * 1024 * 1024
+    });
+    console.log('Event forwarded to UltraCloud successfully');
+  } catch (error) {
+    console.error('Failed to forward to UltraCloud:', error.message);
+    // 不拋出錯誤，避免影響主流程
+  }
 }
 
 /**
@@ -905,6 +1053,14 @@ const userStates = new Map();
 
 async function handleEvent(event) {
   const lineUserId = event.source.userId;
+
+  // ==========================================
+  // 🆕 UltraCloud 路由 - 檔案同步功能
+  // ==========================================
+  if (shouldRouteToUltraCloud(event)) {
+    await forwardToUltraCloud(event);
+    return;
+  }
 
   // 🆕 載入動態內容
   const welcomeMessages = await getWelcomeMessages();
@@ -2428,17 +2584,8 @@ exports.liffRegister = functions.https.onRequest(async (req, res) => {
 // 🆕 更新點數規則（一次性管理員函數）
 // ==========================================
 exports.updatePointsRules = functions.https.onCall(async (_data, context) => {
-  // 驗證管理員權限
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', '請先登入');
-  }
-
-  const adminEmails = ['ppcvote@gmail.com', 'admin@ultra-advisor.tw', 't1st@t1st.com', 'admin@ultraadvisor.com'];
-  const userEmail = context.auth.token.email;
-
-  if (!adminEmails.includes(userEmail)) {
-    throw new functions.https.HttpsError('permission-denied', '無管理員權限');
-  }
+  // 驗證管理員權限（使用 Firestore admins collection）
+  await verifyAdminAccess(context);
 
   const now = admin.firestore.Timestamp.now();
   const batch = db.batch();
@@ -2784,18 +2931,8 @@ exports.getMissions = functions.https.onCall(async (_data, context) => {
  * @returns {Promise<{success: boolean, message: string}>}
  */
 exports.initMissions = functions.https.onCall(async (_data, context) => {
-  // 驗證管理員
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', '請先登入');
-  }
-
-  const userDoc = await db.collection('users').doc(context.auth.uid).get();
-  const userEmail = userDoc.exists ? userDoc.data().email : context.auth.token.email;
-  const adminEmails = ['ppcvote@gmail.com', 'admin@ultra-advisor.tw', 't1st@t1st.com', 'admin@ultraadvisor.com'];
-
-  if (!adminEmails.includes(userEmail)) {
-    throw new functions.https.HttpsError('permission-denied', '無管理員權限');
-  }
+  // 驗證管理員權限（使用 Firestore admins collection）
+  await verifyAdminAccess(context);
 
   const now = admin.firestore.Timestamp.now();
 
@@ -2953,13 +3090,14 @@ exports.initMissions = functions.https.onCall(async (_data, context) => {
 });
 
 /**
- * 臨時 HTTP endpoint 重置任務（清除後重新初始化）
- * 呼叫方式：curl https://us-central1-grbt-f87fa.cloudfunctions.net/initMissionsHttp?key=ultra2026init
+ * 重置任務（清除後重新初始化）- 僅限管理員
+ * 使用環境變數存放密鑰，不再硬編碼
  */
 exports.initMissionsHttp = functions.https.onRequest(async (req, res) => {
-  const secretKey = 'ultra2026init';
-  if (req.query.key !== secretKey) {
-    res.status(403).json({ error: '無效的 key' });
+  // 使用環境變數中的密鑰
+  const secretKey = functions.config().admin?.init_key;
+  if (!secretKey || req.query.key !== secretKey) {
+    res.status(403).json({ error: '無效的 key 或未設定環境變數 admin.init_key' });
     return;
   }
 
@@ -3002,12 +3140,14 @@ exports.initMissionsHttp = functions.https.onRequest(async (req, res) => {
 });
 
 /**
- * Debug: 查看用戶資料（臨時用）
+ * Debug: 查看用戶資料 - 僅限管理員
+ * 使用環境變數存放密鑰，不再硬編碼
  */
 exports.debugUserData = functions.https.onRequest(async (req, res) => {
-  const secretKey = 'ultra2026init';
-  if (req.query.key !== secretKey) {
-    res.status(403).json({ error: '無效的 key' });
+  // 使用環境變數中的密鑰
+  const secretKey = functions.config().admin?.debug_key;
+  if (!secretKey || req.query.key !== secretKey) {
+    res.status(403).json({ error: '無效的 key 或未設定環境變數 admin.debug_key' });
     return;
   }
 
@@ -3066,17 +3206,8 @@ exports.debugUserData = functions.https.onRequest(async (req, res) => {
  * 列出孤立的 Auth 用戶（在 Firebase Auth 但不在 Firestore users 集合）
  */
 exports.listOrphanAuthUsers = functions.https.onCall(async (_data, context) => {
-  // 驗證管理員
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', '請先登入');
-  }
-
-  const adminEmails = ['ppcvote@gmail.com', 'admin@ultra-advisor.tw', 't1st@t1st.com', 'admin@ultraadvisor.com'];
-  const userEmail = context.auth.token.email;
-
-  if (!adminEmails.includes(userEmail)) {
-    throw new functions.https.HttpsError('permission-denied', '無管理員權限');
-  }
+  // 驗證管理員權限（使用 Firestore admins collection）
+  await verifyAdminAccess(context);
 
   try {
     // 取得所有 Firestore users 的 UID
@@ -3124,17 +3255,8 @@ exports.listOrphanAuthUsers = functions.https.onCall(async (_data, context) => {
  * 刪除指定的孤立 Auth 用戶
  */
 exports.deleteOrphanAuthUsers = functions.https.onCall(async (data, context) => {
-  // 驗證管理員
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', '請先登入');
-  }
-
-  const adminEmails = ['ppcvote@gmail.com', 'admin@ultra-advisor.tw', 't1st@t1st.com', 'admin@ultraadvisor.com'];
-  const userEmail = context.auth.token.email;
-
-  if (!adminEmails.includes(userEmail)) {
-    throw new functions.https.HttpsError('permission-denied', '無管理員權限');
-  }
+  // 驗證管理員權限（使用 Firestore admins collection）
+  await verifyAdminAccess(context);
 
   const { uids } = data;
 
@@ -3142,16 +3264,9 @@ exports.deleteOrphanAuthUsers = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('invalid-argument', '請提供要刪除的用戶 UID 列表');
   }
 
-  // 安全檢查：不能刪除管理員帳號
-  const adminUids = [];
-  for (const adminEmail of adminEmails) {
-    try {
-      const adminUser = await auth.getUserByEmail(adminEmail);
-      adminUids.push(adminUser.uid);
-    } catch (e) {
-      // 忽略找不到的管理員
-    }
-  }
+  // 安全檢查：不能刪除管理員帳號（從 Firestore admins collection 獲取）
+  const adminsSnapshot = await db.collection('admins').get();
+  const adminUids = adminsSnapshot.docs.map(doc => doc.id);
 
   const safeUids = uids.filter(uid => !adminUids.includes(uid));
 
@@ -3165,7 +3280,7 @@ exports.deleteOrphanAuthUsers = functions.https.onCall(async (data, context) => 
     // 記錄審計日誌
     await db.collection('auditLogs').add({
       adminId: context.auth.uid,
-      adminEmail: userEmail,
+      adminEmail: context.auth.token.email,
       action: 'auth.deleteOrphanUsers',
       description: `刪除 ${deleteResult.successCount} 個孤立 Auth 用戶`,
       details: {
@@ -3479,17 +3594,8 @@ exports.redeemStoreItem = functions.https.onCall(async (data, context) => {
  * @param {string} adminNote - 備註（選填）
  */
 exports.updateOrderStatus = functions.https.onCall(async (data, context) => {
-  // 驗證管理員
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', '請先登入');
-  }
-
-  const adminEmails = ['ppcvote@gmail.com', 'admin@ultra-advisor.tw', 't1st@t1st.com', 'admin@ultraadvisor.com'];
-  const userEmail = context.auth.token.email;
-
-  if (!adminEmails.includes(userEmail)) {
-    throw new functions.https.HttpsError('permission-denied', '無管理員權限');
-  }
+  // 驗證管理員權限（使用 Firestore admins collection）
+  await verifyAdminAccess(context);
 
   const { orderId, status, trackingNumber, adminNote } = data;
 
@@ -3769,5 +3875,1124 @@ exports.imageProxy = functions.https.onRequest(async (req, res) => {
     res.status(500).send('Failed to fetch image');
   }
 });
+
+// ==========================================
+// 📬 新申請通知（Firestore 觸發器）
+// 當有新預約或合作申請時，發送 LINE 通知給管理員
+// ==========================================
+
+// 管理員 LINE 用戶 ID（可透過 firebase functions:config:set admin.line_user_id="YOUR_LINE_USER_ID" 設定）
+const ADMIN_LINE_USER_ID = functions.config().admin?.line_user_id;
+
+// 需求分類對照表
+const NEED_CATEGORY_LABELS = {
+  mortgage: '房貸規劃',
+  retirement: '退休規劃',
+  insurance: '保險檢視',
+  tax: '稅務傳承',
+  investment: '投資理財',
+  other: '其他諮詢',
+};
+
+// 店家類型對照表
+const STORE_TYPE_LABELS = {
+  cafe: '咖啡廳',
+  restaurant: '餐廳',
+  'business-center': '商務中心',
+  gym: '健身房',
+  beauty: '美容美髮',
+  other: '其他',
+};
+
+/**
+ * 🔔 新預約諮詢通知
+ * 當 bookingRequests 有新文件建立時觸發
+ */
+exports.onNewBookingRequest = functions.firestore
+  .document('bookingRequests/{docId}')
+  .onCreate(async (snap, context) => {
+    const data = snap.data();
+    const docId = context.params.docId;
+
+    console.log(`📬 新預約諮詢: ${docId}`, { name: data.name, phone: data.phone });
+
+    // 如果沒有設定管理員 LINE ID，只記錄 log
+    if (!ADMIN_LINE_USER_ID) {
+      console.log('⚠️ 未設定 admin.line_user_id，跳過 LINE 通知');
+      return null;
+    }
+
+    // 準備通知訊息
+    const needLabel = NEED_CATEGORY_LABELS[data.needCategory] || data.needCategory || '未指定';
+    const familyCount = data.familyMemberCount || data.familyMembers?.length || 0;
+    const createdTime = data.createdAt?.toDate?.()?.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) || '剛剛';
+
+    const message = `📋 新預約諮詢！
+
+👤 姓名：${data.name}
+📞 電話：${data.phone}
+📧 Email：${data.email || '-'}
+💼 職業：${data.occupation || '-'}
+
+📌 需求類型：${needLabel}
+👨‍👩‍👧‍👦 家庭成員：${familyCount} 人
+🕐 方便時間：${data.preferredTime || '未指定'}
+
+⏰ 提交時間：${createdTime}
+
+➡️ 前往後台查看：
+https://admin.ultra-advisor.tw/admin/applications`;
+
+    try {
+      await sendLineMessage(ADMIN_LINE_USER_ID, [{ type: 'text', text: message }]);
+      console.log('✅ LINE 通知已發送');
+    } catch (error) {
+      console.error('❌ LINE 通知發送失敗:', error);
+    }
+
+    return null;
+  });
+
+/**
+ * 🔔 新合作申請通知
+ * 當 partnerApplications 有新文件建立時觸發
+ */
+exports.onNewPartnerApplication = functions.firestore
+  .document('partnerApplications/{docId}')
+  .onCreate(async (snap, context) => {
+    const data = snap.data();
+    const docId = context.params.docId;
+
+    console.log(`📬 新合作申請: ${docId}`, { storeName: data.storeName, contact: data.contactName });
+
+    // 如果沒有設定管理員 LINE ID，只記錄 log
+    if (!ADMIN_LINE_USER_ID) {
+      console.log('⚠️ 未設定 admin.line_user_id，跳過 LINE 通知');
+      return null;
+    }
+
+    // 準備通知訊息
+    const storeTypeLabel = STORE_TYPE_LABELS[data.storeType] || data.storeType || '未指定';
+    const cooperations = data.cooperationInterests?.join('、') || '-';
+    const createdTime = data.createdAt?.toDate?.()?.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) || '剛剛';
+
+    const message = `🤝 新合作申請！
+
+🏪 店家名稱：${data.storeName}
+📍 類型：${storeTypeLabel}
+📍 地區：${data.district || '-'}
+📍 地址：${data.address || '-'}
+
+👤 聯絡人：${data.contactName}
+📞 電話：${data.contactPhone}
+📧 Email：${data.contactEmail || '-'}
+
+✨ 合作項目：${cooperations}
+🎁 提供優惠：${data.discountOffer || '-'}
+
+⏰ 提交時間：${createdTime}
+
+➡️ 前往後台查看：
+https://admin.ultra-advisor.tw/admin/applications`;
+
+    try {
+      await sendLineMessage(ADMIN_LINE_USER_ID, [{ type: 'text', text: message }]);
+      console.log('✅ LINE 通知已發送');
+    } catch (error) {
+      console.error('❌ LINE 通知發送失敗:', error);
+    }
+
+    return null;
+  });
+
+// ==========================================
+// 🔔 推播通知系統 - FCM
+// ==========================================
+
+/**
+ * 當 siteContent/notifications 被更新時，發送推播給所有訂閱用戶
+ * 只有新增的通知（enabled: true）會觸發推播
+ */
+exports.onNotificationUpdate = functions
+  .region('asia-east1')
+  .firestore
+  .document('siteContent/notifications')
+  .onWrite(async (change, context) => {
+    console.log('📢 Notifications document changed');
+
+    // 取得更新前後的資料
+    const beforeData = change.before.exists ? change.before.data() : null;
+    const afterData = change.after.exists ? change.after.data() : null;
+
+    if (!afterData || !afterData.items) {
+      console.log('No notification items found');
+      return null;
+    }
+
+    // 找出新增的通知（比對 ID）
+    const beforeIds = beforeData?.items?.map(n => n.id) || [];
+    const newNotifications = afterData.items.filter(n =>
+      n.enabled !== false && !beforeIds.includes(n.id)
+    );
+
+    if (newNotifications.length === 0) {
+      console.log('No new enabled notifications to push');
+      return null;
+    }
+
+    console.log(`📢 Found ${newNotifications.length} new notifications to push`);
+
+    // 取得所有啟用的 FCM tokens
+    const tokensSnapshot = await db.collection('fcmTokens')
+      .where('enabled', '==', true)
+      .get();
+
+    if (tokensSnapshot.empty) {
+      console.log('No FCM tokens found');
+      return null;
+    }
+
+    const tokens = [];
+    tokensSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.token) {
+        tokens.push({ uid: doc.id, token: data.token });
+      }
+    });
+
+    console.log(`📱 Sending push to ${tokens.length} devices`);
+
+    // 發送推播
+    const messaging = admin.messaging();
+    const sendPromises = [];
+
+    for (const notification of newNotifications) {
+      const payload = {
+        notification: {
+          title: notification.title || 'Ultra Advisor 通知',
+          body: notification.content?.substring(0, 100) || '',
+        },
+        data: {
+          notificationId: notification.id,
+          url: '/',
+          priority: String(notification.priority || 50),
+        },
+        webpush: {
+          fcmOptions: {
+            link: 'https://ultra-advisor.tw/',
+          },
+          notification: {
+            icon: 'https://ultra-advisor.tw/logo.png',
+            badge: 'https://ultra-advisor.tw/logo.png',
+            requireInteraction: false,
+          },
+        },
+      };
+
+      // 批量發送給所有設備
+      for (const { uid, token } of tokens) {
+        sendPromises.push(
+          messaging.send({ ...payload, token })
+            .then(() => {
+              console.log(`✅ Push sent to ${uid}`);
+              return { success: true, uid };
+            })
+            .catch(async (error) => {
+              console.error(`❌ Push failed for ${uid}:`, error.code);
+
+              // 如果 token 失效，標記為 disabled
+              if (error.code === 'messaging/registration-token-not-registered' ||
+                  error.code === 'messaging/invalid-registration-token') {
+                await db.collection('fcmTokens').doc(uid).update({
+                  enabled: false,
+                  error: error.code,
+                  errorAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                console.log(`🗑️ Disabled invalid token for ${uid}`);
+              }
+
+              return { success: false, uid, error: error.code };
+            })
+        );
+      }
+    }
+
+    const results = await Promise.all(sendPromises);
+    const successCount = results.filter(r => r.success).length;
+    const failCount = results.filter(r => !r.success).length;
+
+    console.log(`📊 Push results: ${successCount} success, ${failCount} failed`);
+
+    return { successCount, failCount };
+  });
+
+/**
+ * 手動發送推播通知（管理員專用）
+ * 用於測試或發送自訂通知
+ */
+exports.sendPushNotification = functions
+  .region('asia-east1')
+  .https.onCall(async (data, context) => {
+    // 驗證管理員身分
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', '請先登入');
+    }
+
+    // 檢查是否為管理員
+    const adminDoc = await db.collection('admins').doc(context.auth.uid).get();
+    if (!adminDoc.exists) {
+      throw new functions.https.HttpsError('permission-denied', '權限不足');
+    }
+
+    const { title, body, url, targetUids } = data;
+
+    if (!title) {
+      throw new functions.https.HttpsError('invalid-argument', '標題不可為空');
+    }
+
+    // 取得目標 tokens
+    let tokensQuery = db.collection('fcmTokens').where('enabled', '==', true);
+
+    // 如果指定了目標用戶
+    if (targetUids && Array.isArray(targetUids) && targetUids.length > 0) {
+      // Firestore 的 in 查詢最多支援 10 個值
+      const chunks = [];
+      for (let i = 0; i < targetUids.length; i += 10) {
+        chunks.push(targetUids.slice(i, i + 10));
+      }
+
+      const allTokens = [];
+      for (const chunk of chunks) {
+        const snapshot = await db.collection('fcmTokens')
+          .where(admin.firestore.FieldPath.documentId(), 'in', chunk)
+          .where('enabled', '==', true)
+          .get();
+
+        snapshot.forEach(doc => {
+          allTokens.push({ uid: doc.id, token: doc.data().token });
+        });
+      }
+
+      return await sendPushToTokens(allTokens, title, body, url);
+    }
+
+    // 發送給所有用戶
+    const tokensSnapshot = await tokensQuery.get();
+    const tokens = [];
+    tokensSnapshot.forEach(doc => {
+      if (doc.data().token) {
+        tokens.push({ uid: doc.id, token: doc.data().token });
+      }
+    });
+
+    return await sendPushToTokens(tokens, title, body, url);
+  });
+
+/**
+ * 輔助函數：發送推播給指定的 tokens
+ */
+async function sendPushToTokens(tokens, title, body, url) {
+  if (tokens.length === 0) {
+    return { success: true, sent: 0, failed: 0 };
+  }
+
+  const messaging = admin.messaging();
+  const payload = {
+    notification: { title, body: body || '' },
+    data: { url: url || '/' },
+    webpush: {
+      fcmOptions: { link: url || 'https://ultra-advisor.tw/' },
+      notification: {
+        icon: 'https://ultra-advisor.tw/logo.png',
+        badge: 'https://ultra-advisor.tw/logo.png',
+      },
+    },
+  };
+
+  const results = await Promise.all(
+    tokens.map(({ uid, token }) =>
+      messaging.send({ ...payload, token })
+        .then(() => ({ success: true, uid }))
+        .catch(error => ({ success: false, uid, error: error.code }))
+    )
+  );
+
+  const sent = results.filter(r => r.success).length;
+  const failed = results.filter(r => !r.success).length;
+
+  console.log(`📊 Manual push: ${sent} sent, ${failed} failed`);
+
+  return { success: true, sent, failed };
+}
+
+// ==========================================
+// 📰 新文章推播通知
+// ==========================================
+
+/**
+ * 發送新文章推播通知（管理員專用）
+ *
+ * @param {string} articleSlug - 文章 slug（用於組成 URL）
+ * @param {string} articleTitle - 文章標題
+ * @param {string} articleSummary - 文章摘要（選填）
+ */
+exports.sendNewArticleNotification = functions
+  .region('us-central1')
+  .https.onCall(async (data, context) => {
+    // 驗證管理員權限
+    await verifyAdminAccess(context);
+
+    const { articleSlug, articleTitle, articleSummary } = data;
+
+    if (!articleSlug || !articleTitle) {
+      throw new functions.https.HttpsError('invalid-argument', '缺少文章 slug 或標題');
+    }
+
+    const articleUrl = `https://ultra-advisor.tw/blog/${articleSlug}`;
+    const title = '📚 新文章上線';
+    const body = articleTitle + (articleSummary ? `\n${articleSummary}` : '');
+
+    // 取得所有啟用推播的用戶 tokens
+    const tokensSnapshot = await db.collection('fcmTokens')
+      .where('enabled', '==', true)
+      .get();
+
+    const tokens = [];
+    tokensSnapshot.forEach(doc => {
+      if (doc.data().token) {
+        tokens.push({ uid: doc.id, token: doc.data().token });
+      }
+    });
+
+    if (tokens.length === 0) {
+      return { success: true, sent: 0, failed: 0, message: '沒有可通知的用戶' };
+    }
+
+    const messaging = admin.messaging();
+    const payload = {
+      notification: {
+        title,
+        body,
+      },
+      data: {
+        type: 'new_article',
+        url: articleUrl,
+        articleSlug,
+        articleTitle,
+      },
+      webpush: {
+        fcmOptions: { link: articleUrl },
+        notification: {
+          icon: 'https://ultra-advisor.tw/logo.png',
+          badge: 'https://ultra-advisor.tw/logo.png',
+          tag: `article-${articleSlug}`,
+          requireInteraction: true,
+          actions: [
+            { action: 'read', title: '閱讀文章' },
+            { action: 'dismiss', title: '稍後再看' },
+          ],
+        },
+      },
+    };
+
+    const results = await Promise.all(
+      tokens.map(({ uid, token }) =>
+        messaging.send({ ...payload, token })
+          .then(() => ({ success: true, uid }))
+          .catch(async (error) => {
+            // 清理無效 token
+            if (error.code === 'messaging/registration-token-not-registered' ||
+                error.code === 'messaging/invalid-registration-token') {
+              await db.collection('fcmTokens').doc(uid).update({
+                enabled: false,
+                disabledAt: admin.firestore.Timestamp.now(),
+                disabledReason: error.code,
+              });
+            }
+            return { success: false, uid, error: error.code };
+          })
+      )
+    );
+
+    const sent = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+
+    // 記錄推播歷史
+    await db.collection('pushNotificationLogs').add({
+      type: 'new_article',
+      articleSlug,
+      articleTitle,
+      totalRecipients: tokens.length,
+      sent,
+      failed,
+      sentBy: context.auth.uid,
+      createdAt: admin.firestore.Timestamp.now(),
+    });
+
+    console.log(`📰 New article push: "${articleTitle}" - ${sent} sent, ${failed} failed`);
+
+    return {
+      success: true,
+      sent,
+      failed,
+      message: `已發送給 ${sent} 位用戶`,
+    };
+  });
+
+// ==========================================
+// 🆕 保單健診系統 - OCR 辨識
+// ==========================================
+
+exports.processInsuranceOCR = functions
+  .runWith({ timeoutSeconds: 120, memory: '512MB' })
+  .https.onCall(async (data, context) => {
+  // 1. 身份驗證
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', '請先登入');
+  }
+
+  const { imageBase64, storagePath } = data;
+
+  // 支援兩種模式：base64 直傳 或 Storage 路徑
+  if (!imageBase64 && !storagePath) {
+    throw new functions.https.HttpsError('invalid-argument', '缺少圖片資料');
+  }
+
+  const userId = context.auth.uid;
+
+  // 若用 storagePath，需安全檢查
+  if (storagePath && !storagePath.startsWith(`insurance-policies/${userId}/`)) {
+    throw new functions.https.HttpsError('permission-denied', '無權存取此檔案');
+  }
+
+  try {
+    const vision = require('@google-cloud/vision');
+    const client = new vision.ImageAnnotatorClient();
+
+    let fullText = '';
+
+    if (imageBase64) {
+      // 模式 A：直接用 base64 圖片
+      // 移除 data URL 前綴 (data:image/jpeg;base64,...)
+      const base64Data = imageBase64.replace(/^data:[^;]+;base64,/, '');
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+
+      console.log(`🔍 OCR 辨識開始 (base64, ${Math.round(imageBuffer.length / 1024)}KB)`);
+
+      const [result] = await client.textDetection({
+        image: { content: imageBuffer },
+      });
+      fullText = result.fullTextAnnotation?.text || '';
+    } else {
+      // 模式 B：從 Storage 讀取
+      const bucket = admin.storage().bucket();
+      const gcsUri = `gs://${bucket.name}/${storagePath}`;
+
+      console.log(`🔍 OCR 辨識開始: ${storagePath}`);
+
+      if (storagePath.toLowerCase().endsWith('.pdf')) {
+        const [result] = await client.documentTextDetection(gcsUri);
+        fullText = result.fullTextAnnotation?.text || '';
+      } else {
+        const [result] = await client.textDetection(gcsUri);
+        fullText = result.fullTextAnnotation?.text || '';
+      }
+    }
+
+    console.log(`✅ OCR 完成，擷取 ${fullText.length} 字元`);
+    // 印出原始文字以便除錯（截斷到 500 字元）
+    console.log(`📄 OCR 原始文字: ${fullText.substring(0, 500)}`);
+
+    return {
+      success: true,
+      rawText: fullText,
+      extractedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error('❌ OCR 辨識失敗:', error.message);
+    throw new functions.https.HttpsError('internal', `OCR 辨識失敗: ${error.message}`);
+  }
+});
+
+// ==========================================
+// 保單健診系統 — Gemini AI 解析 & 險種快取
+// ==========================================
+
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+/**
+ * parseInsuranceOCR — Gemini Vision 直接辨識保單圖片
+ * 輸入：{ imageBase64, mimeType, imageUrl, familyMemberId }
+ * 支援兩種模式：
+ *   1. imageBase64 + mimeType：前端直接傳 base64（推薦）
+ *   2. imageUrl：從 Storage URL 下載後再傳給 Gemini
+ * 輸出：{ policy: Partial<PolicyInfo> }
+ */
+exports.parseInsuranceOCR = functions
+  .runWith({ timeoutSeconds: 120, memory: '512MB' })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', '請先登入');
+    }
+
+    const { imageBase64, mimeType, imageUrl, familyMemberId } = data;
+    if (!imageBase64 && !imageUrl) {
+      throw new functions.https.HttpsError('invalid-argument', '缺少圖片資料');
+    }
+
+    try {
+      const geminiApiKey = functions.config().gemini?.api_key;
+      if (!geminiApiKey) {
+        throw new Error('Gemini API key 未設定，請執行 firebase functions:config:set gemini.api_key="YOUR_KEY"');
+      }
+
+      const genAI = new GoogleGenerativeAI(geminiApiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+      // 準備圖片資料
+      let imgBase64 = imageBase64;
+      let imgMimeType = mimeType || 'image/jpeg';
+
+      if (!imgBase64 && imageUrl) {
+        // 從 URL 下載圖片轉 base64
+        const axios = require('axios');
+        const response = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 30000 });
+        imgBase64 = Buffer.from(response.data).toString('base64');
+        imgMimeType = response.headers['content-type'] || 'image/jpeg';
+      }
+
+      if (!imgBase64) {
+        throw new Error('無法取得圖片資料');
+      }
+
+      // HEIC/HEIF 格式轉換為 JPEG（iPhone 預設格式，Gemini 不支援）
+      if (imgMimeType === 'image/heic' || imgMimeType === 'image/heif') {
+        console.log('📷 偵測到 HEIC/HEIF 格式，轉換 mimeType 為 image/jpeg');
+        imgMimeType = 'image/jpeg';
+      }
+
+      console.log(`📷 parseInsuranceOCR: 圖片大小 ${(imgBase64.length / 1024).toFixed(0)} KB, 類型 ${imgMimeType}`);
+
+      // Gemini Vision 直接辨識圖片 + 結構化解析（一步到位）
+      const prompt = `你是台灣保險專家。請辨識這張保單圖片中的所有文字，並解析為以下 JSON 格式。
+
+請回傳純 JSON（不要 markdown 程式碼區塊）：
+
+{
+  "insurer": "保險公司名稱",
+  "policyNumber": "保單號碼",
+  "applicant": "要保人姓名",
+  "applicantBirthDate": "要保人出生日期 YYYY-MM-DD 或民國格式如 65/12/23",
+  "applicantAgeAtIssue": 要保人投保年齡（數字），
+  "applicantGender": "要保人性別 male 或 female",
+  "insured": "被保險人姓名",
+  "insuredBirthDate": "被保險人出生日期 YYYY-MM-DD 或民國格式如 87/05/10",
+  "insuredAgeAtIssue": 被保險人投保年齡（數字），
+  "insuredGender": "被保險人性別 male 或 female",
+  "effectiveDate": "YYYY-MM-DD",
+  "totalAnnualPremium": 數字,
+  "paymentFrequency": "年繳/半年繳/季繳/月繳/躉繳",
+  "currency": "TWD/USD/其他",
+  "coverages": [
+    {
+      "name": "險種名稱",
+      "code": "險種代碼（如有）",
+      "sumInsured": 保額數字,
+      "annualPremium": 保費數字,
+      "paymentYears": 繳費年期,
+      "coverageYears": 保障年期,
+      "isLifetime": 是否終身布林值,
+      "isRider": 是否為附約布林值
+    }
+  ]
+}
+
+注意：
+- 第一筆通常是主約（isRider: false），後面是附約（isRider: true）
+- 金額請用數字，不要帶逗號或「萬」
+- 日期格式 YYYY-MM-DD（民國年請保留原始格式如 65/12/23）
+- 如果有些欄位看不出來，請填 null
+- 幣別預設 TWD
+- 如果圖片模糊看不清，盡量辨識能看到的部分
+- 性別若無法直接判斷，可以從姓名或稱謂推測（先生/女士）
+- 保單面頁常見「投保年齡」欄位，請務必抓取 applicantAgeAtIssue 和 insuredAgeAtIssue`;
+
+      const imagePart = {
+        inlineData: {
+          data: imgBase64,
+          mimeType: imgMimeType,
+        },
+      };
+
+      const result = await model.generateContent([prompt, imagePart]);
+      const responseText = result.response.text();
+      console.log(`🤖 Gemini 回應長度: ${responseText.length}`);
+
+      // 提取 JSON（支援有或沒有 markdown code block）
+      let jsonStr = responseText;
+      const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonStr = codeBlockMatch[1].trim();
+      } else {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonStr = jsonMatch[0];
+        }
+      }
+
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonStr);
+      } catch (parseErr) {
+        console.error('❌ JSON 解析失敗:', jsonStr.substring(0, 200));
+        throw new Error('AI 回傳格式錯誤，請重新拍照');
+      }
+
+      // 補上 familyMemberId
+      parsed.familyMemberId = familyMemberId;
+      parsed.inputMethod = 'ocr';
+
+      // 為每個 coverage 補 id
+      if (parsed.coverages) {
+        parsed.coverages = parsed.coverages.map((c, i) => ({
+          ...c,
+          id: `ocr-${Date.now()}-${i}`,
+          isRider: c.isRider !== false && i > 0,
+        }));
+      }
+
+      console.log(`✅ Gemini 保單解析完成：${parsed.insurer || '未知'} / ${parsed.coverages?.length || 0} 個險種`);
+
+      return { policy: parsed };
+    } catch (error) {
+      console.error('❌ parseInsuranceOCR 錯誤:', error.message);
+      throw new functions.https.HttpsError('internal', `保單解析失敗: ${error.message}`);
+    }
+  });
+
+/**
+ * lookupInsuranceProduct — 搜尋險種條款 + Gemini 摘要
+ * 輸入：{ insurer, productName }
+ * 輸出：{ product: ProductCache, claimSummary }
+ */
+exports.lookupInsuranceProduct = functions
+  .runWith({ timeoutSeconds: 120, memory: '512MB' })
+  .https.onCall(async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', '請先登入');
+    }
+
+    const { insurer, productName } = data;
+    if (!productName) {
+      throw new functions.https.HttpsError('invalid-argument', '缺少 productName');
+    }
+
+    try {
+      // 先查快取
+      const cacheQuery = await db.collection('productCache')
+        .where('insurer', '==', insurer || '')
+        .where('productName', '==', productName)
+        .limit(1)
+        .get();
+
+      if (!cacheQuery.empty) {
+        const cached = cacheQuery.docs[0].data();
+        // 更新搜尋次數
+        await cacheQuery.docs[0].ref.update({
+          searchCount: admin.firestore.FieldValue.increment(1),
+          lastSearched: new Date().toISOString(),
+        });
+        console.log(`✅ 快取命中：${insurer} - ${productName}`);
+        return { product: { id: cacheQuery.docs[0].id, ...cached }, claimSummary: cached.claimSummary };
+      }
+
+      // 快取未命中 → Gemini AI 生成摘要
+      const geminiApiKey = functions.config().gemini?.api_key;
+      if (!geminiApiKey) {
+        throw new Error('Gemini API key 未設定');
+      }
+
+      const genAI = new GoogleGenerativeAI(geminiApiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+      const prompt = `你是台灣保險條款分析專家。請根據你的知識，分析以下保險商品並回傳 JSON 格式。
+
+保險公司：${insurer || '未知'}
+商品名稱：${productName}
+
+重要：你只需要回傳「險種分類」和「保障特性」，不要猜測具體金額（因為金額依投保內容而定）。
+
+請回傳以下 JSON 格式（只回傳 JSON，不要其他文字）：
+
+{
+  "category": "險種分類，選擇一個：life_term/life_whole/medical_expense/medical_daily/surgery/critical_illness/major_injury/cancer/accident/accident_medical/disability/long_term_care/waiver/annuity/investment/other",
+  "status": "selling",
+  "waitingPeriod": 等待期天數（如30、90，無則填0）,
+  "isCopyReceipt": 是否接受副本理賠（true/false，若不確定填 null）,
+  "isGuaranteedRenewal": 是否保證續保（true/false，若不確定填 null）,
+  "claimConditions": "簡述理賠條件，50字內",
+  "coverageFeatures": ["此險種的保障特色，如：住院雜費、門診手術、骨折未住院、意外身故等"],
+  "claimSummary": {},
+  "keywords": ["相關關鍵字"]
+}
+
+險種分類說明：
+- medical_expense：實支實付（住院雜費、手術費等限額給付）
+- medical_daily：住院日額（按住院天數給付）
+- surgery：手術險（按手術等級表給付）
+- accident：意外險（意外身故、失能保障，不含醫療）
+- accident_medical：意外醫療（意外實支、意外住院日額、骨折未住院）
+- critical_illness：重大疾病（一次金給付）
+- cancer：癌症險
+- waiver：豁免附約
+- life_term/life_whole：壽險
+
+注意：
+1. claimSummary 留空物件 {}，實際金額由保單資料提供
+2. coverageFeatures 填寫此險種「通常包含」的保障項目
+3. 如果是「傷害醫療」類，通常包含：意外實支、意外住院日額、骨折未住院
+4. 如果是純「傷害保險」（不含醫療），只有意外身故和失能，沒有醫療給付`;
+
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
+
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      let productData = {};
+      if (jsonMatch) {
+        productData = JSON.parse(jsonMatch[0]);
+      }
+
+      // 儲存到快取
+      const cacheDoc = {
+        insurer: insurer || '',
+        productName,
+        productCode: '',
+        category: productData.category || 'other',
+        keywords: productData.keywords || [productName],
+        searchCount: 1,
+        lastSearched: new Date().toISOString(),
+        status: productData.status || 'selling',
+        claimSummary: productData.claimSummary || {},
+        rawDescription: responseText.substring(0, 2000),
+        lastUpdated: new Date().toISOString(),
+        updatedBy: 'ai',
+      };
+
+      const docRef = await db.collection('productCache').add(cacheDoc);
+      console.log(`✅ 新增快取：${insurer} - ${productName} (${docRef.id})`);
+
+      return {
+        product: { id: docRef.id, ...cacheDoc },
+        claimSummary: cacheDoc.claimSummary,
+      };
+    } catch (error) {
+      console.error('❌ lookupInsuranceProduct 錯誤:', error.message);
+      throw new functions.https.HttpsError('internal', `險種查詢失敗: ${error.message}`);
+    }
+  });
+
+/**
+ * searchProductCache — 險種名稱自動完成查詢
+ * 輸入：{ keyword }
+ * 輸出：{ products: ProductCache[] }
+ */
+exports.searchProductCache = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', '請先登入');
+  }
+
+  const { keyword } = data;
+  if (!keyword || keyword.length < 2) {
+    return { products: [] };
+  }
+
+  try {
+    // Firestore 不支援 LIKE 查詢，使用前綴比對
+    const snapshot = await db.collection('productCache')
+      .where('productName', '>=', keyword)
+      .where('productName', '<=', keyword + '\uf8ff')
+      .orderBy('productName')
+      .limit(10)
+      .get();
+
+    const products = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    // 也搜尋 keywords 陣列
+    if (products.length < 10) {
+      const keywordSnapshot = await db.collection('productCache')
+        .where('keywords', 'array-contains', keyword)
+        .limit(10 - products.length)
+        .get();
+
+      const existingIds = new Set(products.map(p => p.id));
+      keywordSnapshot.docs.forEach(doc => {
+        if (!existingIds.has(doc.id)) {
+          products.push({ id: doc.id, ...doc.data() });
+        }
+      });
+    }
+
+    return { products };
+  } catch (error) {
+    console.error('❌ searchProductCache 錯誤:', error.message);
+    return { products: [] };
+  }
+});
+
+// ==========================================
+// Threads Token 換取
+// ==========================================
+
+/**
+ * exchangeThreadsToken
+ * 前端取得授權碼後，透過 Cloud Function 安全地換取 Token
+ * 流程：授權碼 → 短期 Token → 長期 Token → 取得用戶資訊
+ */
+exports.exchangeThreadsToken = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', '請先登入');
+  }
+
+  const { appId, appSecret, code, redirectUri } = data;
+
+  if (!appId || !appSecret || !code || !redirectUri) {
+    throw new functions.https.HttpsError('invalid-argument', '缺少必要參數');
+  }
+
+  try {
+    // Step 1: 授權碼 → 短期 Token
+    const shortTokenResponse = await axios.post(
+      'https://graph.threads.net/oauth/access_token',
+      new URLSearchParams({
+        client_id: appId,
+        client_secret: appSecret,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri,
+        code: code,
+      }).toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    const shortToken = shortTokenResponse.data.access_token;
+    if (!shortToken) {
+      throw new functions.https.HttpsError('internal', '換取短期 Token 失敗');
+    }
+
+    // Step 2: 短期 Token → 長期 Token
+    const longTokenResponse = await axios.get(
+      'https://graph.threads.net/access_token', {
+        params: {
+          grant_type: 'th_exchange_token',
+          client_secret: appSecret,
+          access_token: shortToken,
+        },
+      }
+    );
+
+    const longToken = longTokenResponse.data.access_token;
+    const expiresIn = longTokenResponse.data.expires_in; // 約 60 天（秒數）
+    if (!longToken) {
+      throw new functions.https.HttpsError('internal', '換取長期 Token 失敗');
+    }
+
+    // Step 3: 取得用戶資訊
+    const userResponse = await axios.get(
+      'https://graph.threads.net/v1.0/me', {
+        params: {
+          fields: 'id,username',
+          access_token: longToken,
+        },
+      }
+    );
+
+    const userId = userResponse.data.id;
+    const username = userResponse.data.username;
+
+    return {
+      success: true,
+      accessToken: longToken,
+      userId: userId,
+      username: username || '',
+      expiresIn: expiresIn || 5184000,
+    };
+  } catch (error) {
+    console.error('❌ exchangeThreadsToken 錯誤:', error.response?.data || error.message);
+    const errorMessage = error.response?.data?.error_message
+      || error.response?.data?.error?.message
+      || error.message
+      || 'Token 換取失敗';
+    throw new functions.https.HttpsError('internal', errorMessage);
+  }
+});
+
+// ==========================================
+// Threads 排程自動發文
+// ==========================================
+
+/**
+ * threadsScheduledPublish
+ * 每 30 分鐘執行一次，檢查所有啟用排程的用戶
+ * 如果當前時間匹配用戶設定的發文時間，自動發佈下一篇文案
+ */
+exports.threadsScheduledPublish = functions.pubsub
+  .schedule('*/30 * * * *')
+  .timeZone('Asia/Taipei')
+  .onRun(async () => {
+    const now = new Date();
+    // 台灣時間 HH:MM
+    const twHour = now.toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone: 'Asia/Taipei' }).padStart(2, '0');
+    const twMinute = now.toLocaleString('en-US', { minute: '2-digit', timeZone: 'Asia/Taipei' }).padStart(2, '0');
+    const currentTime = `${twHour}:${twMinute}`;
+
+    // 比對允許的時間窗口（±15 分鐘內算匹配，因為 cron 每 30 分鐘執行一次）
+    const isTimeMatch = (scheduleTimes) => {
+      if (!scheduleTimes || scheduleTimes.length === 0) return false;
+      for (const t of scheduleTimes) {
+        const [h, m] = t.split(':').map(Number);
+        const scheduleMinutes = h * 60 + m;
+        const currentMinutes = parseInt(twHour) * 60 + parseInt(twMinute);
+        const diff = Math.abs(currentMinutes - scheduleMinutes);
+        if (diff <= 15 || diff >= 1425) return true; // 1425 = 24*60 - 15，處理跨日
+      }
+      return false;
+    };
+
+    console.log(`🕐 Threads 排程檢查開始，台灣時間: ${currentTime}`);
+
+    // 查詢所有啟用排程的用戶（透過 collectionGroup 查詢 threadsConfig）
+    // 注意：threadsConfig 存在 users/{uid}/threadsConfig/settings
+    const usersSnapshot = await db.collection('users').get();
+    let publishedCount = 0;
+
+    for (const userDoc of usersSnapshot.docs) {
+      const userId = userDoc.id;
+
+      try {
+        const configRef = db.collection('users').doc(userId).collection('threadsConfig').doc('settings');
+        const configSnap = await configRef.get();
+        if (!configSnap.exists) continue;
+
+        const config = configSnap.data();
+        if (!config.libraryScheduleEnabled) continue;
+        if (!config.threadsAccessToken || !config.threadsUserId) continue;
+        if (!isTimeMatch(config.libraryScheduleTimes)) continue;
+
+        // 取得文案庫（按 order 排序）
+        const librarySnap = await db.collection('users').doc(userId)
+          .collection('threadsLibrary')
+          .orderBy('order', 'asc')
+          .get();
+
+        if (librarySnap.empty) continue;
+
+        const libraryItems = librarySnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const currentIndex = config.libraryCurrentIndex || 0;
+
+        // 已發完
+        if (currentIndex >= libraryItems.length) {
+          console.log(`📭 用戶 ${userId} 文案庫已發完，停用排程`);
+          await configRef.update({
+            libraryScheduleEnabled: false,
+            updatedAt: admin.firestore.Timestamp.now(),
+          });
+          continue;
+        }
+
+        const item = libraryItems[currentIndex];
+        const textToPublish = config.signatureLine
+          ? `${item.content}\n\n${config.signatureLine}`
+          : item.content;
+
+        // Step 1: 建立貼文容器
+        const createResponse = await axios.post(
+          `https://graph.threads.net/v1.0/${config.threadsUserId}/threads`,
+          new URLSearchParams({
+            media_type: 'TEXT',
+            text: textToPublish,
+            access_token: config.threadsAccessToken,
+          }).toString(),
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+
+        const creationId = createResponse.data.id;
+
+        // 等待 3 秒
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        // Step 2: 發佈
+        const publishResponse = await axios.post(
+          `https://graph.threads.net/v1.0/${config.threadsUserId}/threads_publish`,
+          new URLSearchParams({
+            creation_id: creationId,
+            access_token: config.threadsAccessToken,
+          }).toString(),
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+
+        const postId = publishResponse.data.id;
+
+        // 更新文案庫狀態
+        await db.collection('users').doc(userId).collection('threadsLibrary').doc(item.id).update({
+          status: 'published',
+          publishedAt: admin.firestore.Timestamp.now(),
+        });
+
+        // 寫入發文紀錄
+        await db.collection('users').doc(userId).collection('threadsPosts').add({
+          content: textToPublish,
+          source: 'library',
+          libraryItemId: item.id,
+          threadsPostId: postId,
+          status: 'published',
+          publishedAt: admin.firestore.Timestamp.now(),
+          createdAt: admin.firestore.Timestamp.now(),
+        });
+
+        // 更新 config: index + 1, lastPostAt
+        const nextIndex = currentIndex + 1;
+        await configRef.update({
+          libraryCurrentIndex: nextIndex,
+          lastPostAt: admin.firestore.Timestamp.now(),
+          updatedAt: admin.firestore.Timestamp.now(),
+          // 如果下一篇超出範圍，自動停用
+          ...(nextIndex >= libraryItems.length ? { libraryScheduleEnabled: false } : {}),
+        });
+
+        publishedCount++;
+        console.log(`✅ 用戶 ${userId} 排程發文成功 (${currentIndex + 1}/${libraryItems.length})`);
+
+      } catch (error) {
+        console.error(`❌ 用戶 ${userId} 排程發文失敗:`, error.response?.data || error.message);
+
+        // 寫入失敗紀錄
+        try {
+          const configSnap = await db.collection('users').doc(userId).collection('threadsConfig').doc('settings').get();
+          const config = configSnap.data();
+          const librarySnap = await db.collection('users').doc(userId).collection('threadsLibrary').orderBy('order', 'asc').get();
+          const items = librarySnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const idx = config?.libraryCurrentIndex || 0;
+          if (idx < items.length) {
+            await db.collection('users').doc(userId).collection('threadsPosts').add({
+              content: items[idx].content,
+              source: 'library',
+              libraryItemId: items[idx].id,
+              status: 'failed',
+              errorMessage: error.response?.data?.error?.message || error.message || '排程發文失敗',
+              publishedAt: admin.firestore.Timestamp.now(),
+              createdAt: admin.firestore.Timestamp.now(),
+            });
+          }
+        } catch (logError) {
+          console.error(`❌ 寫入失敗紀錄也失敗:`, logError.message);
+        }
+      }
+    }
+
+    console.log(`🕐 Threads 排程完成，本次發文 ${publishedCount} 篇`);
+    return null;
+  });
 
 console.log('Ultra Advisor Cloud Functions loaded');

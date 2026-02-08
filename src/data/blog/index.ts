@@ -102,6 +102,8 @@ import { article as article54 } from './articles/54-taiwan-gdp-surpass-japan-kor
 import { article as article55 } from './articles/55-ultra-alliance-maker-island-ecosystem-2026';
 // 文章 56：GLP-1 減重藥美國訴訟警示
 import { article as article56 } from './articles/56-glp1-drug-lawsuit-taiwan-warning-2026';
+// 文章 57：成交的多巴胺 vs 滑手機的多巴胺
+import { article as article57 } from './articles/57-dopamine-success-vs-scrolling-2026';
 
 // ============ 匯出文章陣列 ============
 export const blogArticles: BlogArticle[] = [
@@ -161,6 +163,7 @@ export const blogArticles: BlogArticle[] = [
   article54,
   article55,
   article56,
+  article57,
 ];
 
 // ============ 匯出輔助函數 ============

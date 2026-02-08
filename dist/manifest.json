@@ -1,31 +1,39 @@
 {
   "name": "Ultra Advisor 戰情室",
   "short_name": "Ultra Advisor",
-  "description": "台灣最強財務視覺化解決方案",
-  "start_url": "/",
+  "description": "台灣最強財務視覺化解決方案，18 種專業工具幫助財務顧問快速產出提案",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/logo-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/logo-512.png",
+      "src": "/logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "房貸計算機",
+      "short_name": "房貸",
+      "description": "智能房貸戰情室",
+      "url": "/calculator"
     },
     {
-      "src": "/logo.png",
-      "sizes": "any",
-      "type": "image/png"
+      "name": "知識庫",
+      "short_name": "文章",
+      "description": "財務規劃知識庫",
+      "url": "/blog"
     }
   ],
   "categories": ["finance", "business", "productivity"],
-  "lang": "zh-TW"
+  "lang": "zh-TW",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "id": "ultra-advisor-pwa"
 }

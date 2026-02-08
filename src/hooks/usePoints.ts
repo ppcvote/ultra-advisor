@@ -6,22 +6,8 @@
  */
 
 import { useState, useCallback } from 'react';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { initializeApp, getApps } from 'firebase/app';
-
-// Firebase 設定
-const firebaseConfig = {
-  apiKey: "AIzaSyAqS6fhHQVyBNr1LCkCaQPyJ13Rkq7bfHA",
-  authDomain: "grbt-f87fa.firebaseapp.com",
-  projectId: "grbt-f87fa",
-  storageBucket: "grbt-f87fa.firebasestorage.app",
-  messagingSenderId: "169700005946",
-  appId: "1:169700005946:web:9b0722f31aa9fe7ad13d03",
-};
-
-// 確保只初始化一次
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const functions = getFunctions(app, 'us-central1');
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebase';
 
 // 類型定義
 interface DailyLoginResult {

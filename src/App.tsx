@@ -3,7 +3,7 @@ import {
   Wallet, Building2, Coins, Check, ShieldAlert, Menu, X, LogOut, FileBarChart,
   GraduationCap, Umbrella, Waves, Landmark, Lock, Rocket, Car, Loader2,
   ChevronLeft, Users, ShieldCheck, Activity, History, LayoutDashboard, Flame,
-  Sparkles
+  Sparkles, HeartPulse, GitBranch
 } from 'lucide-react';
 
 import { signOut, onAuthStateChanged } from 'firebase/auth';
@@ -38,7 +38,10 @@ import MillionDollarGiftTool from './components/MillionDollarGiftTool';
 import FreeDashboardTool from './components/FreeDashboardTool';
 import MarketDataZone from './components/MarketDataZone'; 
 import GoldenSafeVault from './components/GoldenSafeVault'; 
-import FundTimeMachine from './components/FundTimeMachine'; 
+import FundTimeMachine from './components/FundTimeMachine';
+import InsuranceCheckupTool from './components/insurance/InsuranceCheckupTool';
+import FamilyTreeTool from './components/insurance/FamilyTreeTool';
+import type { InsuranceCheckupData } from './types/insurance';
 
 // 🆕 點數系統與會員權限
 import { pointsApi } from './hooks/usePoints';
@@ -58,6 +61,18 @@ import RegisterPage from './pages/RegisterPage';
 
 // 🆕 部落格頁面（SEO 內容行銷）
 import BlogPage from './pages/BlogPage';
+
+// 🆕 預約試算頁面
+import BookingPage from './pages/BookingPage';
+
+// 🆕 傲創聯盟頁面
+import AlliancePage from './pages/AlliancePage';
+
+// 🆕 合作夥伴申請頁面
+import PartnerApplicationPage from './pages/PartnerApplicationPage';
+
+// 🆕 UltraCloud Logo 展示頁面
+import UltraCloudDemo from './pages/UltraCloudDemo';
 
 // 🆕 主題切換
 import { ThemeProvider } from './context/ThemeContext';
@@ -143,6 +158,10 @@ export default function App() {
   const [isLiffRegisterRoute, setIsLiffRegisterRoute] = useState(false); // 🆕 LIFF 註冊路由
   const [isRegisterRoute, setIsRegisterRoute] = useState(false); // 🆕 公開註冊路由
   const [isBlogRoute, setIsBlogRoute] = useState(() => window.location.pathname.startsWith('/blog')); // 🆕 部落格路由（初始化時檢查 URL）
+  const [isBookingRoute, setIsBookingRoute] = useState(() => window.location.pathname === '/booking'); // 🆕 預約試算路由
+  const [isAllianceRoute, setIsAllianceRoute] = useState(() => window.location.pathname === '/alliance'); // 🆕 傲創聯盟路由
+  const [isPartnerApplyRoute, setIsPartnerApplyRoute] = useState(() => window.location.pathname === '/partner-apply'); // 🆕 合作夥伴申請路由
+  const [isUltraCloudDemoRoute, setIsUltraCloudDemoRoute] = useState(() => window.location.pathname === '/ultracloud'); // 🆕 UltraCloud Demo 路由
   const [clientLoading, setClientLoading] = useState(false); 
   const [currentClient, setCurrentClient] = useState<any>(null);
   // 🆕 activeTab 持久化：重新整理後保持在原工具介面
@@ -184,7 +203,8 @@ export default function App() {
     pension: { currentAge: 30, retireAge: 65, salary: 45000, laborInsYears: 35, selfContribution: false, pensionReturnRate: 3, desiredMonthlyIncome: 60000 },
     reservoir: { initialCapital: 1000, dividendRate: 5, reinvestRate: 8, years: 20 },
     tax: { spouse: true, children: 2, minorYearsTotal: 0, parents: 0, cash: 3000, realEstateMarket: 4000, stocks: 1000, insurancePlan: 0 },
-    free_dashboard: { layout: [null, null, null, null] }
+    free_dashboard: { layout: [null, null, null, null] },
+    insurance_checkup: { activeStep: 1 as const }
   };
 
   const [goldenSafeData, setGoldenSafeData] = useState(defaultStates.golden_safe); 
@@ -197,6 +217,11 @@ export default function App() {
   const [reservoirData, setReservoirData] = useState(defaultStates.reservoir);
   const [taxData, setTaxData] = useState(defaultStates.tax);
   const [freeDashboardLayout, setFreeDashboardLayout] = useState<(string | null)[]>(defaultStates.free_dashboard.layout);
+  const [insuranceCheckupData, setInsuranceCheckupData] = useState<InsuranceCheckupData>(() => {
+    // 從 localStorage 恢復 activeStep
+    const savedStep = localStorage.getItem('insurance_checkup_step');
+    return savedStep ? { activeStep: parseInt(savedStep) as 1 | 2 } : defaultStates.insurance_checkup;
+  });
 
   const showToast = (message: string, type = 'success') => { setToast({ message, type }); };
 
@@ -261,12 +286,14 @@ export default function App() {
   // 🆕 建立資料 payload（供自動存檔與手動存檔共用）
   const getDataPayload = () => ({
     goldenSafeData, giftData, estateData, studentData, superActiveData,
-    carData, pensionData, reservoirData, taxData, freeDashboardLayout
+    carData, pensionData, reservoirData, taxData, freeDashboardLayout,
+    insuranceCheckupData
   });
 
   // 🆕 執行存檔的共用函數
   const performSave = async (dataPayload: ReturnType<typeof getDataPayload>) => {
     if (!user || !currentClient) return;
+    if (currentClient.id === 'self-checkup') return; // 虛擬客戶不存檔
 
     setIsSaving(true);
     setHasUnsavedChanges(false);
@@ -313,8 +340,15 @@ export default function App() {
   }, [
     goldenSafeData, giftData, estateData, studentData, superActiveData,
     carData, pensionData, reservoirData, taxData, freeDashboardLayout,
-    user, currentClient, isDataLoaded
+    insuranceCheckupData, user, currentClient, isDataLoaded
   ]);
+
+  // 保存 insurance_checkup 的 activeStep 到 localStorage（即時保存）
+  useEffect(() => {
+    if (insuranceCheckupData.activeStep) {
+      localStorage.setItem('insurance_checkup_step', insuranceCheckupData.activeStep.toString());
+    }
+  }, [insuranceCheckupData.activeStep]);
 
   // ==========================================
   // 3. UI 修復：手機選單背景滾動鎖定
@@ -343,7 +377,11 @@ export default function App() {
       setIsLiffRegisterRoute(path === '/liff/register');
       setIsRegisterRoute(path === '/register'); // 🆕 公開註冊
       setIsBlogRoute(path.startsWith('/blog')); // 🆕 部落格（包含 /blog/xxx 文章頁）
-      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); }
+      setIsBookingRoute(path === '/booking'); // 🆕 預約試算
+      setIsAllianceRoute(path === '/alliance'); // 🆕 傲創聯盟
+      setIsPartnerApplyRoute(path === '/partner-apply'); // 🆕 合作夥伴申請
+      setIsUltraCloudDemoRoute(path === '/ultracloud'); // 🆕 UltraCloud Demo
+      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -357,6 +395,10 @@ export default function App() {
     else if (path === '/liff/register') setIsLiffRegisterRoute(true);
     else if (path === '/register') setIsRegisterRoute(true); // 🆕 公開註冊
     else if (path.startsWith('/blog')) setIsBlogRoute(true); // 🆕 部落格（包含 /blog/xxx 文章頁）
+    else if (path === '/booking') setIsBookingRoute(true); // 🆕 預約試算
+    else if (path === '/alliance') setIsAllianceRoute(true); // 🆕 傲創聯盟
+    else if (path === '/partner-apply') setIsPartnerApplyRoute(true); // 🆕 合作夥伴申請
+    else if (path === '/ultracloud') setIsUltraCloudDemoRoute(true); // 🆕 UltraCloud Demo
 
     // 🆕 SplashScreen 只在這個 session 第一次進入時顯示
     if (sessionStorage.getItem('splash_shown') !== 'true') {
@@ -411,6 +453,23 @@ export default function App() {
   // 客戶資料監聽
   useEffect(() => {
       if (!user || !currentClient) { setIsDataLoaded(false); return; }
+      // 虛擬客戶（從戰情室直接跳轉工具）不需要載入 Firestore 資料
+      if (currentClient.id === 'self-checkup') {
+        // 重置所有工具資料為預設值，避免殘留前一個客戶的資料
+        setInsuranceCheckupData(defaultStates.insurance_checkup);
+        setGoldenSafeData(defaultStates.golden_safe);
+        setGiftData(defaultStates.gift);
+        setEstateData(defaultStates.estate);
+        setStudentData(defaultStates.student);
+        setSuperActiveData(defaultStates.super_active);
+        setCarData(defaultStates.car);
+        setPensionData(defaultStates.pension);
+        setReservoirData(defaultStates.reservoir);
+        setTaxData(defaultStates.tax);
+        setFreeDashboardLayout(defaultStates.free_dashboard.layout);
+        setIsDataLoaded(true);
+        return;
+      }
       setClientLoading(true);
       const clientDocRef = doc(db, 'users', user.uid, 'clients', currentClient.id);
       const unsubscribeClient = onSnapshot(clientDocRef, (docSnap) => {
@@ -426,6 +485,7 @@ export default function App() {
               if (data.reservoirData) setReservoirData(prev => ({...prev, ...data.reservoirData}));
               if (data.taxData) setTaxData(prev => ({...prev, ...data.taxData}));
               if (data.freeDashboardLayout) setFreeDashboardLayout(data.freeDashboardLayout);
+              if (data.insuranceCheckupData) setInsuranceCheckupData(prev => ({...prev, ...data.insuranceCheckupData}));
           }
           setClientLoading(false);
           setIsDataLoaded(true); 
@@ -452,6 +512,7 @@ export default function App() {
       case 'reservoir': return reservoirData;
       case 'pension': return pensionData;
       case 'tax': return taxData;
+      case 'insurance_checkup': return insuranceCheckupData;
       default: return {};
     }
   };
@@ -499,6 +560,68 @@ export default function App() {
           setIsRegisterRoute(false);
           setIsLoginRoute(true);
           window.history.pushState({}, '', '/login');
+        }}
+      />
+    );
+  }
+
+  // 🆕 預約試算頁面（不需登入）
+  if (isBookingRoute || window.location.pathname === '/booking') {
+    return (
+      <BookingPage
+        onBack={() => {
+          setIsBookingRoute(false);
+          window.history.pushState({}, '', '/');
+          window.location.reload();
+        }}
+        onLogin={() => {
+          setIsBookingRoute(false);
+          setIsLoginRoute(true);
+          window.history.pushState({}, '', '/login');
+        }}
+      />
+    );
+  }
+
+  // 🆕 傲創聯盟頁面（不需登入）
+  if (isAllianceRoute || window.location.pathname === '/alliance') {
+    return (
+      <AlliancePage
+        onBack={() => {
+          setIsAllianceRoute(false);
+          window.history.pushState({}, '', '/');
+          window.location.reload();
+        }}
+        onLogin={() => {
+          setIsAllianceRoute(false);
+          setIsLoginRoute(true);
+          window.history.pushState({}, '', '/login');
+        }}
+      />
+    );
+  }
+
+  // 🆕 合作夥伴申請頁面（不需登入）
+  if (isPartnerApplyRoute || window.location.pathname === '/partner-apply') {
+    return (
+      <PartnerApplicationPage
+        onBack={() => {
+          setIsPartnerApplyRoute(false);
+          setIsAllianceRoute(true);
+          window.history.pushState({}, '', '/alliance');
+        }}
+      />
+    );
+  }
+
+  // 🆕 UltraCloud Logo 展示頁面（不需登入）
+  if (isUltraCloudDemoRoute || window.location.pathname === '/ultracloud') {
+    return (
+      <UltraCloudDemo
+        onBack={() => {
+          setIsUltraCloudDemoRoute(false);
+          window.history.pushState({}, '', '/');
+          window.location.reload();
         }}
       />
     );
@@ -625,6 +748,17 @@ export default function App() {
               user={user}
               onSelectClient={setCurrentClient}
               onLogout={handleLogout}
+              onNavigateToTool={(toolId) => {
+                // 以虛擬客戶進入工具介面，然後跳轉到指定工具
+                setCurrentClient({ id: 'self-checkup', name: '保單健診（個人）', phone: '', note: '' });
+                setActiveTab(toolId);
+              }}
+              onStartCheckup={(clientId, clientName) => {
+                // 保單健診：綁定真實客戶
+                setCurrentClient({ id: clientId, name: clientName, phone: '', note: '' });
+                setInsuranceCheckupData({ activeStep: 1, clientId });
+                setActiveTab('insurance_checkup');
+              }}
             />
           </ThemeProvider>
       );
@@ -723,6 +857,16 @@ export default function App() {
                 </span>
               </div>
               <NavItem icon={Landmark} label="稅務傳承專案" active={activeTab === 'tax'} onClick={() => { setActiveTab('tax'); setIsMobileMenuOpen(false); }} locked={!canAccessTool('tax')} />
+
+              {/* 保單健診 */}
+              <div className="text-xs font-bold text-rose-400 px-4 py-2 uppercase tracking-wider flex items-center gap-2 mt-4">
+                保單健診
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                  <Sparkles size={10} />PRO
+                </span>
+              </div>
+              <NavItem icon={HeartPulse} label="保單健診系統" active={activeTab === 'insurance_checkup'} onClick={() => { setActiveTab('insurance_checkup'); setIsMobileMenuOpen(false); }} locked={!canAccessTool('insurance_checkup')} />
+              <NavItem icon={GitBranch} label="家庭圖管理" active={activeTab === 'family_tree'} onClick={() => { setActiveTab('family_tree'); setIsMobileMenuOpen(false); }} locked={!canAccessTool('family_tree')} />
             </div>
             <div className="p-4 border-t border-slate-800 space-y-2">
               <button onClick={() => { setIsReportOpen(true); setIsMobileMenuOpen(false); }} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-3 rounded-xl w-full">
@@ -790,6 +934,23 @@ export default function App() {
                   onSaveLayout={setFreeDashboardLayout} 
                 />
               ), '自由組合戰情室')}
+              {activeTab === 'insurance_checkup' && renderTool('insurance_checkup',
+                <InsuranceCheckupTool
+                  data={insuranceCheckupData}
+                  setData={setInsuranceCheckupData}
+                  userId={user?.uid}
+                  clientId={insuranceCheckupData.clientId || currentClient?.id}
+                  clientName={currentClient?.name}
+                />,
+                '保單健診系統'
+              )}
+              {activeTab === 'family_tree' && renderTool('family_tree',
+                <FamilyTreeTool
+                  userId={user?.uid}
+                  clientId={currentClient?.id}
+                />,
+                '家庭圖管理'
+              )}
             </div>
         </div>
       </main>

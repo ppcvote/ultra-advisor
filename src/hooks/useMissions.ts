@@ -5,32 +5,10 @@
  * 檔案位置：src/hooks/useMissions.ts
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { getFunctions, httpsCallable, Functions } from 'firebase/functions';
+import { useState, useCallback, useEffect } from 'react';
+import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
-import { auth, db } from '../firebase';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-
-// Firebase 設定（備用，以防主 app 還沒初始化）
-const firebaseConfig = {
-  apiKey: "AIzaSyAqS6fhHQVyBNr1LCkCaQPyJ13Rkq7bfHA",
-  authDomain: "grbt-f87fa.firebaseapp.com",
-  projectId: "grbt-f87fa",
-  storageBucket: "grbt-f87fa.firebasestorage.app",
-  messagingSenderId: "169700005946",
-  appId: "1:169700005946:web:9b0722f31aa9fe7ad13d03",
-};
-
-// 延遲初始化 functions
-let _functions: Functions | null = null;
-const getFunctionsInstance = (): Functions => {
-  if (!_functions) {
-    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    _functions = getFunctions(app, 'us-central1');
-    console.log('Firebase Functions initialized');
-  }
-  return _functions;
-};
+import { auth, db, functions } from '../firebase';
 
 // 類型定義
 export interface Mission {
@@ -87,8 +65,7 @@ export const useMissions = () => {
     setError(null);
 
     try {
-      const functions = getFunctionsInstance();
-      const getMissionsFunc = httpsCallable(functions, 'getMissions');
+            const getMissionsFunc = httpsCallable(functions, 'getMissions');
       const result = await getMissionsFunc({});
       const data = result.data as { missions: Mission[] };
 
@@ -145,8 +122,7 @@ export const useMissions = () => {
 
     try {
       console.log('Creating callable function...');
-      const functions = getFunctionsInstance();
-      const completeMissionFunc = httpsCallable(functions, 'completeMission');
+            const completeMissionFunc = httpsCallable(functions, 'completeMission');
       console.log('Calling Cloud Function...');
       const result = await completeMissionFunc({ missionId });
       console.log('Cloud Function result:', result);
@@ -260,15 +236,13 @@ export const useMissions = () => {
 // 靜態 API（不需要 Hook）
 export const missionsApi = {
   async getMissions(): Promise<{ missions: Mission[] }> {
-    const functions = getFunctionsInstance();
-    const getMissionsFunc = httpsCallable(functions, 'getMissions');
+        const getMissionsFunc = httpsCallable(functions, 'getMissions');
     const result = await getMissionsFunc({});
     return result.data as { missions: Mission[] };
   },
 
   async completeMission(missionId: string): Promise<CompleteMissionResult> {
-    const functions = getFunctionsInstance();
-    const completeMissionFunc = httpsCallable(functions, 'completeMission');
+        const completeMissionFunc = httpsCallable(functions, 'completeMission');
     const result = await completeMissionFunc({ missionId });
     return result.data as CompleteMissionResult;
   },

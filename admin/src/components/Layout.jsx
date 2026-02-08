@@ -18,6 +18,7 @@ import {
   TrophyOutlined,
   UsergroupAddOutlined,
   ShoppingOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
@@ -60,6 +61,11 @@ const MainLayout = () => {
       key: '/admin/users',
       icon: <UserOutlined />,
       label: '用戶管理',
+    },
+    {
+      key: '/admin/applications',
+      icon: <CalendarOutlined />,
+      label: '申請管理',
     },
     {
       type: 'divider',

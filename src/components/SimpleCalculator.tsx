@@ -128,20 +128,68 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
     return rounded.toLocaleString('zh-TW', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   };
 
-  // 安全的數學表達式計算
+  // 安全的數學表達式計算（不使用 eval 或 new Function）
   const safeCalculate = (expr: string): number => {
     // 處理百分比：將 X% 轉換為 (X/100)
     let processed = expr.replace(/(\d+(?:\.\d+)?)\s*%/g, '($1/100)');
-    // 處理乘法優先級：數字後直接接百分比結果要相乘
-    // 例如 12345 * 5% => 12345 * (5/100)
     processed = processed.replace(/\s+/g, '');
 
     // 僅允許數字、運算符、小數點、括號
     const sanitized = processed.replace(/[^0-9+\-*/.()]/g, '');
     if (!sanitized) throw new Error('Invalid expression');
 
-    const calculate = new Function(`return (${sanitized})`);
-    return calculate();
+    // 使用安全的遞迴解析器代替 new Function()
+    return parseExpression(sanitized);
+  };
+
+  // 安全的表達式解析器（遞迴下降解析）
+  const parseExpression = (expr: string): number => {
+    let pos = 0;
+
+    const parseNumber = (): number => {
+      let numStr = '';
+      while (pos < expr.length && /[0-9.]/.test(expr[pos])) {
+        numStr += expr[pos++];
+      }
+      if (!numStr) throw new Error('Expected number');
+      return parseFloat(numStr);
+    };
+
+    const parseFactor = (): number => {
+      if (expr[pos] === '(') {
+        pos++; // 跳過 '('
+        const result = parseAddSub();
+        if (expr[pos] === ')') pos++; // 跳過 ')'
+        return result;
+      }
+      if (expr[pos] === '-') {
+        pos++;
+        return -parseFactor();
+      }
+      return parseNumber();
+    };
+
+    const parseMulDiv = (): number => {
+      let result = parseFactor();
+      while (pos < expr.length && (expr[pos] === '*' || expr[pos] === '/')) {
+        const op = expr[pos++];
+        const right = parseFactor();
+        result = op === '*' ? result * right : result / right;
+      }
+      return result;
+    };
+
+    const parseAddSub = (): number => {
+      let result = parseMulDiv();
+      while (pos < expr.length && (expr[pos] === '+' || expr[pos] === '-')) {
+        const op = expr[pos++];
+        const right = parseMulDiv();
+        result = op === '+' ? result + right : result - right;
+      }
+      return result;
+    };
+
+    return parseAddSub();
   };
 
   // 處理數字輸入

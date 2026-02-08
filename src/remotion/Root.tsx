@@ -4,6 +4,8 @@ import { FinancialCalculatorAnimation } from './FinancialCalculatorAnimation';
 import { UltraAdvisorBrandVideo } from './UltraAdvisorBrandVideo';
 import { UltraAdvisorFirstPersonDemo } from './UltraAdvisorFirstPersonDemo';
 import { UltraAdvisorSystemDemo } from './UltraAdvisorSystemDemo';
+import { UltraAllianceBackground } from './UltraAllianceBackground';
+import { UltraAlliancePromo } from './UltraAlliancePromo';
 
 const RemotionRoot: React.FC = () => {
   return (
@@ -88,6 +90,50 @@ const RemotionRoot: React.FC = () => {
           loanRate: 2.2,
           investReturnRate: 6,
         }}
+      />
+
+      {/* ==================== 傲創聯盟背景動畫 ==================== */}
+
+      {/* Ultra Alliance 粒子連結網絡 - 10秒循環 (網頁背景用) */}
+      <Composition
+        id="AllianceBackground"
+        component={UltraAllianceBackground}
+        durationInFrames={600} // 10秒 @ 60fps
+        fps={60}
+        width={1920}
+        height={1080}
+      />
+
+      {/* Ultra Alliance 粒子連結網絡 - 方形版 */}
+      <Composition
+        id="AllianceBackgroundSquare"
+        component={UltraAllianceBackground}
+        durationInFrames={600}
+        fps={60}
+        width={1080}
+        height={1080}
+      />
+
+      {/* ==================== 傲創聯盟招商影片 ==================== */}
+
+      {/* 傲創聯盟 30 秒招商宣傳影片 - 給店家看 (v4 絲滑版) */}
+      <Composition
+        id="AlliancePromo"
+        component={UltraAlliancePromo}
+        durationInFrames={1800} // 30秒 @ 60fps
+        fps={60}
+        width={1920}
+        height={1080}
+      />
+
+      {/* 傲創聯盟招商影片 - 直向版 (IG Reels / TikTok) */}
+      <Composition
+        id="AlliancePromoVertical"
+        component={UltraAlliancePromo}
+        durationInFrames={1800} // 30秒 @ 60fps
+        fps={60}
+        width={1080}
+        height={1920}
       />
     </>
   );

@@ -152,7 +152,7 @@ const Users = () => {
 
       console.log('查詢到的文檔數:', snapshot.size);
 
-      // 🆕 載入每個用戶的 profile 子集合
+      // 🆕 載入每個用戶的 profile 子集合和每日金句分享記錄
       const usersList = await Promise.all(
         snapshot.docs.map(async (userDoc) => {
           const data = userDoc.data();
@@ -168,6 +168,17 @@ const Users = () => {
             // 忽略錯誤，可能沒有 profile
           }
 
+          // 🆕 嘗試載入每日金句分享記錄
+          let quoteShareData = {};
+          try {
+            const quoteShareDoc = await getDoc(doc(db, 'users', userDoc.id, 'dailyQuoteShares', 'data'));
+            if (quoteShareDoc.exists()) {
+              quoteShareData = quoteShareDoc.data();
+            }
+          } catch (err) {
+            // 忽略錯誤，可能沒有分享記錄
+          }
+
           return {
             key: userDoc.id,
             id: userDoc.id,
@@ -177,6 +188,9 @@ const Users = () => {
             photoURL: profileData.photoURL || data.photoURL || '',
             phone: profileData.phone || data.phone || '',
             lineId: profileData.lineId || data.lineId || '',
+            // 🆕 每日金句分享資料
+            lastQuoteShareDate: quoteShareData.lastShareDate || null,
+            totalQuoteShareDays: quoteShareData.totalShareDays || 0,
           };
         })
       );
@@ -659,6 +673,36 @@ const Users = () => {
               <span style={{ color: '#9ca3af' }}>-</span>
             )}
           </div>
+        );
+      },
+    },
+    {
+      title: '每日金句',
+      key: 'quoteShare',
+      width: 120,
+      render: (_, record) => {
+        if (!record.lastQuoteShareDate) {
+          return <span style={{ color: '#9ca3af' }}>未使用</span>;
+        }
+        const lastDate = record.lastQuoteShareDate;
+        const today = new Date().toISOString().split('T')[0];
+        const isToday = lastDate === today;
+        const daysAgo = Math.floor((new Date(today) - new Date(lastDate)) / (1000 * 60 * 60 * 24));
+
+        return (
+          <Tooltip title={`累積分享 ${record.totalQuoteShareDays} 天`}>
+            <div style={{ fontSize: 12 }}>
+              <div style={{
+                color: isToday ? '#10b981' : daysAgo <= 7 ? '#3b82f6' : '#f59e0b',
+                fontWeight: 600
+              }}>
+                {isToday ? '今天' : daysAgo === 1 ? '昨天' : `${daysAgo} 天前`}
+              </div>
+              <div style={{ color: '#8b5cf6', fontSize: 11 }}>
+                共 {record.totalQuoteShareDays} 天
+              </div>
+            </div>
+          </Tooltip>
         );
       },
     },
@@ -1244,6 +1288,42 @@ const Users = () => {
                 <div>
                   <Text type="secondary">🔥 連續登入</Text>
                   <div><Text>{selectedUser.loginStreak || 0} 天</Text></div>
+                </div>
+              </Col>
+            </Row>
+
+            {/* 🆕 每日金句分享 */}
+            <Divider style={{ margin: '12px 0' }} />
+            <Row gutter={16}>
+              <Col span={12}>
+                <div>
+                  <Text type="secondary">💬 上次分享金句</Text>
+                  <div>
+                    {selectedUser.lastQuoteShareDate ? (
+                      <Text>
+                        {selectedUser.lastQuoteShareDate}
+                        {(() => {
+                          const today = new Date().toISOString().split('T')[0];
+                          const daysAgo = Math.floor((new Date(today) - new Date(selectedUser.lastQuoteShareDate)) / (1000 * 60 * 60 * 24));
+                          if (daysAgo === 0) return <Tag color="green" style={{ marginLeft: 8 }}>今天</Tag>;
+                          if (daysAgo === 1) return <Tag color="blue" style={{ marginLeft: 8 }}>昨天</Tag>;
+                          return <Tag color={daysAgo <= 7 ? 'blue' : 'orange'} style={{ marginLeft: 8 }}>{daysAgo} 天前</Tag>;
+                        })()}
+                      </Text>
+                    ) : (
+                      <Text type="secondary">-</Text>
+                    )}
+                  </div>
+                </div>
+              </Col>
+              <Col span={12}>
+                <div>
+                  <Text type="secondary">📊 累積分享天數</Text>
+                  <div>
+                    <Text strong style={{ color: '#8b5cf6', fontSize: 18 }}>
+                      {selectedUser.totalQuoteShareDays || 0} 天
+                    </Text>
+                  </div>
                 </div>
               </Col>
             </Row>

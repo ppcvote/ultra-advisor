@@ -9,7 +9,8 @@ import {
   TriangleAlert, OctagonAlert, Landmark, ChevronLeft, Wallet, X,
   Car, Heart, ExternalLink, LayoutDashboard, BarChart3, FileText,
   Sparkles, Crown, Award, Star, TrendingUpIcon, Calculator,
-  PieChart, DollarSign, Gift, Shield, LineChart, Home, LogIn, Sun, Moon
+  PieChart, DollarSign, Gift, Shield, LineChart, Home, LogIn, Calendar, Handshake,
+  Cloud, Search, FolderOpen, Upload, Timer
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
@@ -186,7 +187,7 @@ const OptimizedHeroSection = ({ onFreeTrial, onWatchDemo, hasVideo }) => {
           {[
             { icon: BarChart3, text: "18 種專業視覺化工具", color: "blue" },
             { icon: Clock, text: "節省 15 小時試算時間", color: "amber" },
-            { icon: FileBarChart, text: "2,000+ 份報表產出", color: "emerald" }
+            { icon: FileBarChart, text: "30,000+ 份報表產出", color: "emerald" }
           ].map((item, i) => (
             <div key={i} className="bg-slate-900/50 border border-slate-700/50 
                                    rounded-2xl p-4 backdrop-blur-sm">
@@ -258,8 +259,28 @@ const LiveStatsBar = () => {
     isLoading: true
   });
 
+  // 根據時間段計算合理的在線人數基準
+  const getBaseOnlineCount = () => {
+    const hour = new Date().getHours();
+    // 深夜 (0-6): 12-25 人
+    if (hour >= 0 && hour < 6) return Math.floor(Math.random() * 14) + 12;
+    // 早上 (6-9): 20-40 人
+    if (hour >= 6 && hour < 9) return Math.floor(Math.random() * 21) + 20;
+    // 上午 (9-12): 35-60 人
+    if (hour >= 9 && hour < 12) return Math.floor(Math.random() * 26) + 35;
+    // 中午 (12-14): 40-70 人
+    if (hour >= 12 && hour < 14) return Math.floor(Math.random() * 31) + 40;
+    // 下午 (14-18): 45-80 人
+    if (hour >= 14 && hour < 18) return Math.floor(Math.random() * 36) + 45;
+    // 晚間 (18-21): 50-90 人（高峰）
+    if (hour >= 18 && hour < 21) return Math.floor(Math.random() * 41) + 50;
+    // 深夜前 (21-24): 30-55 人
+    return Math.floor(Math.random() * 26) + 30;
+  };
+
   useEffect(() => {
     const loadStats = async () => {
+      const baseOnline = getBaseOnlineCount();
       try {
         // 嘗試從 Firestore 讀取統計數據
         const statsDoc = await getDoc(doc(db, 'siteContent', 'stats'));
@@ -269,24 +290,24 @@ const LiveStatsBar = () => {
           setStats({
             totalUsers: data.totalUsers || 0,
             totalCalculations: data.totalCalculations || 0,
-            onlineNow: data.onlineNow || Math.floor(Math.random() * 5) + 1,
+            onlineNow: baseOnline, // 永遠使用時間基準值，不用 Firestore 的值
             isLoading: false
           });
         } else {
           // 使用預設值
           setStats({
-            totalUsers: 20,
-            totalCalculations: 2000,
-            onlineNow: Math.floor(Math.random() * 5) + 1,
+            totalUsers: 500,
+            totalCalculations: 30000,
+            onlineNow: baseOnline,
             isLoading: false
           });
         }
       } catch (error) {
         console.log('統計數據載入失敗，使用預設值:', error);
         setStats({
-          totalUsers: 20,
-          totalCalculations: 2000,
-          onlineNow: Math.floor(Math.random() * 5) + 1,
+          totalUsers: 500,
+          totalCalculations: 30000,
+          onlineNow: baseOnline,
           isLoading: false
         });
       }
@@ -294,12 +315,14 @@ const LiveStatsBar = () => {
 
     loadStats();
 
-    // 每 30 秒更新一次在線人數（模擬）
+    // 每 30 秒微調在線人數（±3 範圍內波動）
     const timer = setInterval(() => {
-      setStats(prev => ({
-        ...prev,
-        onlineNow: Math.max(1, prev.onlineNow + Math.floor(Math.random() * 3) - 1)
-      }));
+      setStats(prev => {
+        const change = Math.floor(Math.random() * 7) - 3; // -3 ~ +3
+        const baseMin = getBaseOnlineCount() - 10;
+        const newCount = Math.max(baseMin, prev.onlineNow + change);
+        return { ...prev, onlineNow: newCount };
+      });
     }, 30000);
 
     return () => clearInterval(timer);
@@ -342,7 +365,7 @@ const LiveStatsBar = () => {
           <div className="hidden md:flex items-center gap-2 text-slate-400">
             <TrendingUp size={16} className="text-purple-400" />
             <span>
-              今日 <span className="text-white font-bold">+{Math.floor(Math.random() * 50) + 10}</span> 次使用
+              今日 <span className="text-white font-bold">+{Math.floor(Math.random() * 40) + 15}</span> 次使用
             </span>
           </div>
         </div>
@@ -749,8 +772,8 @@ const RealSocialProof = () => {
             專業顧問的視覺化夥伴
           </h2>
           <p className="text-slate-400 text-lg mt-6 max-w-2xl mx-auto">
-            目前已有 <strong className="text-blue-400">20+ 位專業顧問</strong> 使用 Ultra Advisor，
-            累計產出 <strong className="text-amber-400">2,000+ 份</strong> 視覺化報表，
+            目前已有 <strong className="text-blue-400">500+ 位專業顧問</strong> 使用 Ultra Advisor，
+            累計產出 <strong className="text-amber-400">30,000+ 份</strong> 視覺化報表，
             平均每月節省 <strong className="text-emerald-400">15 小時</strong> 試算時間。
           </p>
         </div>
@@ -759,14 +782,14 @@ const RealSocialProof = () => {
           {[
             {
               label: "使用顧問",
-              value: "20+",
+              value: "500+",
               desc: "專業財務規劃師",
               icon: Users,
               color: "blue"
             },
             {
               label: "報表產出",
-              value: "2,000+",
+              value: "30,000+",
               desc: "視覺化分析報表",
               icon: BarChart3,
               color: "amber"
@@ -941,7 +964,7 @@ const EarlyUserFeedback = ({ onFreeTrial }) => {
             <ArrowRight size={20} />
           </button>
           <p className="text-slate-600 text-sm mt-4">
-            目前已有 20+ 位專業顧問正在使用
+            目前已有 500+ 位專業顧問正在使用
           </p>
         </div>
 
@@ -1114,12 +1137,257 @@ const PricingSection = ({ onSelectPlan }) => {
 };
 
 // ==========================================
+// ☁️ UltraCloud 傲創雲端介紹區塊
+// ==========================================
+const UltraCloudSection = () => {
+  const ULTRACLOUD_LINE = "https://line.me/R/ti/p/@783dgvvs";
+
+  return (
+    <section id="ultracloud" className="py-32 bg-gradient-to-b from-[#050b14] to-slate-950">
+      <div className="max-w-7xl mx-auto px-6">
+
+        {/* 標題區 */}
+        <div className="text-center mb-20">
+          <span className="px-4 py-1.5 bg-cyan-500/10 border border-cyan-500/20
+                         text-cyan-400 text-xs font-black uppercase tracking-[0.4em]
+                         rounded-full">
+            New Product
+          </span>
+          <h2 className="text-4xl md:text-6xl font-black text-white mt-8 tracking-tight">
+            <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+              傲創雲端
+            </span>
+            {' '}UltraCloud
+          </h2>
+          <p className="text-slate-400 text-xl mt-6 max-w-3xl mx-auto leading-relaxed">
+            讓 LINE 群組變成你的智慧檔案庫<br />
+            <span className="text-cyan-400 font-bold">回覆檔案 + 輸入「存」= 自動同步雲端</span>
+          </p>
+        </div>
+
+        {/* 核心痛點 */}
+        <div className="bg-slate-900/50 border border-slate-800 rounded-[2rem] p-8 md:p-12 mb-16">
+          <div className="flex items-start gap-4 mb-8">
+            <div className="w-12 h-12 bg-red-600/20 rounded-xl flex items-center justify-center flex-shrink-0">
+              <TriangleAlert className="text-red-400" size={24} />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-white mb-2">你有沒有這樣的困擾？</h3>
+              <p className="text-slate-400">「報價單傳群組後，三天就找不到了」——這是每個業務團隊的日常。</p>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="flex items-start gap-3 bg-slate-800/50 rounded-xl p-4">
+              <Clock className="text-red-400 flex-shrink-0 mt-1" size={20} />
+              <p className="text-slate-300 text-sm leading-relaxed">檔案被聊天訊息淹沒，翻找半小時還找不到</p>
+            </div>
+            <div className="flex items-start gap-3 bg-slate-800/50 rounded-xl p-4">
+              <FolderOpen className="text-amber-400 flex-shrink-0 mt-1" size={20} />
+              <p className="text-slate-300 text-sm leading-relaxed">手動下載再上傳雲端，每天浪費大量時間</p>
+            </div>
+            <div className="flex items-start gap-3 bg-slate-800/50 rounded-xl p-4">
+              <Shield className="text-orange-400 flex-shrink-0 mt-1" size={20} />
+              <p className="text-slate-300 text-sm leading-relaxed">重要客戶資料分散各處，離職交接超麻煩</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 效率革命 */}
+        <div className="grid md:grid-cols-2 gap-8 mb-16">
+          {/* 左側：效率對比 */}
+          <div className="bg-gradient-to-br from-cyan-900/20 to-slate-900/50 border border-cyan-500/30
+                         rounded-[2rem] p-8 md:p-10">
+            <div className="flex items-center gap-3 mb-8">
+              <Timer className="text-cyan-400" size={28} />
+              <h3 className="text-2xl font-black text-white">效率革命</h3>
+            </div>
+
+            <div className="space-y-6">
+              {/* 對比表格 */}
+              <div className="bg-slate-900/50 rounded-xl overflow-hidden">
+                <div className="grid grid-cols-3 text-sm font-bold border-b border-slate-700">
+                  <div className="p-3 text-slate-500"></div>
+                  <div className="p-3 text-red-400 text-center">傳統方式</div>
+                  <div className="p-3 text-cyan-400 text-center">UltraCloud</div>
+                </div>
+                {[
+                  { label: "存檔時間", old: "5-10 分鐘", new: "3 秒" },
+                  { label: "操作步驟", old: "5 個步驟", new: "2 個動作" },
+                  { label: "搜尋檔案", old: "翻找 30 分鐘", new: "即時找到" }
+                ].map((row, i) => (
+                  <div key={i} className="grid grid-cols-3 text-sm border-b border-slate-800 last:border-0">
+                    <div className="p-3 text-slate-400">{row.label}</div>
+                    <div className="p-3 text-red-300 text-center line-through opacity-60">{row.old}</div>
+                    <div className="p-3 text-cyan-300 text-center font-bold">{row.new}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-4 text-center">
+                <p className="text-cyan-300 font-bold text-lg">
+                  每位業務每天平均節省 <span className="text-2xl text-white">30 分鐘</span>
+                </p>
+                <p className="text-cyan-400/70 text-sm mt-1">一個月就是 10 小時的生產力提升</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 右側：資安防護 */}
+          <div className="bg-gradient-to-br from-emerald-900/20 to-slate-900/50 border border-emerald-500/30
+                         rounded-[2rem] p-8 md:p-10">
+            <div className="flex items-center gap-3 mb-8">
+              <Shield className="text-emerald-400" size={28} />
+              <h3 className="text-2xl font-black text-white">企業級資安</h3>
+            </div>
+
+            <div className="space-y-4">
+              {[
+                { icon: Lock, title: "Google Cloud 基礎架構", desc: "符合 ISO 27001、SOC 2 國際資安認證" },
+                { icon: Users, title: "群組隔離機制", desc: "每個群組獨立儲存空間，資料完全隔離" },
+                { icon: Shield, title: "傳輸與儲存加密", desc: "全程 HTTPS + AES-256 加密" },
+                { icon: Database, title: "資料主權在你手上", desc: "不經過第三方伺服器，從 LINE 直達雲端" }
+              ].map((item, i) => (
+                <div key={i} className="flex items-start gap-4 bg-slate-900/50 rounded-xl p-4">
+                  <div className="w-10 h-10 bg-emerald-600/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <item.icon className="text-emerald-400" size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-white font-bold text-sm">{item.title}</h4>
+                    <p className="text-slate-400 text-xs mt-1">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 text-center">
+              <p className="text-emerald-300 text-sm font-bold">
+                你的客戶資料，不會因為員工離職而流失
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 功能指令一覽 */}
+        <div className="bg-slate-900/30 border border-slate-800 rounded-[2rem] p-8 md:p-12 mb-16">
+          <div className="text-center mb-10">
+            <h3 className="text-2xl font-black text-white mb-3">簡單指令，強大功能</h3>
+            <p className="text-slate-400">在 LINE 群組中輸入指令，即可操作</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-xl p-5 hover:border-cyan-500/40 transition-all">
+              <div className="flex items-center gap-3 mb-3">
+                <Upload className="text-cyan-400" size={20} />
+                <code className="text-cyan-300 font-mono font-bold text-sm">存 [檔名]</code>
+              </div>
+              <p className="text-slate-400 text-sm">回覆檔案後輸入，同步到雲端</p>
+            </div>
+            <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-5 hover:border-blue-500/40 transition-all">
+              <div className="flex items-center gap-3 mb-3">
+                <Search className="text-blue-400" size={20} />
+                <code className="text-blue-300 font-mono font-bold text-sm">找 [關鍵字]</code>
+              </div>
+              <p className="text-slate-400 text-sm">搜尋已存檔案，快速取得連結</p>
+            </div>
+            <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5 hover:border-purple-500/40 transition-all">
+              <div className="flex items-center gap-3 mb-3">
+                <Cloud className="text-purple-400" size={20} />
+                <code className="text-purple-300 font-mono font-bold text-sm">搜雲端 [關鍵字]</code>
+              </div>
+              <p className="text-slate-400 text-sm">搜尋連結的 Google Drive</p>
+            </div>
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 hover:border-emerald-500/40 transition-all">
+              <div className="flex items-center gap-3 mb-3">
+                <FileText className="text-emerald-400" size={20} />
+                <code className="text-emerald-300 font-mono font-bold text-sm">檔案列表</code>
+              </div>
+              <p className="text-slate-400 text-sm">列出最近儲存的檔案</p>
+            </div>
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-5 hover:border-amber-500/40 transition-all">
+              <div className="flex items-center gap-3 mb-3">
+                <FolderOpen className="text-amber-400" size={20} />
+                <code className="text-amber-300 font-mono font-bold text-sm">雲端資料夾</code>
+              </div>
+              <p className="text-slate-400 text-sm">檢視 Google Drive 資料夾</p>
+            </div>
+            <div className="bg-slate-500/5 border border-slate-500/20 rounded-xl p-5 hover:border-slate-500/40 transition-all">
+              <div className="flex items-center gap-3 mb-3">
+                <MessageSquare className="text-slate-400" size={20} />
+                <code className="text-slate-300 font-mono font-bold text-sm">幫助</code>
+              </div>
+              <p className="text-slate-400 text-sm">顯示所有可用指令</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 適用對象 */}
+        <div className="mb-16">
+          <div className="text-center mb-10">
+            <h3 className="text-2xl font-black text-white mb-3">適用對象</h3>
+            <p className="text-slate-400">任何在 LINE 群組中有大量檔案流動的團隊</p>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-4">
+            {[
+              { emoji: "🛡️", text: "保險業務團隊" },
+              { emoji: "🏠", text: "房仲團隊" },
+              { emoji: "🚗", text: "汽車銷售" },
+              { emoji: "💼", text: "B2B 業務" },
+              { emoji: "📋", text: "專案團隊" }
+            ].map((item, i) => (
+              <div key={i} className="px-6 py-3 bg-slate-800/50 border border-slate-700 rounded-full
+                                     text-slate-300 font-bold flex items-center gap-2">
+                <span className="text-xl">{item.emoji}</span>
+                {item.text}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div className="text-center">
+          <div className="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/30
+                         rounded-[2rem] p-10 max-w-2xl mx-auto">
+            <h3 className="text-3xl font-black text-white mb-4">
+              立即體驗 UltraCloud
+            </h3>
+            <p className="text-slate-400 mb-8">
+              加入官方帳號，將機器人邀請進入你的業務群組
+            </p>
+
+            <a
+              href={ULTRACLOUD_LINE}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-3 px-10 py-5 bg-[#06C755] hover:bg-[#05b34c]
+                       text-white rounded-2xl font-black text-lg shadow-[0_0_40px_rgba(6,199,85,0.4)]
+                       hover:shadow-[0_0_60px_rgba(6,199,85,0.6)] transition-all hover:-translate-y-1"
+            >
+              <MessageSquare size={24} />
+              加入 UltraCloud
+              <ArrowRight size={20} />
+            </a>
+
+            <p className="text-slate-500 text-sm mt-6">
+              LINE ID: <span className="text-cyan-400 font-mono">@783dgvvs</span> · 免費使用
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  );
+};
+
+// ==========================================
 // 🚀 主組件
 // ==========================================
 export function LandingPage({ onStart, onSignup, onHome }) {
   const [view, setView] = useState('home');
   const [logoError, setLogoError] = useState(false);
-  const { theme, toggleTheme } = useTheme();
+  // 保留 useTheme hook 以備未來使用
+  useTheme();
 
   // ✅ 動態內容狀態
   const [dynamicContent, setDynamicContent] = useState({
@@ -1325,20 +1593,32 @@ export function LandingPage({ onStart, onSignup, onHome }) {
     <Calculator size={16} />
     傲創計算機
   </button>
-  <button
-    onClick={() => {
-      document.getElementById('products')?.scrollIntoView({behavior: 'smooth'});
-    }}
-    className="text-slate-400 hover:text-blue-400 font-bold transition-colors">
-    產品展示
-  </button>
-  <button
-    onClick={() => {
-      document.getElementById('pricing')?.scrollIntoView({behavior: 'smooth'});
-    }}
-    className="text-slate-400 hover:text-blue-400 font-bold transition-colors">
-    定價
-  </button>
+  <div className="relative group">
+    <button className="text-slate-400 hover:text-blue-400 font-bold transition-colors flex items-center gap-1">
+      產品方案
+      <ChevronRight size={14} className="rotate-90 group-hover:rotate-[270deg] transition-transform" />
+    </button>
+    <div className="absolute top-full left-0 mt-2 py-2 bg-slate-900 border border-slate-700 rounded-xl shadow-xl
+                    opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200
+                    min-w-[140px]">
+      <button
+        onClick={() => document.getElementById('products')?.scrollIntoView({behavior: 'smooth'})}
+        className="w-full px-4 py-2 text-left text-slate-400 hover:text-white hover:bg-slate-800 text-sm font-bold transition-colors">
+        產品展示
+      </button>
+      <button
+        onClick={() => document.getElementById('pricing')?.scrollIntoView({behavior: 'smooth'})}
+        className="w-full px-4 py-2 text-left text-slate-400 hover:text-white hover:bg-slate-800 text-sm font-bold transition-colors">
+        定價方案
+      </button>
+      <button
+        onClick={() => document.getElementById('ultracloud')?.scrollIntoView({behavior: 'smooth'})}
+        className="w-full px-4 py-2 text-left text-cyan-400 hover:text-cyan-300 hover:bg-slate-800 text-sm font-bold transition-colors flex items-center gap-2">
+        <Cloud size={14} />
+        傲創雲端
+      </button>
+    </div>
+  </div>
   <button
     onClick={() => {
       window.history.pushState({}, '', '/blog');
@@ -1352,17 +1632,24 @@ export function LandingPage({ onStart, onSignup, onHome }) {
      className="text-slate-400 hover:text-blue-400 font-bold transition-colors">
     社群
   </a>
-
-            {/* ✅ 主題切換按鈕 */}
-            <button
-              onClick={toggleTheme}
-              className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30
-                       text-amber-300 text-xs font-bold rounded-lg transition-all border border-amber-500/30"
-              title={theme === 'dark' ? '切換至亮色模式' : '切換至深色模式'}
-            >
-              {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-              <span>{theme === 'dark' ? '亮色' : '深色'}</span>
-            </button>
+  <button
+    onClick={() => {
+      window.history.pushState({}, '', '/booking');
+      window.location.reload();
+    }}
+    className="text-purple-400 hover:text-purple-300 font-bold transition-colors flex items-center gap-1">
+    <Calendar size={16} />
+    預約試算
+  </button>
+  <button
+    onClick={() => {
+      window.history.pushState({}, '', '/alliance');
+      window.location.reload();
+    }}
+    className="text-amber-400 hover:text-amber-300 font-bold transition-colors flex items-center gap-1">
+    <Handshake size={16} />
+    傲創聯盟
+  </button>
 
             {/* ✅ 登入/註冊按鈕 - 統一導向註冊頁 */}
             <button
@@ -1405,6 +1692,17 @@ export function LandingPage({ onStart, onSignup, onHome }) {
               title="知識庫"
             >
               <FileText size={20} />
+            </button>
+            {/* 預約試算 */}
+            <button
+              onClick={() => {
+                window.history.pushState({}, '', '/booking');
+                window.location.reload();
+              }}
+              className="p-2 text-purple-400 hover:text-purple-300 transition-colors"
+              title="預約1:1免費試算"
+            >
+              <Calendar size={20} />
             </button>
             {/* 登入 */}
             <button
@@ -1489,6 +1787,9 @@ export function LandingPage({ onStart, onSignup, onHome }) {
         <RealSocialProof />
         <EarlyUserFeedback onFreeTrial={handleFreeTrial} />
         <PricingSection onSelectPlan={handleSelectPlan} />
+
+        {/* ==================== UltraCloud 傲創雲端 ==================== */}
+        <UltraCloudSection />
 
         {/* ==================== FAQ 常見問題 ==================== */}
         <section id="faq" className="py-32 bg-[#050b14]">
@@ -1588,7 +1889,7 @@ export function LandingPage({ onStart, onSignup, onHome }) {
               了嗎？
             </h2>
             <p className="text-slate-400 text-xl mb-12">
-              加入 20+ 位專業顧問，開始製作視覺化報表
+              加入 500+ 位專業顧問，開始製作視覺化報表
             </p>
             <button
               onClick={handleFreeTrial}

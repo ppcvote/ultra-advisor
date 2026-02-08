@@ -3,6 +3,7 @@ import {
   LayoutDashboard, ShieldCheck, Activity, History,
   Wallet, Building2, GraduationCap, Rocket,
   Waves, Car, Umbrella, Landmark,
+  HeartPulse, GitBranch,
   LucideIcon
 } from 'lucide-react';
 
@@ -20,7 +21,7 @@ export interface Tool {
 export interface ToolCategory {
   id: string;
   title: string;
-  color: 'yellow' | 'emerald' | 'blue' | 'purple';  // 分類顏色
+  color: 'yellow' | 'emerald' | 'blue' | 'purple' | 'rose';  // 分類顏色
   colorClasses: {
     text: string;
     bg: string;
@@ -179,6 +180,35 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
         label: '稅務傳承專案',
         description: '遺產稅 & 贈與稅精算，最佳化傳承策略',
         benefits: ['遺產稅試算', '贈與稅規劃', '流動性缺口測試'],
+        isFree: false
+      }
+    ]
+  },
+  {
+    id: 'checkup',
+    title: '保單健診',
+    color: 'rose',
+    colorClasses: {
+      text: 'text-rose-400',
+      bg: 'bg-rose-500/10',
+      border: 'border-rose-500/30'
+    },
+    isFreeCategory: false,
+    tools: [
+      {
+        id: 'insurance_checkup',
+        icon: HeartPulse,
+        label: '保單健診系統',
+        description: '家庭保單健檢，缺口分析一目了然',
+        benefits: ['OCR 保單辨識', '家庭保障總覽', '缺口分析報告'],
+        isFree: false
+      },
+      {
+        id: 'family_tree',
+        icon: GitBranch,
+        label: '家庭圖管理',
+        description: '建立家庭成員關係圖，視覺化家庭保障',
+        benefits: ['家庭成員管理', '關係圖視覺化', '保單綁定成員'],
         isFree: false
       }
     ]

@@ -51,7 +51,14 @@ service cloud.firestore {
       allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
       allow write: if isSignedIn() && (isOwner(userId) || isAdmin());
 
-      // 子集合（profile, preferences 等）
+      // 社群助理 - 發文紀錄：只能新增，不能修改和刪除（審計用途）
+      match /threadsPosts/{docId} {
+        allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+        allow create: if isSignedIn() && isOwner(userId);
+        allow update, delete: if isAdmin();
+      }
+
+      // 子集合（profile, preferences, threadsConfig, threadsLibrary 等）
       match /{allSubcollections=**} {
          allow read, write: if isSignedIn() && (isOwner(userId) || isAdmin());
       }
@@ -88,6 +95,26 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // 預約諮詢：任何人可提交，管理員可讀寫
+    match /bookingRequests/{doc} {
+      allow read: if isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // 合作申請：任何人可提交，管理員可讀寫
+    match /partnerApplications/{doc} {
+      allow read: if isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // FCM 推播 Token：自己可讀寫，管理員可讀（發送推播由後端處理）
+    match /fcmTokens/{userId} {
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+
     // completedMissions collectionGroup 查詢（跨用戶查詢任務完成狀態）
     match /{path=**}/completedMissions/{doc} {
       allow read: if isAdmin();
@@ -112,7 +139,17 @@ service cloud.firestore {
     }
 
     // ============================================
-    // 4. 安全保底（預設拒絕）
+    // 4. 保單健診系統
+    // ============================================
+
+    // 險種快取資料庫：登入用戶可讀（自動完成搜尋），僅後端可寫
+    match /productCache/{doc} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // ============================================
+    // 5. 安全保底（預設拒絕）
     // ============================================
     match /{document=**} {
       allow read, write: if false;

@@ -1,0 +1,1929 @@
+# 📋 Ultra Advisor 保單健診系統規格書
+
+> 版本：v1.0
+> 
+> 
+> **建立日期**：2026-01-28
+> 
+> **狀態**：開發規格
+> 
+
+---
+
+## 目錄
+
+1. [系統概述](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#1-%E7%B3%BB%E7%B5%B1%E6%A6%82%E8%BF%B0)
+2. [功能清單與優先級](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#2-%E5%8A%9F%E8%83%BD%E6%B8%85%E5%96%AE%E8%88%87%E5%84%AA%E5%85%88%E7%B4%9A)
+3. [家庭圖模組](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#3-%E5%AE%B6%E5%BA%AD%E5%9C%96%E6%A8%A1%E7%B5%84)
+4. [OCR 保單辨識模組](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#4-ocr-%E4%BF%9D%E5%96%AE%E8%BE%A8%E8%AD%98%E6%A8%A1%E7%B5%84)
+5. [條款查詢與 AI 摘要模組](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#5-%E6%A2%9D%E6%AC%BE%E6%9F%A5%E8%A9%A2%E8%88%87-ai-%E6%91%98%E8%A6%81%E6%A8%A1%E7%B5%84)
+6. [險種快取資料庫](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#6-%E9%9A%AA%E7%A8%AE%E5%BF%AB%E5%8F%96%E8%B3%87%E6%96%99%E5%BA%AB)
+7. [保單資料結構](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#7-%E4%BF%9D%E5%96%AE%E8%B3%87%E6%96%99%E7%B5%90%E6%A7%8B)
+8. [理賠摘要標準化格式](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#8-%E7%90%86%E8%B3%A0%E6%91%98%E8%A6%81%E6%A8%99%E6%BA%96%E5%8C%96%E6%A0%BC%E5%BC%8F)
+9. [保單健診分析模組](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#9-%E4%BF%9D%E5%96%AE%E5%81%A5%E8%A8%BA%E5%88%86%E6%9E%90%E6%A8%A1%E7%B5%84)
+10. [外幣與投資型保單](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#10-%E5%A4%96%E5%B9%A3%E8%88%87%E6%8A%95%E8%B3%87%E5%9E%8B%E4%BF%9D%E5%96%AE)
+11. [提醒通知系統](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#11-%E6%8F%90%E9%86%92%E9%80%9A%E7%9F%A5%E7%B3%BB%E7%B5%B1)
+12. [Ultra Advisor 工具串接](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#12-ultra-advisor-%E5%B7%A5%E5%85%B7%E4%B8%B2%E6%8E%A5)
+13. [UI 流程設計](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#13-ui-%E6%B5%81%E7%A8%8B%E8%A8%AD%E8%A8%88)
+14. [技術架構](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#14-%E6%8A%80%E8%A1%93%E6%9E%B6%E6%A7%8B)
+15. [附錄](https://claude.ai/chat/8a125075-604f-4bd5-bdbc-47f22e9c2c72#15-%E9%99%84%E9%8C%84)
+
+---
+
+## 1. 系統概述
+
+### 1.1 產品定位
+
+保單健診系統是 Ultra Advisor 平台的核心模組，透過 OCR 辨識、AI 條款解析、家庭圖視覺化，幫助財務顧問快速完成客戶保單健診，並無縫銜接規劃工具。
+
+### 1.2 核心價值
+
+| 價值主張 | 說明 |
+| --- | --- |
+| **效率提升** | 拍照即分析，省去人工查條款時間 |
+| **專業呈現** | 標準化健診報告，提升顧問專業形象 |
+| **精準規劃** | 保障缺口分析 → 直接進入規劃工具 |
+| **家庭視角** | 家庭圖呈現全家保障，發掘交叉銷售機會 |
+
+### 1.3 使用流程總覽
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      保單健診系統流程                            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 1：建立家庭圖                                              │
+│  ┌─────┐    ┌─────┐         ┌─────┐                            │
+│  │ 爸爸 │────│ 媽媽 │         │ 配偶 │                            │
+│  └──┬──┘    └──┬──┘         └──┬──┘                            │
+│     └─────┬─────┘               │                               │
+│           │                     │                               │
+│       ┌───┴───┐            ┌───┴───┐                           │
+│       │【本人】│────────────│  配偶  │                           │
+│       └───┬───┘            └───────┘                           │
+│           │                                                     │
+│     ┌─────┴─────┐                                              │
+│   兒子        女兒                                               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 2：上傳保單（OCR 辨識 / 手動輸入）                          │
+│                                                                 │
+│  📄 全球人壽 重大疾病終身 → 本人                                  │
+│  📄 南山人壽 實支實付 → 本人                                      │
+│  📄 國泰人壽 意外險 → 配偶                                        │
+│  📄 台灣人壽 終身壽險 → 兒子                                      │
+│                                                                 │
+│  系統自動：                                                      │
+│  ├─ OCR 解析基本資料                                            │
+│  ├─ Web Search 查條款                                           │
+│  ├─ AI 摘要理賠規則                                             │
+│  └─ 綁定到對應家庭成員                                          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 3：保單健診報告                                            │
+│                                                                 │
+│  📊 家庭保障總覽                                                 │
+│  📊 個人保障摘要（標準化理賠項目）                                │
+│  📊 保障缺口分析                                                 │
+│  📊 重複保障偵測                                                 │
+│  📊 保費佔比分析                                                 │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 4：選擇成員進入規劃                                        │
+│                                                                 │
+│  ☑️ 本人（3 張保單）                                             │
+│  ☑️ 配偶（1 張保單）                                             │
+│  ☐ 爸爸（0 張保單）← 缺口！                                      │
+│                                                                 │
+│              [ 進入規劃工具 ]                                    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 5：Ultra Advisor 工具規劃                                  │
+│                                                                 │
+│  已匯入資料：                                                    │
+│  • 本人：年齡 35、年收入 120 萬、現有保障 300 萬                  │
+│  • 配偶：年齡 32、現有保障 100 萬                                 │
+│                                                                 │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐                       │
+│  │ 退休缺口  │ │ 大小水庫  │ │ 百萬禮物  │                       │
+│  │  試算    │ │  專案    │ │  專案    │                       │
+│  └──────────┘ └──────────┘ └──────────┘                       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Step 6：產出報告                                                │
+│                                                                 │
+│  📊 家庭保障總覽 PDF                                             │
+│  📊 個人健診報告 PDF                                             │
+│  📊 建議規劃方案 PDF                                             │
+└─────────────────────────────────────────────────────────────────┘
+
+```
+
+---
+
+## 2. 功能清單與優先級
+
+### 2.1 P0 必做（MVP）
+
+| # | 功能 | 說明 |
+| --- | --- | --- |
+| 1 | 家庭圖建立 | 拖拉式家庭成員關係圖 |
+| 2 | 成員選擇進入規劃 | 勾選成員帶入工具 |
+| 3 | OCR 保單辨識 | 拍照自動辨識保單首頁 |
+| 4 | OpenCV 前處理 | 陰影消除、歪斜校正 |
+| 5 | Web Search 查條款 | Google 搜尋險種條款 |
+| 6 | AI 摘要理賠內容 | Claude 整理理賠規則 |
+| 7 | 險種快取資料庫 | 查過的險種存起來 |
+| 8 | 手動輸入保單 | 險種名稱自動完成 |
+| 9 | 自動計算契約年資 | 生效日 → 現在 |
+| 10 | 自動計算已繳保費 | 年繳 × 年數 |
+| 11 | 標準化理賠摘要表 | 統一格式呈現 |
+| 12 | 多張保單合併計算 | 同一人保障加總 |
+| 13 | 家庭保障總覽 | 全家人保障一覽 |
+| 14 | 保障缺口分析 | 哪些沒保 |
+| 15 | 外幣保單支援 | USD/CNY/AUD 等 |
+| 16 | 與 Ultra Advisor 串接 | 資料帶入工具 |
+
+### 2.2 P1 應做
+
+| # | 功能 | 說明 |
+| --- | --- | --- |
+| 17 | 保費佔收入比 | 區分保障型 vs 投資型 |
+| 18 | 重複保障偵測 | 實支實付張數警告 |
+| 19 | 保單 PDF 匯出 | 健診報告下載 |
+| 20 | 解約金輸入 | 手動輸入 + ROI 計算 |
+
+### 2.3 P2 可做
+
+| # | 功能 | 說明 |
+| --- | --- | --- |
+| 21 | 繳費日提醒 | 前 14/7/1 天通知 |
+| 22 | 保單到期提醒 | 定期險到期通知 |
+| 23 | 理賠試算模擬 | 假設住院 5 天算理賠 |
+| 24 | 投資型淨值查詢 | 輸入標的代碼查淨值 |
+| 25 | 保單價值追蹤 | 解約金歷史曲線 |
+
+### 2.4 P3 之後
+
+| # | 功能 | 說明 |
+| --- | --- | --- |
+| 26 | LINE 推播通知 | 繳費/到期提醒 |
+| 27 | 條款更新通知 | 險種條款變動 |
+| 28 | 淨值異常警報 | 投資型大跌通知 |
+
+---
+
+## 3. 家庭圖模組
+
+### 3.1 功能說明
+
+使用 Genogram（家系圖）風格呈現家庭成員關係，並連結各成員的保單資料。
+
+### 3.2 視覺符號
+
+| 符號 | 說明 |
+| --- | --- |
+| □ | 男性 |
+| ○ | 女性 |
+| □—○ | 婚姻關係 |
+| ｜ | 親子關係 |
+| ☀️ | 主被保人（焦點人物） |
+| ╱╲ | 已故 |
+
+### 3.3 資料結構
+
+```tsx
+// 家庭成員
+interface FamilyMember {
+  id: string;
+  name: string;
+  relationship: RelationType;
+  gender: 'male' | 'female';
+  birthDate?: string;
+  age?: number;
+  isDeceased?: boolean;
+  isMainInsured?: boolean;           // 是否為主被保人
+
+  // 關係連結
+  spouseId?: string;
+  parentIds?: string[];
+  childrenIds?: string[];
+
+  // 財務資料（用於規劃工具）
+  annualIncome?: number;
+  occupation?: string;
+  occupationClass?: 1 | 2 | 3 | 4 | 5 | 6;
+
+  // 保單連結
+  policyIds?: string[];
+
+  // 規劃選擇
+  isSelectedForPlanning?: boolean;
+}
+
+// 關係類型
+type RelationType =
+  | 'self'           // 本人
+  | 'spouse'         // 配偶
+  | 'father'         // 父親
+  | 'mother'         // 母親
+  | 'father_in_law'  // 公公/岳父
+  | 'mother_in_law'  // 婆婆/岳母
+  | 'son'            // 兒子
+  | 'daughter'       // 女兒
+  | 'brother'        // 兄弟
+  | 'sister'         // 姐妹
+  | 'grandfather'    // 祖父/外公
+  | 'grandmother'    // 祖母/外婆
+  | 'grandson'       // 孫子
+  | 'granddaughter'  // 孫女
+  | 'other';         // 其他
+
+// 家庭圖
+interface FamilyTree {
+  id: string;
+  userId: string;                    // 建立者 ID
+  name: string;                      // 家庭名稱（如「王家」）
+  mainInsuredId: string;             // 主被保人 ID
+  members: FamilyMember[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+```
+
+### 3.4 技術實作建議
+
+| 方案 | 優點 | 缺點 | 建議 |
+| --- | --- | --- | --- |
+| **React Flow** | 拖拉支援、彈性高 | 需自定義節點樣式 | ✅ 推薦 |
+| D3.js | 客製化程度最高 | 學習曲線高 |  |
+| GoJS | 專業模板多 | 付費授權 |  |
+| 自建 SVG | 完全掌控 | 開發時間長 |  |
+
+---
+
+## 4. OCR 保單辨識模組
+
+### 4.1 辨識流程
+
+```
+使用者拍照上傳
+      │
+      ▼
+┌─────────────────────────────────────┐
+│  Phase 1：前處理（Frontend）         │
+│  ┌─────────────────────────────────┐ │
+│  │ OpenCV.js                       │ │
+│  │ ├─ 灰階轉換                      │ │
+│  │ ├─ 自適應二值化（消除陰影）       │ │
+│  │ ├─ 降噪處理                      │ │
+│  │ ├─ 歪斜校正                      │ │
+│  │ └─ 即時預覽                      │ │
+│  └─────────────────────────────────┘ │
+└─────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────┐
+│  Phase 2：OCR 辨識                   │
+│  Google Vision OCR API              │
+│  • 成本：約 NT$ 0.1 / 張             │
+│  • 輸出：文字 + 位置座標              │
+└─────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────┐
+│  Phase 3：結構化解析                 │
+│  Claude API（文字處理）              │
+│  • 輸入：OCR 文字結果                 │
+│  • 輸出：結構化 JSON                  │
+└─────────────────────────────────────┘
+
+```
+
+### 4.2 OCR 抓取欄位
+
+| 欄位 | 必要性 | 說明 |
+| --- | --- | --- |
+| 保險公司 | ✅ 必要 | 全球人壽、南山人壽等 |
+| 保單號碼 | ✅ 必要 | 唯一識別碼 |
+| 要保人 | ✅ 必要 |  |
+| 被保險人 | ✅ 必要 |  |
+| 性別 | ⚠️ 選填 |  |
+| 投保年齡 | ⚠️ 選填 |  |
+| 契約生效日 | ✅ 必要 | 計算契約年資用 |
+| 年繳保費合計 | ✅ 必要 |  |
+| 繳費方式 | ⚠️ 選填 | 年繳/半年繳/季繳/月繳 |
+| 險種名稱 | ✅ 必要 | 每個險種 |
+| 險種代碼 | ⚠️ 選填 | DDB、XPS 等 |
+| 各險種保額 | ✅ 必要 |  |
+| 各險種保費 | ✅ 必要 |  |
+| 繳費年期 | ✅ 必要 |  |
+| 保障終期 | ⚠️ 選填 | 終身或特定日期 |
+| 幣別 | ⚠️ 選填 | TWD/USD/CNY 等 |
+| 宣告利率 | ⚠️ 選填 | 利變型保單 |
+
+### 4.3 OpenCV.js 前處理範例
+
+```jsx
+// OpenCV.js 預處理 Pipeline
+async function preprocessImage(imageElement) {
+  const src = cv.imread(imageElement);
+  const dst = new cv.Mat();
+
+  // 1. 灰階轉換
+  cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+
+  // 2. 自適應二值化（消除陰影）
+  cv.adaptiveThreshold(
+    dst, dst, 255,
+    cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+    cv.THRESH_BINARY,
+    11, 2
+  );
+
+  // 3. 降噪
+  cv.medianBlur(dst, dst, 3);
+
+  // 4. 歪斜校正（簡化版）
+  // ... 霍夫變換檢測線條角度 ...
+
+  // 5. 回傳處理後的 base64
+  const canvas = document.createElement('canvas');
+  cv.imshow(canvas, dst);
+
+  src.delete();
+  dst.delete();
+
+  return canvas.toDataURL('image/png');
+}
+
+```
+
+### 4.4 Claude 解析 Prompt
+
+```
+你是保單資料解析專家。請從以下 OCR 文字中提取保單資訊，以 JSON 格式回傳。
+
+OCR 文字：
+"""
+{ocr_text}
+"""
+
+請提取以下欄位（找不到的填 null）：
+
+{
+  "insurer": "保險公司名稱",
+  "policyNumber": "保單號碼",
+  "applicant": "要保人",
+  "insured": "被保險人",
+  "gender": "男/女",
+  "ageAtIssue": 投保年齡（數字）,
+  "effectiveDate": "YYYY-MM-DD",
+  "totalAnnualPremium": 年繳保費合計（數字）,
+  "currency": "TWD/USD/CNY/AUD/EUR/JPY",
+  "paymentFrequency": "年繳/半年繳/季繳/月繳",
+  "coverages": [
+    {
+      "name": "險種全名",
+      "code": "險種代碼（如 DDB）",
+      "sumInsured": 保額（數字）,
+      "plan": "計劃別（如 計劃四）",
+      "annualPremium": 年繳保費（數字）,
+      "paymentYears": 繳費年期（數字）,
+      "coverageEndDate": "保障終期 YYYY-MM-DD 或 '終身'",
+      "isRider": true/false（是否為附約）
+    }
+  ]
+}
+
+```
+
+---
+
+## 5. 條款查詢與 AI 摘要模組
+
+### 5.1 查詢流程
+
+```
+OCR 抓到險種名稱
+      │
+      ▼
+┌─────────────────────────────────────┐
+│  Step 1：檢查快取資料庫              │
+│                                     │
+│  有 → 直接回傳理賠摘要               │
+│  無 → 進入 Step 2                   │
+└─────────────────────────────────────┘
+      │（無快取）
+      ▼
+┌─────────────────────────────────────┐
+│  Step 2：Web Search                 │
+│                                     │
+│  搜尋關鍵字：                        │
+│  "{險種名稱} 條款 理賠"              │
+│                                     │
+│  優先來源：                          │
+│  • Finfo (finfo.tw)                 │
+│  • CLAUSE (clause.com.tw)           │
+│  • 保險公司官網                      │
+│  • MY83 (my83.com.tw)               │
+└─────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────┐
+│  Step 3：AI 摘要                     │
+│                                     │
+│  Claude 整理：                       │
+│  • 理賠條件                          │
+│  • 給付項目與金額                    │
+│  • 等待期                           │
+│  • 除外責任重點                      │
+│  • 是否副本理賠                      │
+└─────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────┐
+│  Step 4：存入快取                    │
+│                                     │
+│  下次查詢同險種直接使用              │
+└─────────────────────────────────────┘
+
+```
+
+### 5.2 AI 摘要 Prompt
+
+```
+你是保險條款分析專家。請根據以下搜尋結果，整理這個險種的理賠規則。
+
+險種名稱：{product_name}
+搜尋結果：
+"""
+{search_results}
+"""
+
+請以下列 JSON 格式回傳（找不到的填 null）：
+
+{
+  "productName": "完整商品名稱",
+  "productCode": "商品代碼",
+  "insurer": "保險公司",
+  "category": "險種分類（見下方列表）",
+  "status": "selling/discontinued",
+  "waitingPeriod": 等待期天數,
+  "isCopyReceipt": true/false（副本理賠）,
+  "isGuaranteedRenewal": true/false（保證續保）,
+
+  "claimConditions": "理賠條件說明（100字內）",
+  "exclusions": "除外責任重點（100字內）",
+
+  "claimItems": {
+    // 依險種類型填入對應項目，見標準化格式
+  }
+}
+
+險種分類（category）選項：
+- life_term（定期壽險）
+- life_whole（終身壽險）
+- medical_expense（實支實付）
+- medical_daily（住院日額）
+- surgery（手術險）
+- critical_illness（重大疾病）
+- major_injury（重大傷病）
+- cancer（癌症險）
+- accident（意外險）
+- accident_medical（意外醫療）
+- disability（失能險）
+- long_term_care（長照險）
+- waiver（豁免附約）
+- annuity（年金險）
+- investment（投資型）
+
+```
+
+---
+
+## 6. 險種快取資料庫
+
+### 6.1 資料結構
+
+```tsx
+interface ProductCache {
+  id: string;                          // 自動產生 ID
+
+  // === 基本資訊 ===
+  insurer: string;                     // 保險公司
+  productName: string;                 // 商品全名
+  productCode?: string;                // 商品代碼（DDB、XPS）
+  category: ProductCategory;           // 險種分類
+
+  // === 搜尋索引 ===
+  keywords: string[];                  // 關鍵字（含別名、簡稱）
+  searchCount: number;                 // 被搜尋次數（熱門排序）
+  lastSearched: string;                // 最後搜尋時間
+
+  // === 商品狀態 ===
+  status: 'selling' | 'discontinued';
+  effectiveDate?: string;              // 銷售起日
+  discontinuedDate?: string;           // 停售日
+
+  // === 理賠規則 ===
+  waitingPeriod?: number;              // 等待期（天）
+  isCopyReceipt?: boolean;             // 副本理賠
+  isGuaranteedRenewal?: boolean;       // 保證續保
+  claimConditions?: string;            // 理賠條件摘要
+  exclusions?: string;                 // 除外責任摘要
+
+  // === 標準化理賠項目 ===
+  claimSummary: ClaimSummary;
+
+  // === 來源追蹤 ===
+  sourceUrl?: string;                  // 資料來源網址
+  rawDescription?: string;             // 原始摘要文字
+  lastUpdated: string;                 // 資料更新時間
+  updatedBy: 'ai' | 'manual';          // 更新方式
+}
+
+type ProductCategory =
+  | 'life_term'              // 定期壽險
+  | 'life_whole'             // 終身壽險
+  | 'medical_expense'        // 實支實付
+  | 'medical_daily'          // 住院日額
+  | 'surgery'                // 手術險
+  | 'critical_illness'       // 重大疾病
+  | 'major_injury'           // 重大傷病
+  | 'cancer'                 // 癌症險
+  | 'accident'               // 意外險
+  | 'accident_medical'       // 意外醫療
+  | 'disability'             // 失能險
+  | 'long_term_care'         // 長照險
+  | 'waiver'                 // 豁免附約
+  | 'annuity'                // 年金險
+  | 'investment'             // 投資型
+  | 'other';                 // 其他
+
+```
+
+### 6.2 自動完成 API
+
+```tsx
+// Request
+interface AutocompleteRequest {
+  query: string;                       // 使用者輸入
+  insurer?: string;                    // 限定保險公司
+  limit?: number;                      // 最多回傳幾筆（預設 5）
+}
+
+// Response
+interface AutocompleteResponse {
+  suggestions: {
+    productId: string;
+    productName: string;
+    productCode?: string;
+    insurer: string;
+    category: ProductCategory;
+    status: 'selling' | 'discontinued';
+    matchType: 'exact' | 'partial' | 'fuzzy';
+  }[];
+  hasMore: boolean;
+}
+
+// 範例
+// Request: { query: "全球重大" }
+// Response:
+// {
+//   suggestions: [
+//     { productName: "全球人壽重大疾病終身健康保險(乙型)", code: "DDB", ... },
+//     { productName: "全球人壽醫卡讚重大傷病一年期健康保險附約", code: "XDE", ... },
+//   ],
+//   hasMore: true
+// }
+
+```
+
+---
+
+## 7. 保單資料結構
+
+### 7.1 完整保單結構
+
+```tsx
+interface PolicyInfo {
+  id: string;
+
+  // === 基本資料（OCR 抓取）===
+  insurer: string;                     // 保險公司
+  policyNumber: string;                // 保單號碼
+  applicant: string;                   // 要保人
+  insured: string;                     // 被保險人
+  effectiveDate: string;               // 契約生效日
+  expiryDate?: string;                 // 契約終期
+
+  // === 繳費資訊 ===
+  totalAnnualPremium: number;          // 年繳保費合計
+  paymentFrequency: '年繳' | '半年繳' | '季繳' | '月繳';
+
+  // === 選填（OCR）===
+  gender?: '男' | '女';
+  ageAtIssue?: number;                 // 投保年齡
+  declaredInterestRate?: number;       // 宣告利率
+
+  // === 幣別（外幣保單）===
+  currency: CurrencyType;
+  exchangeRateAtIssue?: number;        // 投保當時匯率
+  currentExchangeRate?: number;        // 現在匯率
+  exchangeRateDate?: string;           // 匯率更新日期
+
+  // === 投資型保單 ===
+  isInvestmentLinked?: boolean;
+  fundCode?: string;                   // 標的代碼
+  fundName?: string;                   // 標的名稱
+  units?: number;                      // 持有單位數
+  nav?: number;                        // 最新淨值
+  navDate?: string;                    // 淨值日期
+  accountValue?: number;               // 帳戶價值
+  totalCost?: number;                  // 投入成本
+
+  // === 險種明細 ===
+  coverages: Coverage[];
+
+  // === 價值追蹤（自動+手動）===
+  value: {
+    // 自動計算
+    contractYears: number;             // 契約第幾年
+    contractMonths: number;            // 第幾個月
+    totalMonthsElapsed: number;        // 總月數
+    totalPremiumPaid: number;          // 已繳保費
+    remainingPaymentYears?: number;    // 剩餘繳費年數
+
+    // 手動輸入
+    surrenderValue?: number;           // 解約金
+    surrenderValueDate?: string;       // 解約金更新日期
+    roi?: number;                      // 解約金 / 已繳保費
+  };
+
+  // === 連結 ===
+  familyMemberId: string;              // 對應的家庭成員 ID
+
+  // === 提醒 ===
+  nextPaymentDate?: string;            // 下次繳費日
+
+  // === 系統欄位 ===
+  createdAt: string;
+  updatedAt: string;
+  inputMethod: 'ocr' | 'manual';       // 輸入方式
+}
+
+// 幣別
+type CurrencyType = 'TWD' | 'USD' | 'CNY' | 'AUD' | 'EUR' | 'JPY' | 'GBP' | 'HKD';
+
+// 險種明細
+interface Coverage {
+  id: string;
+
+  // === 基本 ===
+  name: string;                        // 險種全名
+  code?: string;                       // 險種代碼
+  sumInsured?: number;                 // 保額
+  plan?: string;                       // 計劃別
+  annualPremium: number;               // 年繳保費
+
+  // === 繳費/保障期 ===
+  paymentYears?: number;               // 繳費年期
+  coverageYears?: number;              // 保障年期
+  coverageEndDate?: string;            // 保障終期
+  isLifetime?: boolean;                // 是否終身
+
+  // === 分類 ===
+  isRider: boolean;                    // 是否為附約
+  category?: ProductCategory;          // 系統判斷的分類
+
+  // === 連結快取 ===
+  productCacheId?: string;             // 對應的險種快取 ID
+
+  // === 理賠摘要（從快取帶入）===
+  claimSummary?: ClaimSummary;
+}
+
+```
+
+### 7.2 契約年資計算
+
+```tsx
+function calculateContractAge(effectiveDate: string): {
+  years: number;
+  months: number;
+  totalMonths: number;
+} {
+  const start = new Date(effectiveDate);
+  const now = new Date();
+
+  let years = now.getFullYear() - start.getFullYear();
+  let months = now.getMonth() - start.getMonth();
+
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+
+  // 契約年資從第 1 年起算
+  const totalMonths = years * 12 + months;
+
+  return {
+    years: years + 1,              // 第 1 年、第 2 年...
+    months: months + 1,            // 第 1 個月、第 2 個月...
+    totalMonths: totalMonths + 1
+  };
+}
+
+// 範例：2023-12-29 生效，現在 2026-01-28
+// → 契約第 3 年第 2 個月（總第 26 個月）
+
+```
+
+---
+
+## 8. 理賠摘要標準化格式
+
+### 8.1 完整理賠摘要結構
+
+```tsx
+interface ClaimSummary {
+  // === 一次金 ===
+  lumpSum?: {
+    death?: number;                    // 身故保險金
+    accidentDeath?: number;            // 意外身故
+    totalDisability?: number;          // 完全失能
+
+    disability?: {                     // 失能（依等級）
+      level1?: number;                 // 1 級
+      level2?: number;
+      level3?: number;
+      level4?: number;
+      level5?: number;
+      level6?: number;
+      level7?: number;
+      level8?: number;
+      level9?: number;
+      level10?: number;
+      level11?: number;
+    };
+
+    criticalIllness?: number;          // 重大疾病（重度）
+    criticalIllnessLight?: number;     // 輕度重大疾病
+    specificDisease?: number;          // 特定傷病
+    majorInjury?: number;              // 重大傷病（健保卡）
+
+    cancer?: number;                   // 癌症（重度）
+    cancerLight?: number;              // 輕度/原位癌
+
+    burn?: number;                     // 燒燙傷
+    bone?: number;                     // 骨折（最高）
+  };
+
+  // === 住院日額 ===
+  hospitalDaily?: {
+    illness?: number;                  // 疾病住院日額
+    accident?: number;                 // 意外住院日額
+    icu?: number;                      // 加護病房日額
+    burn?: number;                     // 燒燙傷病房日額
+    cancer?: number;                   // 癌症住院日額
+    maxDays?: number;                  // 最高給付天數
+  };
+
+  // === 出院療養 ===
+  dischargeCare?: {
+    daily?: number;                    // 出院療養日額
+    maxDays?: number;                  // 最高天數
+  };
+
+  // === 實支實付 ===
+  actualExpense?: {
+    roomDaily?: number;                // 病房費限額/日
+    roomIcu?: number;                  // 加護病房限額/日
+    medicalExpense?: number;           // 住院醫療雜費限額
+    medicalExpenseIncrease?: {         // 雜費遞增
+      days?: number;                   // 住院超過幾天
+      multiplier?: number;             // 倍數
+    };
+    surgeryInpatient?: number;         // 住院手術限額
+    surgeryOutpatient?: number;        // 門診手術限額
+    outpatientLimit?: number;          // 門診手術次數/年
+    emergencyOutpatient?: number;      // 門診急診限額
+    beforeAfterClinic?: boolean;       // 含住院前後門診
+    beforeDays?: number;               // 住院前幾天
+    afterDays?: number;                // 出院後幾天
+
+    isCopyReceipt?: boolean;           // 副本理賠
+    nonNhiRatio?: number;              // 非健保打幾折（如 0.7）
+
+    lifetimeLimit?: number;            // 終身理賠上限
+    annualLimit?: number;              // 年度理賠上限
+  };
+
+  // === 手術 ===
+  surgery?: {
+    type: 'table' | 'ratio' | 'actual'; // 表定/比例/實支
+    baseAmount?: number;               // 基本單位金額
+    maxMultiplier?: number;            // 最高倍數
+    lifetimeLimit?: number;            // 終身理賠上限
+    includesOutpatient?: boolean;      // 含門診手術
+  };
+
+  // === 癌症療程 ===
+  cancerTreatment?: {
+    hospitalization?: number;          // 癌症住院日額
+    surgery?: number;                  // 癌症手術
+    chemo?: number;                    // 化療
+    radiation?: number;                // 放療
+    targetDrug?: number;               // 標靶藥物
+    outpatient?: number;               // 門診治療
+    bonemarrow?: number;               // 骨髓移植
+  };
+
+  // === 意外醫療 ===
+  accidentMedical?: {
+    actualExpense?: number;            // 意外實支實付限額
+    actualExpenseIcu?: number;         // 加護病房限額（如 2 倍）
+    daily?: number;                    // 意外住院日額
+
+    bone?: {                           // 骨折
+      complete?: number;               // 完全骨折
+      incomplete?: number;             // 不完全骨折
+      crack?: number;                  // 骨裂
+    };
+
+    burn?: {                           // 燒燙傷
+      level2?: number;                 // 二度
+      level3?: number;                 // 三度
+    };
+
+    isCopyReceipt?: boolean;           // 副本理賠
+    nonNhiRatio?: number;              // 非健保打幾折
+  };
+
+  // === 長照/失能照護 ===
+  longTermCare?: {
+    monthly?: number;                  // 每月給付
+    annually?: number;                 // 每年給付
+    lumpSum?: number;                  // 一次金
+    maxYears?: number;                 // 最長給付年數
+    maxAmount?: number;                // 累計上限
+    trigger: string;                   // 觸發條件描述
+  };
+
+  // === 豁免 ===
+  waiver?: {
+    hasWaiver: boolean;
+    trigger: string;                   // 觸發條件（如 1-6 級失能）
+    scope: string;                     // 豁免範圍（主約/全部）
+  };
+
+  // === 生存/滿期 ===
+  maturity?: {
+    type: 'refund' | 'annuity' | 'lumpSum';
+    amount?: number;
+    description?: string;
+  };
+
+  // === 其他 ===
+  others?: {
+    name: string;
+    description: string;
+    amount?: number;
+  }[];
+}
+
+```
+
+### 8.2 視覺化呈現範例
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  📊 保障摘要 — 謝民義                                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  💀 身故保障                        │  🏥 住院保障               │
+│  ├─ 疾病身故        ❌ 無           │  ├─ 病房費限額  1,500/日   │
+│  ├─ 意外身故        50 萬           │  ├─ 加護病房    4,500/日   │
+│  └─ 完全失能        50 萬           │  ├─ 醫療雜費    12 萬      │
+│                                     │  ├─ 住院手術    5 萬       │
+│  🩺 重大疾病                        │  └─ 門診手術    5 萬(6次)  │
+│  ├─ 輕度            3 萬            │                            │
+│  └─ 重度            30~33 萬        │  🔪 手術保障               │
+│                                     │  └─ 手術定額    1,000×倍數 │
+│  🚑 意外醫療                        │     最高理賠    150 萬     │
+│  └─ 實支實付        1 萬            │                            │
+│                                     │  🛡️ 豁免                  │
+│                                     │  └─ 1-6級失能  ✅          │
+├─────────────────────────────────────────────────────────────────┤
+│  ⚠️ 缺口提醒                                                     │
+│  ├─ ❌ 無壽險保障（僅有意外身故）                                 │
+│  ├─ ❌ 無癌症險                                                  │
+│  ├─ ❌ 無住院日額                                                │
+│  └─ ⚠️ 意外醫療額度偏低（建議 3-5 萬）                           │
+└─────────────────────────────────────────────────────────────────┘
+
+```
+
+---
+
+## 9. 保單健診分析模組
+
+### 9.1 多張保單合併計算
+
+```tsx
+interface MergedCoverage {
+  memberId: string;
+  memberName: string;
+
+  // 合併後的保障總額
+  totalCoverage: {
+    death: number;                     // 身故總額
+    accidentDeath: number;             // 意外身故總額
+    disability: {                      // 失能（依等級加總）
+      level1: number;
+      // ...
+    };
+    criticalIllness: number;           // 重大疾病總額
+    cancer: number;                    // 癌症總額
+
+    hospitalDailyIllness: number;      // 疾病住院日額總和
+    hospitalDailyAccident: number;     // 意外住院日額總和
+
+    medicalExpense: number;            // 實支實付雜費總額
+    // ...
+  };
+
+  // 各保單明細
+  policies: PolicyInfo[];
+
+  // 保費統計
+  premiumSummary: {
+    totalAnnual: number;               // 年繳總保費
+    byType: {
+      protection: number;              // 保障型保費
+      investment: number;              // 投資型保費
+      savings: number;                 // 儲蓄型保費
+    };
+    incomeRatio?: number;              // 佔年收入比例
+  };
+}
+
+```
+
+### 9.2 保障缺口分析
+
+```tsx
+interface CoverageGapAnalysis {
+  memberId: string;
+  memberName: string;
+  age: number;
+
+  gaps: CoverageGap[];
+  warnings: CoverageWarning[];
+  score: number;                       // 0-100 分
+}
+
+interface CoverageGap {
+  category: string;                    // 缺口類別
+  severity: 'critical' | 'warning' | 'info';
+  description: string;
+  recommendation: string;
+  suggestedTools?: string[];           // 建議使用的 Ultra Advisor 工具
+}
+
+// 缺口判斷規則
+const gapRules = [
+  {
+    category: '壽險',
+    check: (coverage) => coverage.death === 0,
+    severity: 'critical',
+    description: '無壽險保障',
+    recommendation: '若有家庭責任，建議補強壽險',
+    suggestedTools: ['百萬禮物專案', '大小水庫專案']
+  },
+  {
+    category: '實支實付',
+    check: (coverage) => coverage.medicalExpense === 0,
+    severity: 'critical',
+    description: '無實支實付醫療險',
+    recommendation: '建議至少投保一張實支實付'
+  },
+  {
+    category: '癌症險',
+    check: (coverage) => coverage.cancer === 0,
+    severity: 'warning',
+    description: '無癌症一次金保障',
+    recommendation: '癌症為國人主要死因，建議補強'
+  },
+  {
+    category: '意外醫療',
+    check: (coverage) => coverage.accidentMedical < 30000,
+    severity: 'info',
+    description: '意外醫療額度偏低',
+    recommendation: '建議提高至 3-5 萬'
+  },
+  // ... 更多規則
+];
+
+```
+
+### 9.3 重複保障偵測
+
+```tsx
+interface DuplicateCoverageWarning {
+  type: 'info' | 'warning';
+  category: string;
+  policies: string[];                  // 重複的保單名稱
+  description: string;
+  advice: string;
+}
+
+// 偵測規則
+const duplicateRules = [
+  {
+    category: '實支實付',
+    maxRecommended: 2,
+    warning: (count) => count >= 3,
+    description: '已有 {count} 張實支實付',
+    advice: '第 3 張實支可能面臨理賠限制，請確認條款'
+  },
+  {
+    category: '重大疾病/重大傷病',
+    checkOverlap: true,
+    description: '重大疾病與重大傷病保障重疊',
+    advice: '兩者理賠條件不同，部分疾病可能重複給付'
+  }
+];
+
+```
+
+### 9.4 保費佔收入比分析
+
+```tsx
+interface PremiumAnalysis {
+  memberId: string;
+  annualIncome?: number;
+
+  premiumBreakdown: {
+    total: number;                     // 年繳總保費
+    protection: number;                // 保障型
+    investment: number;                // 投資型
+    savings: number;                   // 儲蓄型
+  };
+
+  ratios: {
+    totalRatio?: number;               // 總保費 / 年收入
+    protectionRatio?: number;          // 保障型 / 年收入
+  };
+
+  // 注意：不做好壞評價，僅呈現數據
+  display: {
+    totalRatio: string;                // 如 "12.5%"
+    note: string;                      // "其中投資型佔 8.2%"
+  };
+}
+
+```
+
+---
+
+## 10. 外幣與投資型保單
+
+### 10.1 外幣保單結構
+
+```tsx
+interface ForeignCurrencyPolicy extends PolicyInfo {
+  currency: CurrencyType;              // USD, CNY, AUD, etc.
+
+  // 匯率資訊
+  exchangeRates: {
+    atIssue: number;                   // 投保當時匯率
+    atIssueDate: string;               // 投保當時日期
+    current: number;                   // 現在匯率
+    currentDate: string;               // 匯率更新日期
+  };
+
+  // 換算台幣
+  twdEquivalent: {
+    sumInsured: number;                // 保額換算 TWD
+    annualPremium: number;             // 年繳換算 TWD
+    surrenderValue?: number;           // 解約金換算 TWD
+  };
+
+  // 匯率損益
+  exchangeGainLoss?: {
+    premiumDiff: number;               // 保費匯差
+    surrenderDiff?: number;            // 解約金匯差
+  };
+}
+
+// 匯率查詢 API（可使用台灣銀行牌告匯率）
+interface ExchangeRateAPI {
+  getRate(currency: CurrencyType, date?: string): Promise<{
+    currency: string;
+    rate: number;
+    date: string;
+    source: string;
+  }>;
+}
+
+```
+
+### 10.2 外幣保單 UI
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  💵 外幣保單：全球人壽美元利變型終身壽險                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  幣別：USD 美元                                                  │
+│  保額：USD 50,000                                               │
+│  年繳：USD 1,200                                                │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│  📊 匯率資訊                                                     │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  │              │  投保當時      │  現在         │  差異       │
+│  │              │  (2023/06/15)  │  (2026/01/28) │             │
+│  ├──────────────┼────────────────┼───────────────┼─────────────┤
+│  │ 匯率         │  30.5          │  31.8         │  +1.3       │
+│  │ 保額(TWD)    │  1,525,000     │  1,590,000    │  +65,000    │
+│  │ 年繳(TWD)    │  36,600        │  38,160       │  +1,560     │
+│  └──────────────┴────────────────┴───────────────┴─────────────┘
+│                                                                 │
+│  ⚠️ 匯率風險提醒：外幣保單受匯率波動影響，繳費與理賠金額皆會變動  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+```
+
+### 10.3 投資型保單結構
+
+```tsx
+interface InvestmentLinkedPolicy extends PolicyInfo {
+  isInvestmentLinked: true;
+
+  // 標的資訊
+  funds: InvestmentFund[];
+
+  // 帳戶價值
+  accountValue: {
+    total: number;                     // 帳戶總價值
+    totalTWD?: number;                 // 換算台幣（外幣保單）
+    valueDate: string;                 // 價值計算日期
+  };
+
+  // 成本與損益
+  costBasis: {
+    totalPremiumPaid: number;          // 已繳保費
+    totalCost: number;                 // 投入成本（扣除費用後）
+    gainLoss: number;                  // 損益金額
+    gainLossRatio: number;             // 損益比例
+  };
+}
+
+interface InvestmentFund {
+  fundCode: string;                    // 標的代碼
+  fundName: string;                    // 標的名稱
+  currency: CurrencyType;              // 標的幣別
+  units: number;                       // 持有單位數
+  nav: number;                         // 最新淨值
+  navDate: string;                     // 淨值日期
+  marketValue: number;                 // 市值（單位數 × 淨值）
+  allocation: number;                  // 配置比例 %
+}
+
+// 淨值查詢 API
+interface FundNAVAPI {
+  getNAV(fundCode: string): Promise<{
+    fundCode: string;
+    fundName: string;
+    nav: number;
+    navDate: string;
+    currency: string;
+    change: number;                    // 漲跌
+    changePercent: number;             // 漲跌幅
+  }>;
+}
+
+```
+
+### 10.4 投資型保單 UI
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  📈 投資型保單：全球人壽目標到期債券基金                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  標的代碼    ┌───────────────────────────────┐                  │
+│              │ TGBF2026A                  🔍 │                  │
+│              └───────────────────────────────┘                  │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│  📊 標的資訊（自動查詢）                                         │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  標的名稱：全球新興市場目標到期債券基金                           │
+│  最新淨值：NT$ 10.25（2026/01/28）▲ 0.03 (+0.29%)              │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│  💰 帳戶價值                                                     │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  持有單位：     10,243.56 單位                                   │
+│  帳戶價值：     NT$ 104,996                                     │
+│                                                                 │
+│  投入成本：     NT$ 100,000                                     │
+│  未實現損益：   +NT$ 4,996（+4.99%）📈                          │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│  📉 淨值走勢（近 1 年）                                          │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  [淨值走勢圖]                                                   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+```
+
+---
+
+## 11. 提醒通知系統
+
+### 11.1 提醒類型
+
+| 類型 | 觸發條件 | 提醒時間 | 優先級 |
+| --- | --- | --- | --- |
+| 繳費日提醒 | 接近繳費日 | 前 14/7/1 天 | 高 |
+| 保單到期提醒 | 定期險到期 | 前 90/30 天 | 高 |
+| 保單停效警告 | 超過寬限期 | 立即 | 緊急 |
+| 條款更新通知 | 險種條款變動 | 有更新時 | 中 |
+| 淨值異常提醒 | 投資型淨值大跌 | 跌幅 > 5% | 中 |
+| 匯率異動提醒 | 外幣匯率大幅變動 | 變動 > 3% | 低 |
+
+### 11.2 資料結構
+
+```tsx
+interface Reminder {
+  id: string;
+  userId: string;
+  policyId: string;
+
+  type: ReminderType;
+  status: 'pending' | 'sent' | 'read' | 'dismissed';
+
+  triggerDate: string;                 // 觸發日期
+  sendDate?: string;                   // 發送日期
+  readDate?: string;                   // 已讀日期
+
+  title: string;
+  message: string;
+
+  channels: ('app' | 'email' | 'line')[];
+
+  metadata?: {
+    paymentAmount?: number;
+    dueDate?: string;
+    navChange?: number;
+    // ...
+  };
+}
+
+type ReminderType =
+  | 'payment_due'          // 繳費日
+  | 'policy_expiring'      // 保單到期
+  | 'policy_lapsed'        // 保單停效
+  | 'clause_updated'       // 條款更新
+  | 'nav_alert'            // 淨值異常
+  | 'exchange_rate_alert'; // 匯率異動
+
+```
+
+### 11.3 通知範本
+
+```tsx
+const reminderTemplates = {
+  payment_due_14: {
+    title: '繳費提醒：{policyName}',
+    message: '您的保單「{policyName}」將於 {dueDate} 到期繳費，金額 {amount}，請記得繳費以維持保障。'
+  },
+  payment_due_1: {
+    title: '⚠️ 明天繳費：{policyName}',
+    message: '您的保單「{policyName}」明天（{dueDate}）到期繳費，金額 {amount}，請儘速繳費。'
+  },
+  policy_expiring_90: {
+    title: '保單即將到期：{policyName}',
+    message: '您的保單「{policyName}」將於 {expiryDate} 到期，如需續保或轉換，請提前規劃。'
+  },
+  nav_alert: {
+    title: '📉 淨值異動通知',
+    message: '您的投資型保單「{policyName}」標的「{fundName}」淨值下跌 {changePercent}%，目前淨值 {nav}，帳戶價值約 {accountValue}。'
+  }
+};
+
+```
+
+---
+
+## 12. Ultra Advisor 工具串接
+
+### 12.1 資料傳遞結構
+
+```tsx
+// 從保單健診傳遞到規劃工具的資料
+interface PlanningContext {
+  // 選擇的家庭成員
+  selectedMembers: {
+    id: string;
+    name: string;
+    age: number;
+    gender: 'male' | 'female';
+    relationship: RelationType;
+    annualIncome?: number;
+    occupation?: string;
+  }[];
+
+  // 現有保障摘要（合併後）
+  currentCoverage: {
+    [memberId: string]: MergedCoverage;
+  };
+
+  // 保障缺口
+  gaps: {
+    [memberId: string]: CoverageGap[];
+  };
+
+  // 年繳保費
+  currentPremium: {
+    [memberId: string]: number;
+  };
+}
+
+// 工具接收資料後的處理
+interface ToolIntegration {
+  // 退休缺口試算
+  retirementTool: {
+    prefill: {
+      currentAge: number;
+      annualIncome: number;
+      currentLifeInsurance: number;    // 現有壽險
+      currentPension: number;          // 現有年金
+    };
+  };
+
+  // 大小水庫專案
+  reservoirTool: {
+    prefill: {
+      currentAge: number;
+      annualIncome: number;
+      existingAssets: number;          // 現有資產（含保單價值）
+      existingProtection: number;      // 現有保障
+    };
+  };
+
+  // 百萬禮物專案
+  giftTool: {
+    prefill: {
+      parentAge: number;
+      childAge: number;
+      existingGiftInsurance: number;   // 現有贈與型保單
+    };
+  };
+}
+
+```
+
+### 12.2 工具串接流程
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  保單健診完成                                                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  發現缺口：                                                      │
+│  ├─ 本人：壽險不足、無癌症險                                     │
+│  └─ 配偶：無任何保障                                            │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│  🔧 建議使用工具                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  ┌──────────────────┐  ┌──────────────────┐                    │
+│  │ 🏦 大小水庫專案    │  │ 🎁 百萬禮物專案    │                    │
+│  │                  │  │                  │                    │
+│  │ 適合：           │  │ 適合：           │                    │
+│  │ 本人壽險補強     │  │ 子女教育金規劃    │                    │
+│  │                  │  │                  │                    │
+│  │ [ 開始規劃 ]     │  │ [ 開始規劃 ]     │                    │
+│  └──────────────────┘  └──────────────────┘                    │
+│                                                                 │
+│  ┌──────────────────┐  ┌──────────────────┐                    │
+│  │ 👴 退休缺口試算    │  │ 🚗 五年換車專案    │                    │
+│  │                  │  │                  │                    │
+│  │ 適合：           │  │ 適合：           │                    │
+│  │ 退休金規劃       │  │ 短期目標儲蓄     │                    │
+│  │                  │  │                  │                    │
+│  │ [ 開始規劃 ]     │  │ [ 開始規劃 ]     │                    │
+│  └──────────────────┘  └──────────────────┘                    │
+│                                                                 │
+│  📋 已選成員資料將自動帶入工具                                    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+```
+
+---
+
+## 13. UI 流程設計
+
+### 13.1 手動輸入保單流程
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ➕ 手動新增保單                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  保險公司                                                        │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ 全球人壽                                             🔽 │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  險種名稱（輸入關鍵字搜尋）                                       │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ 重大疾病終身                                          🔍 │   │
+│  ├─────────────────────────────────────────────────────────┤   │
+│  │ 💡 建議商品                                              │   │
+│  │                                                         │   │
+│  │ ┌─────────────────────────────────────────────────────┐ │   │
+│  │ │ ⭐ 全球人壽重大疾病終身健康保險(乙型)                 │ │   │
+│  │ │    DDB ｜ 重大疾病 ｜ 銷售中                         │ │   │
+│  │ └─────────────────────────────────────────────────────┘ │   │
+│  │ ┌─────────────────────────────────────────────────────┐ │   │
+│  │ │    全球人壽重大疾病及特定傷病健康保險附約             │ │   │
+│  │ │    DSR ｜ 重大疾病 ｜ 停售                           │ │   │
+│  │ └─────────────────────────────────────────────────────┘ │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  🔎 找不到商品？ [ 搜尋網路 ]                                    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+```
+
+### 13.2 選擇商品後
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ➕ 手動新增保單                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  保險公司：全球人壽                                              │
+│  險種名稱：全球人壽重大疾病終身健康保險(乙型) ✅                  │
+│  商品代碼：DDB                                                   │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│  📋 系統已自動帶入理賠規則                                        │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  📌 理賠條件：                                                   │
+│  • 輕度重大疾病：保額 × 10%（4 項）                              │
+│  • 重度重大疾病：保額 × 100%~110%（7 項）                        │
+│  • 等待期：90 天                                                 │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│  請輸入您的保單資訊：                                            │
+│  ─────────────────────────────────────────────────────────────  │
+│                                                                 │
+│  保額           ┌─────────────────┐                             │
+│                 │ 300,000      元 │  ← 點擊輸入或拖拉滑軌        │
+│                 └─────────────────┘                             │
+│                 ○────────●──────○ 30萬 ~ 500萬                  │
+│                                                                 │
+│  繳費年期       ○ 10年  ● 20年  ○ 30年                          │
+│                                                                 │
+│  生效日期       ┌─────────────────┐                             │
+│                 │ 2023/12/29     📅│                             │
+│                 └─────────────────┘                             │
+│                                                                 │
+│  年繳保費       ┌─────────────────┐                             │
+│                 │ 7,350        元 │                             │
+│                 └─────────────────┘                             │
+│                                                                 │
+│  解約金（選填） ┌─────────────────┐                             │
+│                 │              元 │                             │
+│                 └─────────────────┘                             │
+│                                                                 │
+│  ─────────────────────────────────────────────────────────────  │
+│  💰 自動計算                                                     │
+│  ─────────────────────────────────────────────────────────────  │
+│  • 契約年資：第 2 年 2 個月                                      │
+│  • 已繳保費：NT$ 14,700                                         │
+│  • 輕度理賠：NT$ 30,000（保額 10%）                              │
+│  • 重度理賠：NT$ 300,000 ~ 330,000（保額 100%~110%）             │
+│                                                                 │
+│                    [ 取消 ]    [ 儲存保單 ]                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+```
+
+### 13.3 網路搜尋流程
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🔍 搜尋網路：「台灣人壽新住院醫療保險附約」                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ⏳ 正在搜尋網路資料...                                           │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ ████████████████░░░░░░░░░░░░░░░░ 60%                    │   │
+│  │                                                         │   │
+│  │ ✅ 找到商品資訊                                          │   │
+│  │ ✅ 正在分析理賠條件...                                   │   │
+│  │ ⏳ 整理理賠摘要                                          │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  ✅ 搜尋完成                                                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  找到商品：台灣人壽新住院醫療保險附約 (HNRC)                       │
+│                                                                 │
+│  📋 理賠摘要                                                     │
+│  ─────────────────────────────────────────────────────────────  │
+│  • 病房費限額：1,000 ~ 3,000/日（依計劃）                        │
+│  • 住院雜費：6 ~ 24 萬（依計劃）                                 │
+│  • 住院手術：依手術表                                           │
+│  • 門診手術：有                                                 │
+│  • 副本理賠：✅                                                  │
+│  • 等待期：30 天                                                │
+│                                                                 │
+│  💾 此商品已加入資料庫，下次輸入可直接帶入                        │
+│                                                                 │
+│                         [ 使用此商品 ]                          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+```
+
+---
+
+## 14. 技術架構
+
+### 14.1 系統架構圖
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Frontend (React)                        │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  家庭圖元件   │  │  OCR 上傳    │  │  健診報告    │          │
+│  │ (React Flow) │  │ (OpenCV.js) │  │  (Recharts) │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Firebase Cloud Functions                     │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  OCR 解析    │  │  條款搜尋    │  │  AI 摘要     │          │
+│  │ (Vision API)│  │ (Web Search)│  │ (Claude API)│          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  淨值查詢    │  │  匯率查詢    │  │  提醒排程    │          │
+│  │ (Fund API)  │  │ (台銀 API)  │  │ (Scheduler) │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Firestore Database                         │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │ familyTrees  │  │  policies    │  │productCache  │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │  reminders   │  │exchangeRates │  │   fundNAV    │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+└─────────────────────────────────────────────────────────────────┘
+
+```
+
+### 14.2 Firestore 集合結構
+
+```
+/users/{userId}
+  /familyTrees/{treeId}
+    - name: string
+    - mainInsuredId: string
+    - members: FamilyMember[]
+    - createdAt, updatedAt
+
+  /policies/{policyId}
+    - (PolicyInfo 完整結構)
+
+  /reminders/{reminderId}
+    - (Reminder 結構)
+
+/productCache/{productId}
+  - (ProductCache 結構)
+
+/exchangeRates/{currency}
+  - rate: number
+  - date: string
+  - source: string
+
+/fundNAV/{fundCode}
+  - nav: number
+  - navDate: string
+  - fundName: string
+
+```
+
+### 14.3 API 端點規劃
+
+| 端點 | 方法 | 說明 |
+| --- | --- | --- |
+| `/api/ocr/parse` | POST | 上傳圖片，回傳解析結果 |
+| `/api/product/search` | GET | 險種名稱自動完成 |
+| `/api/product/lookup` | POST | 搜尋網路 + AI 摘要 |
+| `/api/exchange-rate` | GET | 查詢匯率 |
+| `/api/fund-nav` | GET | 查詢基金淨值 |
+| `/api/checkup/analyze` | POST | 保單健診分析 |
+| `/api/report/pdf` | POST | 產生 PDF 報告 |
+
+### 14.4 成本估算
+
+| 服務 | 單價 | 預估用量/月 | 月成本 |
+| --- | --- | --- | --- |
+| Google Vision OCR | $1.5/1000 張 | 1,000 張 | ~NT$ 50 |
+| Claude API (Haiku) | $0.25/1M token | 2M token | ~NT$ 20 |
+| Claude API (Sonnet) | $3/1M token | 0.5M token | ~NT$ 50 |
+| Firebase (Blaze) | 用量計費 | - | ~NT$ 300 |
+| **總計** |  |  | **~NT$ 420/月** |
+
+---
+
+## 15. 附錄
+
+### 15.1 保險公司代碼對照表
+
+| 代碼 | 公司名稱 |
+| --- | --- |
+| TGL | 全球人壽 |
+| NAN | 南山人壽 |
+| CAT | 國泰人壽 |
+| TWL | 台灣人壽 |
+| FUB | 富邦人壽 |
+| CHN | 中國人壽 |
+| SHK | 新光人壽 |
+| ALZ | 安聯人壽 |
+| MER | 三商美邦 |
+| TAI | 台新人壽 |
+| YUA | 元大人壽 |
+| FAR | 遠雄人壽 |
+| HON | 宏泰人壽 |
+| FGL | 第一金人壽 |
+| PRU | 保誠人壽 |
+| AXA | 安盛人壽 |
+| AIG | 友邦人壽 |
+| ... | ... |
+
+### 15.2 險種分類對照表
+
+| 分類代碼 | 中文名稱 | 常見關鍵字 |
+| --- | --- | --- |
+| life_term | 定期壽險 | 定期、年繳、身故 |
+| life_whole | 終身壽險 | 終身、壽險、身故 |
+| medical_expense | 實支實付 | 實支、醫療費用、雜費 |
+| medical_daily | 住院日額 | 日額、住院、定額 |
+| surgery | 手術險 | 手術、手術表 |
+| critical_illness | 重大疾病 | 重大疾病、七項、甲乙型 |
+| major_injury | 重大傷病 | 重大傷病、健保卡 |
+| cancer | 癌症險 | 癌症、防癌、罹癌 |
+| accident | 意外險 | 意外、傷害、身故 |
+| accident_medical | 意外醫療 | 意外醫療、骨折 |
+| disability | 失能險 | 失能、殘廢 |
+| long_term_care | 長照險 | 長照、長期照護 |
+| waiver | 豁免附約 | 豁免、免繳 |
+| annuity | 年金險 | 年金、退休 |
+| investment | 投資型 | 投資、變額、標的 |
+
+### 15.3 常見匯率幣別
+
+| 代碼 | 幣別名稱 | 常用於 |
+| --- | --- | --- |
+| TWD | 新台幣 | 本國 |
+| USD | 美元 | 美元保單 |
+| CNY | 人民幣 | 人民幣保單 |
+| AUD | 澳幣 | 澳幣保單 |
+| EUR | 歐元 | 少見 |
+| JPY | 日圓 | 少見 |
+| GBP | 英鎊 | 少見 |
+| HKD | 港幣 | 少見 |
+
+---
+
+## 版本紀錄
+
+| 版本 | 日期 | 說明 |
+| --- | --- | --- |
+| v1.0 | 2026-01-28 | 初版規格書 |
+| v1.1 | 2026-01-28 | 新增開發進度、架構重構紀錄、待辦事項 |
+
+---
+
+## 16. 開發進度與架構紀錄
+
+> 最後更新：2026-01-28
+
+### 16.1 架構重構：三區塊 + 新流程
+
+原始規格的 4 步驟流程（家庭圖→保單輸入→分析→規劃）已重構為 **3 步驟 + 客戶綁定**：
+
+#### UltraWarRoom 三區塊
+
+| 區塊 | 功能 | 進入方式 |
+|------|------|---------|
+| **保單健診** | 拍保單→資料確認(含家庭圖)→分析報表 | 點按鈕→選客戶→開始健診 |
+| **客戶管理** | 查看客戶/家庭的保單狀況 | 點按鈕→開 ClientManager |
+| **我的規劃** | 點客戶→進入18種工具介面 | 維持現狀不動 |
+
+#### 新健診流程（3 步驟）
+
+```
+[UltraWarRoom 點「保單健診」]
+        │
+        ▼
+[CheckupClientSelector Modal — 選擇或新建客戶]
+        │
+        ▼
+┌─────────────────────────────────────────────────────────┐
+│  Step 1: 保單輸入（PolicyManager）                       │
+│  • 拍照 OCR / 上傳照片 / 手動輸入                        │
+│  • 不依賴家庭圖，保單為平面列表                           │
+│  • familyMemberId 此時可為空                              │
+├─────────────────────────────────────────────────────────┤
+│  Step 2: 資料確認（FamilyTreeBuilder）                   │
+│  • 建立/編輯家庭圖（Genogram）                           │
+│  • 將保單綁定到家庭成員                                   │
+├─────────────────────────────────────────────────────────┤
+│  Step 3: 分析報告（CheckupReport）                       │
+│  • 保障分析與缺口報告                                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+**設計決策：**
+1. `clientId` 用欄位過濾，不改 Firestore 路徑（避免資料遷移）
+2. Hook 不傳 `clientId` 時顯示所有資料（向後相容）
+3. `PlanningBridge`（原 Step 4）從 InsuranceCheckupTool 移除，回「我的規劃」即可進工具
+4. `familyMemberId` 改為可選（`PolicyInfo.familyMemberId?: string`），Step 1 輸入時可為空
+
+### 16.2 已完成項目
+
+#### 型別系統
+- [x] `FamilyTree` 加 `clientId?: string`
+- [x] `PolicyInfo` 加 `clientId?: string`
+- [x] `PolicyInfo.familyMemberId` 改為 `optional`
+- [x] `InsuranceCheckupData.activeStep` 從 `1|2|3|4` 改 `1|2|3`
+- [x] `InsuranceCheckupData` 加 `clientId?: string`
+
+#### Hooks
+- [x] `useFamilyTree(userId, clientId?)` — client-side clientId 過濾 + createTree 包含 clientId
+- [x] `usePolicies(userId, clientId?)` — client-side clientId 過濾 + addPolicy 包含 clientId
+- [x] `useFamilyTree` stale closure 修復（useRef pattern for activeTree/userId/clientId）
+
+#### 元件
+- [x] `CheckupClientSelector.tsx`（新增）— 選擇/新建客戶 Modal
+- [x] `InsuranceCheckupTool.tsx` — 從 4 步驟重構為 3 步驟，移除 PlanningBridge
+- [x] `PolicyManager.tsx` — 重寫為不依賴家庭圖的平面保單列表，Step 1 直接拍照/手動輸入
+- [x] `PolicyForm.tsx` — `familyMemberId` 改為可選
+- [x] `OcrUploader.tsx` — `familyMemberId` 改為可選，UI 改為拍照/上傳照片並排按鈕
+- [x] `FamilyTreeBuilder.tsx` — 接收 `clientId` prop
+- [x] `CheckupReport.tsx` — 接收 `clientId` prop
+
+#### 家庭圖（Genogram）
+- [x] React Flow 自定義節點（MemberNode）— 點擊展開泡泡按鈕（父母/配偶/子女/刪除）
+- [x] Genogram 風格邊緣（RelationshipEdge）— 配偶橫線、親子垂直線
+- [x] Smart relationship inference — 新增成員時自動推斷關係類型
+- [x] `handleDeleteMember` 包成 `useCallback([removeMember])` 修復 stale reference
+- [x] 所有泡泡按鈕加 `nodrag nopan` CSS class + `onMouseDown stopPropagation`
+
+#### 整合
+- [x] `UltraWarRoom.tsx` — 保單健診按鈕改為先開 CheckupClientSelector Modal
+- [x] `App.tsx` — `onStartCheckup` callback 綁定真實客戶、設定 activeStep=1
+
+#### OCR 穩定性
+- [x] `preprocessImage` 加 `onerror` handler + 15 秒 timeout
+- [x] 處理中畫面加「取消」按鈕
+- [x] 每階段加 console.log 方便 debug（`[OCR] Step 1/2/3`）
+- [x] 更精確的錯誤訊息（區分 unauthenticated / internal / 圖片無法讀取）
+
+### 16.3 進行中 / 已知問題
+
+#### OCR 上傳卡住問題
+- **現象**：上傳照片後一直卡在「影像前處理中」或後續步驟
+- **已加 debug log**：開瀏覽器 Console 看 `[OCR] Step X` 可確認卡在哪一步
+- **可能原因**：
+  1. Firebase Storage 上傳權限（需確認 Storage Rules 允許 authenticated 用戶寫入 `ocr/` 路徑）
+  2. Cloud Function `parseInsuranceOCR` 的 Gemini API key 或 Vision API 未正確設定
+  3. 前端 `preprocessImage` 影像太大導致 canvas 操作慢（已加 15 秒 timeout）
+- **下一步**：根據 Console log 判斷卡在哪步，針對性修復
+
+#### 家庭圖刪除按鈕
+- **現象**：點刪除按鈕有時無反應
+- **已修復**：`useCallback` + `nodrag nopan` + `onMouseDown stopPropagation`
+- **狀態**：需用戶確認是否修復成功
+
+### 16.4 待開發項目
+
+#### 短期（接續目前工作）
+
+| # | 項目 | 說明 | 相關檔案 |
+|---|------|------|---------|
+| 1 | **修復 OCR 流程** | 根據 Console log 定位並修復卡住的步驟 | `OcrUploader.tsx`, Storage Rules |
+| 2 | **Firebase Storage Rules** | 新增 `ocr/{userId}/` 路徑的寫入權限 | `storage.rules`（可能需新建） |
+| 3 | **Step 2 保單→成員綁定** | FamilyTreeBuilder 裡加「將保單分配給成員」的 UI | `FamilyTreeBuilder.tsx` |
+| 4 | **CheckupReport 實作** | 保障分析、缺口偵測、保費佔比（參照規格 §9） | `CheckupReport.tsx` |
+| 5 | **客戶管理區塊** | UltraWarRoom 的第二區塊，查看客戶保單狀況 | `ClientManager.tsx` |
+
+#### 中期
+
+| # | 項目 | 說明 |
+|---|------|------|
+| 6 | 條款查詢 + AI 摘要 | Web Search → Claude 整理理賠規則（規格 §5） |
+| 7 | 險種快取資料庫 | 查過的險種存入 Firestore productCache（規格 §6） |
+| 8 | 多張保單合併計算 | 同一人的保障加總（規格 §9.1） |
+| 9 | 保障缺口分析 | 自動判斷缺口並給建議（規格 §9.2） |
+| 10 | 重複保障偵測 | 實支實付張數警告等（規格 §9.3） |
+| 11 | 外幣保單匯率顯示 | 換算台幣、匯差計算（規格 §10） |
+| 12 | 健診報告 PDF 匯出 | 產生可下載的 PDF 報告 |
+
+#### 長期
+
+| # | 項目 | 說明 |
+|---|------|------|
+| 13 | 繳費日提醒 | 前 14/7/1 天通知（規格 §11） |
+| 14 | 保單到期提醒 | 定期險到期通知 |
+| 15 | 投資型淨值查詢 | 標的代碼查淨值 |
+| 16 | 解約金 ROI 計算 | 手動輸入解約金、自動算 ROI |
+| 17 | 理賠試算模擬 | 假設住院 N 天算理賠金額 |
+| 18 | Ultra Advisor 工具串接 | 健診資料帶入 18 種規劃工具（規格 §12） |
+
+### 16.5 檔案對照表（已修改/新增）
+
+| 檔案 | 狀態 | 說明 |
+|------|------|------|
+| `src/types/insurance.ts` | 已修改 | clientId, optional familyMemberId, activeStep 1\|2\|3 |
+| `src/hooks/useFamilyTree.ts` | 已修改 | clientId 過濾、useRef pattern |
+| `src/hooks/usePolicies.ts` | 已修改 | clientId 過濾 |
+| `src/components/insurance/CheckupClientSelector.tsx` | **新增** | 客戶選擇器 Modal |
+| `src/components/insurance/InsuranceCheckupTool.tsx` | 已修改 | 3 步驟重構 |
+| `src/components/insurance/PolicyManager.tsx` | 已修改 | 不依賴家庭圖的平面列表 |
+| `src/components/insurance/PolicyForm.tsx` | 已修改 | familyMemberId 可選 |
+| `src/components/insurance/OcrUploader.tsx` | 已修改 | 拍照/上傳 UI、穩定性修復 |
+| `src/components/insurance/FamilyTreeBuilder.tsx` | 已修改 | clientId、useCallback 修復 |
+| `src/components/insurance/CheckupReport.tsx` | 已修改 | clientId |
+| `src/components/insurance/nodes/MemberNode.tsx` | 已修改 | nodrag nopan、stopPropagation |
+| `src/components/insurance/edges/RelationshipEdge.tsx` | 已有 | Genogram 邊緣 |
+| `src/components/UltraWarRoom.tsx` | 已修改 | onStartCheckup + CheckupClientSelector |
+| `src/App.tsx` | 已修改 | onStartCheckup callback 整合 |
+| `functions/index.js` | 已有 | parseInsuranceOCR Cloud Function |
+
+### 16.6 Firestore 路徑
+
+```
+/users/{userId}
+  /familyTrees/{treeId}        ← 加 clientId 欄位過濾
+  /insurancePolicies/{policyId} ← 加 clientId 欄位過濾
+  /clients/{clientId}           ← 客戶列表（CheckupClientSelector 使用）
+```
+
+**注意**：路徑不變，只加 `clientId` 欄位做 client-side 過濾。舊資料沒有 `clientId` 的不會被新客戶的健診看到（符合預期）。
+
+---
+
+**此規格書供開發團隊參考，如有疑問請與產品負責人確認。**

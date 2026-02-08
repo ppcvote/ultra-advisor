@@ -21,7 +21,10 @@
       "Bash(grep:*)",
       "Bash(cmd.exe /c \"dir /s C:\\\\Users\\\\User\\\\AppData\\\\Local\\\\Temp 2>nul\")",
       "Bash(cmd.exe /c \"dir /s C:\\\\Users\\\\User\\\\.nuget 2>nul\")",
-      "Bash(git -C c:/Users/User/financial-planner commit -m \"$\\(cat <<''EOF''\nfeat: 新增文章 32 - 心態，決定你在這行能走多遠\n\n4THINK 風格：精煉、金句、好掃讀\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git -C c:/Users/User/financial-planner commit -m \"$\\(cat <<''EOF''\nfeat: 新增文章 32 - 心態，決定你在這行能走多遠\n\n4THINK 風格：精煉、金句、好掃讀\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(timeout 45 npx vercel:*)",
+      "Bash(timeout 60 npx vercel:*)",
+      "Bash(wmic logicaldisk where \"DeviceID=''C:''\" get Size,FreeSpace /format:value)"
     ]
   }
 }

@@ -1,0 +1,997 @@
+# 🤖 Ultra Advisor - Threads 社群助理 開發規格書
+
+> **版本**：v1.0
+> 
+> 
+> **建立日期**：2026-02-04
+> 
+> **目標**：整合 Threads 自動發文功能至 Ultra Advisor 平台
+> 
+> **開發工具**：Claude Code
+> 
+
+---
+
+## 📋 目錄
+
+1. [功能概述](https://claude.ai/chat/170792d7-4fee-4006-91b8-4e048bbc1e9d#1-%E5%8A%9F%E8%83%BD%E6%A6%82%E8%BF%B0)
+2. [技術架構](https://claude.ai/chat/170792d7-4fee-4006-91b8-4e048bbc1e9d#2-%E6%8A%80%E8%A1%93%E6%9E%B6%E6%A7%8B)
+3. [資料庫設計](https://claude.ai/chat/170792d7-4fee-4006-91b8-4e048bbc1e9d#3-%E8%B3%87%E6%96%99%E5%BA%AB%E8%A8%AD%E8%A8%88)
+4. [API 設計](https://claude.ai/chat/170792d7-4fee-4006-91b8-4e048bbc1e9d#4-api-%E8%A8%AD%E8%A8%88)
+5. [前端元件規格](https://claude.ai/chat/170792d7-4fee-4006-91b8-4e048bbc1e9d#5-%E5%89%8D%E7%AB%AF%E5%85%83%E4%BB%B6%E8%A6%8F%E6%A0%BC)
+6. [頁面流程](https://claude.ai/chat/170792d7-4fee-4006-91b8-4e048bbc1e9d#6-%E9%A0%81%E9%9D%A2%E6%B5%81%E7%A8%8B)
+7. [安全性考量](https://claude.ai/chat/170792d7-4fee-4006-91b8-4e048bbc1e9d#7-%E5%AE%89%E5%85%A8%E6%80%A7%E8%80%83%E9%87%8F)
+8. [開發順序](https://claude.ai/chat/170792d7-4fee-4006-91b8-4e048bbc1e9d#8-%E9%96%8B%E7%99%BC%E9%A0%86%E5%BA%8F)
+9. [測試要點](https://claude.ai/chat/170792d7-4fee-4006-91b8-4e048bbc1e9d#9-%E6%B8%AC%E8%A9%A6%E8%A6%81%E9%BB%9E)
+10. [附錄](https://claude.ai/chat/170792d7-4fee-4006-91b8-4e048bbc1e9d#%E9%99%84%E9%8C%84)
+
+---
+
+## 1. 功能概述
+
+### 1.1 產品定位
+
+在 Ultra Advisor 主選單新增「🤖 社群助理」功能，讓付費會員可以：
+
+- 連結 Threads 帳號
+- 使用 AI 生成符合個人風格的貼文
+- 預覽並發布到 Threads
+- 管理手動文案庫，按排程自動發送
+- 查看發文紀錄
+
+### 1.2 功能清單（MVP）
+
+| 功能 | 優先級 | 說明 |
+| --- | --- | --- |
+| 連結 Threads 帳號 | P0 | 輸入 Access Token 和 User ID |
+| 設定發文風格 | P0 | 自訂 System Prompt |
+| 輸入 Gemini API Key | P0 | 用戶自備 Key |
+| AI 生成貼文 | P0 | 呼叫 Gemini API 生成內容 |
+| 預覽貼文 | P0 | 發布前預覽，可重新生成 |
+| 手動發文 | P0 | 一鍵發布到 Threads |
+| 手動文案庫 | P0 | 匯入多篇文案，按順序排程發送 |
+| 發文紀錄 | P0 | 查看歷史發文 |
+
+### 1.3 使用權限
+
+- **付費會員**：完整功能
+- **試用會員**：無法使用（顯示升級提示）
+- **訪客**：無法使用
+
+---
+
+## 2. 技術架構
+
+### 2.1 現有技術棧
+
+| 層級 | 技術 |
+| --- | --- |
+| 前端 | React + TypeScript + Tailwind CSS |
+| 後端 | Firebase (Firestore + Auth + Functions) |
+| 部署 | Vercel |
+| 圖示 | Lucide React |
+
+### 2.2 新增依賴
+
+```json
+// 無需新增依賴，使用現有 fetch API 呼叫外部服務
+
+```
+
+### 2.3 外部 API
+
+| 服務 | 用途 | 端點 |
+| --- | --- | --- |
+| Gemini API | AI 生成貼文 | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent` |
+| Threads API | 發布貼文 | `https://graph.threads.net/v1.0/{user_id}/threads` |
+
+---
+
+## 3. 資料庫設計
+
+### 3.1 Firestore 集合結構
+
+### `users/{uid}/threadsConfig` (Document)
+
+用戶的 Threads 設定（每位用戶一份）
+
+```tsx
+interface ThreadsConfig {
+  // Threads 帳號資訊
+  threadsAccessToken: string;      // 加密儲存
+  threadsUserId: string;
+  threadsUsername?: string;        // 顯示用
+
+  // Gemini 設定
+  geminiApiKey: string;            // 加密儲存
+
+  // 發文風格
+  systemPrompt: string;            // System Prompt
+  signatureLine: string;           // 簽名檔，如 "- @ginrollbt｜做業務，做得比想得多。"
+
+  // 文案庫排程設定
+  libraryScheduleEnabled: boolean; // 是否啟用文案庫排程
+  libraryScheduleTimes: string[];  // 發文時間，如 ["09:00", "18:00"]
+  libraryCurrentIndex: number;     // 目前發送到第幾篇
+
+  // 狀態
+  isConnected: boolean;
+  lastPostAt?: Timestamp;
+
+  // 時間戳
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+```
+
+### `users/{uid}/threadsLibrary` (Collection)
+
+手動文案庫
+
+```tsx
+interface ThreadsLibraryItem {
+  id: string;                      // 自動生成
+  order: number;                   // 排序順序 (1, 2, 3...)
+  content: string;                 // 貼文內容
+  status: 'pending' | 'published' | 'skipped';
+  publishedAt?: Timestamp;
+  createdAt: Timestamp;
+}
+
+```
+
+### `users/{uid}/threadsPosts` (Collection)
+
+發文紀錄
+
+```tsx
+interface ThreadsPost {
+  id: string;
+  content: string;                 // 貼文內容
+  source: 'ai' | 'library' | 'manual';  // 來源：AI生成 / 文案庫 / 手動輸入
+  libraryItemId?: string;          // 若來自文案庫，關聯 ID
+  threadsPostId?: string;          // Threads 返回的 Post ID
+  status: 'published' | 'failed';
+  errorMessage?: string;           // 失敗原因
+  publishedAt: Timestamp;
+  createdAt: Timestamp;
+}
+
+```
+
+### 3.2 Firestore 安全規則
+
+```jsx
+// firestore.rules 新增
+match /users/{userId}/threadsConfig {
+  allow read, write: if request.auth != null && request.auth.uid == userId;
+}
+
+match /users/{userId}/threadsLibrary/{docId} {
+  allow read, write: if request.auth != null && request.auth.uid == userId;
+}
+
+match /users/{userId}/threadsPosts/{docId} {
+  allow read: if request.auth != null && request.auth.uid == userId;
+  allow create: if request.auth != null && request.auth.uid == userId;
+  // 發文紀錄不允許修改和刪除
+}
+
+```
+
+---
+
+## 4. API 設計
+
+### 4.1 Gemini API 呼叫
+
+```tsx
+// src/utils/threadsApi.ts
+
+interface GeneratePostParams {
+  apiKey: string;
+  systemPrompt: string;
+  topic?: string;  // 可選主題
+}
+
+interface GeneratePostResult {
+  success: boolean;
+  content?: string;
+  error?: string;
+}
+
+async function generateThreadsPost(params: GeneratePostParams): Promise<GeneratePostResult> {
+  const { apiKey, systemPrompt, topic } = params;
+
+  const userPrompt = topic
+    ? `請針對「${topic}」這個主題，寫一篇 Threads 貼文。直接輸出貼文內容，不要有任何前言或說明。`
+    : `請自己發想一個主題，寫一篇 Threads 貼文。主題要有新意。直接輸出貼文內容，不要有任何前言或說明。`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+  const payload = {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: systemPrompt + "\n\n" + userPrompt }]
+      }
+    ],
+    generationConfig: {
+      temperature: 1.0,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 1024,
+    }
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, error: error.error?.message || '生成失敗' };
+    }
+
+    const result = await response.json();
+    let text = result.candidates[0].content.parts[0].text.trim();
+
+    // 清理 code block
+    if (text.startsWith('```')) {
+      text = text.split('\n').slice(1).join('\n');
+    }
+    if (text.endsWith('```')) {
+      text = text.slice(0, -3);
+    }
+
+    return { success: true, content: text.trim() };
+  } catch (error) {
+    return { success: false, error: '網路錯誤，請稍後再試' };
+  }
+}
+
+```
+
+### 4.2 Threads API 呼叫
+
+```tsx
+// src/utils/threadsApi.ts
+
+interface PublishPostParams {
+  accessToken: string;
+  userId: string;
+  text: string;
+}
+
+interface PublishPostResult {
+  success: boolean;
+  postId?: string;
+  error?: string;
+}
+
+async function publishToThreads(params: PublishPostParams): Promise<PublishPostResult> {
+  const { accessToken, userId, text } = params;
+
+  try {
+    // Step 1: 建立貼文容器
+    const createResponse = await fetch(
+      `https://graph.threads.net/v1.0/${userId}/threads`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          media_type: 'TEXT',
+          text: text,
+          access_token: accessToken
+        })
+      }
+    );
+
+    if (!createResponse.ok) {
+      const error = await createResponse.json();
+      return { success: false, error: error.error?.message || '建立貼文失敗' };
+    }
+
+    const createResult = await createResponse.json();
+    const creationId = createResult.id;
+
+    // 等待 3 秒讓 Threads 處理
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Step 2: 發布貼文
+    const publishResponse = await fetch(
+      `https://graph.threads.net/v1.0/${userId}/threads_publish`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          creation_id: creationId,
+          access_token: accessToken
+        })
+      }
+    );
+
+    if (!publishResponse.ok) {
+      const error = await publishResponse.json();
+      return { success: false, error: error.error?.message || '發布失敗' };
+    }
+
+    const publishResult = await publishResponse.json();
+    return { success: true, postId: publishResult.id };
+
+  } catch (error) {
+    return { success: false, error: '網路錯誤，請稍後再試' };
+  }
+}
+
+```
+
+### 4.3 驗證 Threads 連線
+
+```tsx
+async function verifyThreadsConnection(accessToken: string): Promise<{
+  success: boolean;
+  userId?: string;
+  username?: string;
+  error?: string;
+}> {
+  try {
+    const response = await fetch(
+      `https://graph.threads.net/v1.0/me?fields=id,username&access_token=${accessToken}`
+    );
+
+    if (!response.ok) {
+      return { success: false, error: 'Token 無效或已過期' };
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      userId: data.id,
+      username: data.username
+    };
+  } catch {
+    return { success: false, error: '驗證失敗，請檢查網路連線' };
+  }
+}
+
+```
+
+---
+
+## 5. 前端元件規格
+
+### 5.1 檔案結構
+
+```
+src/
+├── components/
+│   └── threads/
+│       ├── ThreadsAssistant.tsx      # 主頁面容器
+│       ├── ThreadsSetup.tsx          # 帳號設定（Token、API Key、Prompt）
+│       ├── ThreadsComposer.tsx       # AI 生成 + 預覽 + 發文
+│       ├── ThreadsLibrary.tsx        # 手動文案庫管理
+│       ├── ThreadsHistory.tsx        # 發文紀錄
+│       └── ThreadsLibraryImport.tsx  # 批次匯入文案 Modal
+│
+├── hooks/
+│   └── useThreads.ts                 # Threads 相關 Hook
+│
+└── utils/
+    └── threadsApi.ts                 # API 呼叫函式
+
+```
+
+### 5.2 元件規格
+
+### `ThreadsAssistant.tsx` - 主頁面容器
+
+```tsx
+/**
+ * 社群助理主頁面
+ *
+ * 功能：
+ * - 檢查用戶是否為付費會員，非付費顯示升級提示
+ * - 分頁切換：設定 / 發文 / 文案庫 / 紀錄
+ * - 載入用戶的 Threads 設定
+ *
+ * UI 結構：
+ * ┌─────────────────────────────────────┐
+ * │ 🤖 社群助理                          │
+ * ├─────────────────────────────────────┤
+ * │ [設定] [發文] [文案庫] [紀錄]        │
+ * ├─────────────────────────────────────┤
+ * │                                     │
+ * │  （根據選擇的分頁顯示對應內容）        │
+ * │                                     │
+ * └─────────────────────────────────────┘
+ */
+
+interface ThreadsAssistantProps {}
+
+// 分頁選項
+type TabType = 'setup' | 'compose' | 'library' | 'history';
+
+```
+
+### `ThreadsSetup.tsx` - 帳號設定
+
+```tsx
+/**
+ * 帳號設定頁面
+ *
+ * 功能：
+ * - 輸入 Threads Access Token（附驗證按鈕）
+ * - 輸入 Gemini API Key（附驗證按鈕）
+ * - 編輯 System Prompt（風格設定）
+ * - 編輯簽名檔
+ * - 儲存設定到 Firestore
+ *
+ * UI 結構：
+ * ┌─────────────────────────────────────┐
+ * │ Threads 帳號連結                     │
+ * │ ┌─────────────────────────┐ [驗證]  │
+ * │ │ Access Token            │         │
+ * │ └─────────────────────────┘         │
+ * │ 狀態：✅ 已連結 @username           │
+ * ├─────────────────────────────────────┤
+ * │ Gemini API Key                      │
+ * │ ┌─────────────────────────┐ [驗證]  │
+ * │ │ API Key                 │         │
+ * │ └─────────────────────────┘         │
+ * │ 狀態：✅ 已驗證                     │
+ * ├─────────────────────────────────────┤
+ * │ 發文風格設定 (System Prompt)        │
+ * │ ┌─────────────────────────┐         │
+ * │ │                         │         │
+ * │ │   （多行文字輸入框）      │         │
+ * │ │                         │         │
+ * │ └─────────────────────────┘         │
+ * ├─────────────────────────────────────┤
+ * │ 簽名檔                              │
+ * │ ┌─────────────────────────┐         │
+ * │ │ - @xxx｜簽名            │         │
+ * │ └─────────────────────────┘         │
+ * ├─────────────────────────────────────┤
+ * │              [💾 儲存設定]           │
+ * └─────────────────────────────────────┘
+ *
+ * 附註：
+ * - Token 和 API Key 輸入框使用 type="password"
+ * - 提供「顯示/隱藏」切換按鈕
+ * - 驗證成功顯示綠色勾勾，失敗顯示紅色叉叉
+ */
+
+```
+
+### `ThreadsComposer.tsx` - 發文編輯器
+
+```tsx
+/**
+ * AI 生成 + 預覽 + 發文
+ *
+ * 功能：
+ * - 可選輸入主題，或讓 AI 自由發揮
+ * - 點擊生成，呼叫 Gemini API
+ * - 預覽生成的內容（可編輯）
+ * - 重新生成按鈕
+ * - 發布到 Threads 按鈕
+ * - 顯示發布狀態（成功/失敗）
+ *
+ * UI 結構：
+ * ┌─────────────────────────────────────┐
+ * │ 主題（可選）                         │
+ * │ ┌─────────────────────────┐         │
+ * │ │ 輸入主題或留空讓AI發揮   │         │
+ * │ └─────────────────────────┘         │
+ * │                                     │
+ * │ [🚀 生成貼文]                        │
+ * ├─────────────────────────────────────┤
+ * │ 📝 貼文預覽                          │
+ * │ ┌─────────────────────────┐         │
+ * │ │                         │         │
+ * │ │   （生成的貼文內容）      │         │
+ * │ │   （可直接編輯）         │         │
+ * │ │                         │         │
+ * │ └─────────────────────────┘         │
+ * │                                     │
+ * │ [🔄 重新生成] [📤 發布到 Threads]    │
+ * └─────────────────────────────────────┘
+ *
+ * 狀態處理：
+ * - 生成中：顯示 loading spinner
+ * - 發布中：按鈕 disabled + spinner
+ * - 發布成功：顯示成功訊息 + 清空內容
+ * - 發布失敗：顯示錯誤訊息
+ */
+
+```
+
+### `ThreadsLibrary.tsx` - 文案庫管理
+
+```tsx
+/**
+ * 手動文案庫管理
+ *
+ * 功能：
+ * - 顯示所有文案列表（順序、內容預覽、狀態）
+ * - 批次匯入文案（Modal）
+ * - 新增單篇文案
+ * - 編輯文案
+ * - 刪除文案
+ * - 調整順序（拖曳或上下按鈕）
+ * - 排程設定（發文時間）
+ * - 啟用/停用排程
+ *
+ * UI 結構：
+ * ┌─────────────────────────────────────┐
+ * │ 📚 文案庫                [➕ 新增] [📥 批次匯入] │
+ * ├─────────────────────────────────────┤
+ * │ 排程設定                            │
+ * │ [✓] 啟用自動發文                    │
+ * │ 發文時間：09:00, 18:00 [編輯]       │
+ * │ 目前進度：已發 5 / 共 30 篇          │
+ * ├─────────────────────────────────────┤
+ * │ # │ 內容預覽           │ 狀態   │ 操作 │
+ * │───┼───────────────────┼────────┼──────│
+ * │ 1 │ 別用戰術上的勤奮... │ ✅已發 │ [編輯][刪]│
+ * │ 2 │ 你的大腦是CPU...   │ ✅已發 │ [編輯][刪]│
+ * │ 3 │ 客戶說考慮一下...   │ ⏳待發 │ [編輯][刪]│
+ * │ 4 │ ...               │ ⏳待發 │ [編輯][刪]│
+ * └─────────────────────────────────────┘
+ *
+ * 批次匯入格式（純文字，用分隔線區隔）：
+ * ---
+ * 第一篇貼文內容
+ * 可以有多行
+ * - @ginrollbt｜做業務，做得比想得多。
+ * ---
+ * 第二篇貼文內容
+ * - @ginrollbt｜做業務，做得比想得多。
+ * ---
+ */
+
+```
+
+### `ThreadsLibraryImport.tsx` - 批次匯入 Modal
+
+```tsx
+/**
+ * 批次匯入文案 Modal
+ *
+ * 功能：
+ * - 大型文字輸入框
+ * - 說明匯入格式
+ * - 預覽解析結果（共幾篇）
+ * - 確認匯入
+ *
+ * 匯入格式：
+ * 每篇文案用 "---" 分隔
+ *
+ * UI 結構：
+ * ┌─────────────────────────────────────┐
+ * │ 📥 批次匯入文案                 [X] │
+ * ├─────────────────────────────────────┤
+ * │ 請將文案貼在下方，每篇用 --- 分隔   │
+ * │ ┌─────────────────────────┐         │
+ * │ │ ---                     │         │
+ * │ │ 第一篇文案內容           │         │
+ * │ │ ---                     │         │
+ * │ │ 第二篇文案內容           │         │
+ * │ │ ---                     │         │
+ * │ └─────────────────────────┘         │
+ * │                                     │
+ * │ 預覽：解析到 30 篇文案              │
+ * │                                     │
+ * │ [取消]              [確認匯入]      │
+ * └─────────────────────────────────────┘
+ */
+
+```
+
+### `ThreadsHistory.tsx` - 發文紀錄
+
+```tsx
+/**
+ * 發文紀錄
+ *
+ * 功能：
+ * - 列表顯示歷史發文
+ * - 顯示：時間、內容預覽、來源（AI/文案庫/手動）、狀態
+ * - 點擊可展開查看完整內容
+ * - 分頁或無限滾動
+ *
+ * UI 結構：
+ * ┌─────────────────────────────────────┐
+ * │ 📋 發文紀錄                         │
+ * ├─────────────────────────────────────┤
+ * │ 2026/02/04 09:00                   │
+ * │ 來源：AI 生成 │ 狀態：✅ 已發布     │
+ * │ ┌─────────────────────────┐        │
+ * │ │ 別用戰術上的勤奮掩蓋... │        │
+ * │ │ （點擊展開完整內容）     │        │
+ * │ └─────────────────────────┘        │
+ * ├─────────────────────────────────────┤
+ * │ 2026/02/03 18:00                   │
+ * │ 來源：文案庫 │ 狀態：✅ 已發布      │
+ * │ ┌─────────────────────────┐        │
+ * │ │ 你的大腦是CPU...        │        │
+ * │ └─────────────────────────┘        │
+ * └─────────────────────────────────────┘
+ */
+
+```
+
+### 5.3 Hook 規格
+
+### `useThreads.ts`
+
+```tsx
+/**
+ * Threads 功能 Hook
+ *
+ * 功能：
+ * - 載入/儲存用戶的 Threads 設定
+ * - 管理文案庫 CRUD
+ * - 載入發文紀錄
+ * - 呼叫 API（生成、發文）
+ */
+
+interface UseThreadsReturn {
+  // 設定
+  config: ThreadsConfig | null;
+  configLoading: boolean;
+  saveConfig: (config: Partial<ThreadsConfig>) => Promise<void>;
+
+  // 驗證
+  verifyThreadsToken: (token: string) => Promise<VerifyResult>;
+  verifyGeminiKey: (key: string) => Promise<boolean>;
+
+  // 文案庫
+  library: ThreadsLibraryItem[];
+  libraryLoading: boolean;
+  addLibraryItem: (content: string) => Promise<void>;
+  updateLibraryItem: (id: string, content: string) => Promise<void>;
+  deleteLibraryItem: (id: string) => Promise<void>;
+  importLibrary: (contents: string[]) => Promise<void>;
+  reorderLibrary: (items: ThreadsLibraryItem[]) => Promise<void>;
+
+  // 發文紀錄
+  posts: ThreadsPost[];
+  postsLoading: boolean;
+  loadMorePosts: () => Promise<void>;
+
+  // 操作
+  generatePost: (topic?: string) => Promise<GeneratePostResult>;
+  publishPost: (content: string, source: 'ai' | 'library' | 'manual') => Promise<PublishPostResult>;
+}
+
+function useThreads(): UseThreadsReturn {
+  // 實作...
+}
+
+```
+
+---
+
+## 6. 頁面流程
+
+### 6.1 首次使用流程
+
+```
+用戶進入「社群助理」
+    │
+    ▼
+檢查是否為付費會員 ──否──> 顯示升級提示
+    │
+   是
+    ▼
+檢查是否已設定 ──否──> 引導至「設定」分頁
+    │
+   是
+    ▼
+顯示「發文」分頁（預設）
+
+```
+
+### 6.2 設定流程
+
+```
+「設定」分頁
+    │
+    ▼
+輸入 Threads Access Token
+    │
+    ▼
+點擊「驗證」──失敗──> 顯示錯誤訊息
+    │
+   成功
+    ▼
+顯示連結的帳號名稱
+    │
+    ▼
+輸入 Gemini API Key
+    │
+    ▼
+點擊「驗證」──失敗──> 顯示錯誤訊息
+    │
+   成功
+    ▼
+編輯 System Prompt
+    │
+    ▼
+編輯簽名檔
+    │
+    ▼
+點擊「儲存設定」
+    │
+    ▼
+設定完成，可開始使用
+
+```
+
+### 6.3 AI 發文流程
+
+```
+「發文」分頁
+    │
+    ▼
+（可選）輸入主題
+    │
+    ▼
+點擊「生成貼文」
+    │
+    ▼
+呼叫 Gemini API ──失敗──> 顯示錯誤訊息
+    │
+   成功
+    ▼
+顯示預覽內容（可編輯）
+    │
+    ├── 點擊「重新生成」──> 回到「呼叫 Gemini API」
+    │
+    └── 點擊「發布到 Threads」
+            │
+            ▼
+        呼叫 Threads API ──失敗──> 顯示錯誤訊息
+            │
+           成功
+            ▼
+        顯示成功訊息
+        儲存發文紀錄
+        清空編輯區
+
+```
+
+### 6.4 文案庫排程流程
+
+```
+「文案庫」分頁
+    │
+    ▼
+匯入/新增文案
+    │
+    ▼
+設定發文時間（如 09:00, 18:00）
+    │
+    ▼
+啟用排程
+    │
+    ▼
+（由 Firebase Cloud Functions 處理）
+    │
+每到設定時間
+    │
+    ▼
+取得 libraryCurrentIndex
+    │
+    ▼
+發送該篇文案
+    │
+    ▼
+更新狀態為「已發布」
+index + 1
+    │
+    ▼
+若 index > 文案總數，停用排程
+
+```
+
+---
+
+## 7. 安全性考量
+
+### 7.1 敏感資料處理
+
+| 資料 | 處理方式 |
+| --- | --- |
+| Threads Access Token | 前端加密後儲存，或使用 Firebase Secret Manager |
+| Gemini API Key | 同上 |
+| System Prompt | 明文儲存（非敏感） |
+
+### 7.2 Firestore 安全規則
+
+- 用戶只能讀寫自己的資料
+- 發文紀錄只能新增，不能修改刪除（審計用途）
+
+### 7.3 API 呼叫
+
+- Gemini API 和 Threads API 都從前端直接呼叫（使用用戶自己的 Key）
+- 不經過後端，減少安全風險
+
+### 7.4 權限檢查
+
+- 每個頁面/操作都要檢查用戶是否為付費會員
+- 使用現有的 `useMembership` Hook
+
+---
+
+## 8. 開發順序
+
+### Phase 1：基礎設定（Day 1-2）
+
+1. 建立檔案結構
+2. 實作 `threadsApi.ts`（API 呼叫函式）
+3. 實作 `useThreads.ts` Hook（設定讀寫）
+4. 實作 `ThreadsSetup.tsx`（設定頁面）
+5. 在 `App.tsx` 加入路由
+6. 在側邊欄加入選單項目
+
+### Phase 2：發文功能（Day 3-4）
+
+1. 實作 `ThreadsComposer.tsx`
+2. 實作生成貼文功能
+3. 實作預覽和編輯
+4. 實作發布到 Threads
+5. 實作 `ThreadsHistory.tsx`
+6. 儲存發文紀錄
+
+### Phase 3：文案庫（Day 5-6）
+
+1. 實作 `ThreadsLibrary.tsx`
+2. 實作 `ThreadsLibraryImport.tsx`
+3. 實作 CRUD 功能
+4. 實作排序功能
+5. 實作排程設定 UI
+
+### Phase 4：排程功能（Day 7）
+
+1. 建立 Firebase Cloud Function
+2. 實作排程發文邏輯
+3. 測試和除錯
+
+### Phase 5：整合測試（Day 8）
+
+1. 完整流程測試
+2. 錯誤處理優化
+3. UI/UX 調整
+4. 文件更新
+
+---
+
+## 9. 測試要點
+
+### 9.1 功能測試
+
+| 功能 | 測試項目 |
+| --- | --- |
+| Token 驗證 | 正確 Token、錯誤 Token、過期 Token |
+| API Key 驗證 | 正確 Key、錯誤 Key、超過配額 |
+| 生成貼文 | 有主題、無主題、Prompt 為空 |
+| 發布貼文 | 成功、Token 過期、內容過長 |
+| 文案庫匯入 | 正確格式、錯誤格式、空白內容 |
+| 排程 | 啟用、停用、時間格式 |
+
+### 9.2 邊界測試
+
+- 貼文內容超過 500 字
+- 文案庫超過 100 篇
+- 同時多次點擊發布按鈕
+- 網路斷線時的處理
+
+### 9.3 權限測試
+
+- 試用會員無法使用
+- 過期會員無法使用
+- 付費會員可正常使用
+
+---
+
+## 附錄
+
+### A. System Prompt 範例（謝阿金風格）
+
+```
+你是「退休管理大師謝阿金」(@ginrollbt) 的專屬 AI 寫手。
+
+## 寫作風格特徵
+
+* 關鍵詞：降維打擊、冷酷邏輯、菁英主義、去情緒化
+* 核心價值：鄙視平庸、崇尚極致效率
+* 比喻系統：科技/工程隱喻（大腦=CPU、筆記=SSD）
+* 反常識：喜歡推翻大眾認知的「好人思維」
+
+## 結構要求
+
+* 排版美學：極度重視「留白」，每一句都是獨立的思考單位
+* 起承轉合：
+  1. 起 (Hook)：直擊痛點或反直覺觀點
+  2. 承 (Context)：描述平庸業務的現狀
+  3. 轉 (Flip)：提出「超業思維」的邏輯翻轉
+  4. 合 (CTA)：冷酷的結論或行動呼籲
+
+## 語氣要求
+
+* 傲慢且專業
+* 犀利直接，不使用贅字
+* 禁止雞湯文風格
+* 禁止乞求式行銷
+
+## 格式規則
+
+* 不使用 Markdown 格式
+* 句子之間有清楚的空行
+* 每篇約 150-350 字
+
+```
+
+### B. 批次匯入格式範例
+
+```
+---
+別用戰術上的勤奮，掩蓋戰略上的懶惰。
+
+每天拜訪十個客戶很累，但這不代表你很努力。
+如果你沒有思考這十個客戶的含金量，
+你只是在進行低品質的重複體力活。
+
+勤奮的標準不應該是「工作了幾小時」，
+而是「推進了多少關鍵進度」。
+
+- @ginrollbt｜做業務，做得比想得多。
+---
+你的大腦是 CPU，筆記是 SSD。
+
+這是大多數業務員效率低下的根本原因：
+你們把大腦當成「儲存裝置」在用。
+
+拼命想記住客戶講的每一句話、每一個數字。
+結果呢？你的 RAM 爆了。
+
+頂尖高手的筆記法，只有一個核心：
+「Offload (卸載)」。
+
+把資訊全部卸載到紙上，
+讓大腦保持100%的空間算力。
+
+- @ginrollbt｜做業務，做得比想得多。
+---
+
+```
+
+### C. Threads Token 取得教學（供用戶參考）
+
+1. 前往 developers.facebook.com
+2. 建立應用程式，選「Access the Threads API」
+3. 設定 Redirect URI：https://oauth.pstmn.io/v1/callback
+4. 開啟授權網址取得 code
+5. 用 code 換取 access_token
+6. 換成長期 token（60 天有效）
+
+詳細步驟請參考系統內建教學。
+
+---
+
+## 📝 備註
+
+- 本規格書為 MVP 版本，後續可擴充多帳號、自動回覆等功能
+- Firebase Cloud Functions 排程部分可視需求在 Phase 2 後再實作
+- 建議先完成手動發文功能，確認流程可行後再加排程
+
+---
+
+**規格書結束**
