@@ -104,6 +104,8 @@ import { article as article55 } from './articles/55-ultra-alliance-maker-island-
 import { article as article56 } from './articles/56-glp1-drug-lawsuit-taiwan-warning-2026';
 // 文章 57：成交的多巴胺 vs 滑手機的多巴胺
 import { article as article57 } from './articles/57-dopamine-success-vs-scrolling-2026';
+// 文章 58：看懂基金靠真實數據不是 Excel
+import { article as article58 } from './articles/58-fund-data-vs-excel-myth-2026';
 
 // ============ 匯出文章陣列 ============
 export const blogArticles: BlogArticle[] = [
@@ -164,6 +166,7 @@ export const blogArticles: BlogArticle[] = [
   article55,
   article56,
   article57,
+  article58,
 ];
 
 // ============ 匯出輔助函數 ============

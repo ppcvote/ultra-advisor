@@ -59,6 +59,7 @@ const articleMetadata: Record<string, { title: string; category: string; descrip
   'ultra-alliance-maker-island-ecosystem-2026': { title: '傲創聯盟：打造財務顧問的「創客島嶼生態鏈」', category: 'sales', description: '傲創聯盟串聯線下優質場所，為財務顧問打造專屬商務與生活圈。' },
   'glp1-drug-lawsuit-taiwan-warning-2026': { title: '美國爆發 GLP-1 減重藥集體訴訟：猛健樂、瘦瘦筆在台氾濫，你該知道的真相', category: 'investment', description: '美國法院受理數千起 Ozempic、Mounjaro 傷害訴訟，指控引發胃輕癱等嚴重副作用。台灣卻有人濫用，這篇告訴你真相。' },
   'dopamine-success-vs-scrolling-2026': { title: '成交的多巴胺 vs 滑手機的多巴胺：你在用哪一種方式消耗人生？', category: 'sales', description: '同樣是多巴胺，成交帶來的快樂和滑手機的快樂完全不同。員工用滑手機打發時間，老闆用成交創造價值。這篇告訴你如何戒掉垃圾快樂，擁抱真正的成就感。' },
+  'fund-data-vs-excel-myth-2026': { title: '看懂基金，靠的是真實數據，不是 Excel', category: 'investment', description: '「配息來源可能來自本金」是法規風險揭露，不是基金在吃老本。教你用真實數據判斷一支配息基金的好壞，別被 Excel 試算表的結論帶著走。' },
 };
 
 // 分類對應的 OG 圖片
