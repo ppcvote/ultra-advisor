@@ -106,6 +106,16 @@ import { article as article56 } from './articles/56-glp1-drug-lawsuit-taiwan-war
 import { article as article57 } from './articles/57-dopamine-success-vs-scrolling-2026';
 // 文章 58：看懂基金靠真實數據不是 Excel
 import { article as article58 } from './articles/58-fund-data-vs-excel-myth-2026';
+// 文章 59：境外保單的致命風險
+import { article as article59 } from './articles/59-offshore-insurance-risk-taiwan-2026';
+// 文章 60：投資型保單賠過錢？問題不在保單
+import { article as article60 } from './articles/60-investment-linked-policy-trust-rebuild-2026';
+// 文章 61：教育工作者退休風險
+import { article as article61 } from './articles/61-education-worker-retirement-risk-2026';
+// 文章 62：AI Agent 對金融業的衝擊
+import { article as article62 } from './articles/62-ai-agent-finance-disruption-2026';
+// 文章 63：錯過崩盤低點？下次回檔這樣佈局
+import { article as article63 } from './articles/63-market-crash-buying-opportunity-2026';
 
 // ============ 匯出文章陣列 ============
 export const blogArticles: BlogArticle[] = [
@@ -167,6 +177,11 @@ export const blogArticles: BlogArticle[] = [
   article56,
   article57,
   article58,
+  article59,
+  article60,
+  article61,
+  article62,
+  article63,
 ];
 
 // ============ 匯出輔助函數 ============
