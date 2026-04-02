@@ -61,12 +61,19 @@ export type RelationType =
   | 'mother_in_law'  // 婆婆/岳母
   | 'son'            // 兒子
   | 'daughter'       // 女兒
+  | 'son_in_law'     // 女婿
+  | 'daughter_in_law'// 媳婦
   | 'brother'        // 兄弟
   | 'sister'         // 姐妹
   | 'grandfather'    // 祖父/外公
   | 'grandmother'    // 祖母/外婆
   | 'grandson'       // 孫子
   | 'granddaughter'  // 孫女
+  | 'uncle'          // 叔伯/舅舅
+  | 'aunt'           // 姑姑/阿姨
+  | 'nephew'         // 姪子/外甥
+  | 'niece'          // 姪女/外甥女
+  | 'cousin'         // 表/堂兄弟姐妹
   | 'other';         // 其他
 
 export const RELATION_LABELS: Record<RelationType, string> = {
@@ -78,12 +85,19 @@ export const RELATION_LABELS: Record<RelationType, string> = {
   mother_in_law: '婆婆/岳母',
   son: '兒子',
   daughter: '女兒',
+  son_in_law: '女婿',
+  daughter_in_law: '媳婦',
   brother: '兄弟',
   sister: '姐妹',
   grandfather: '祖父/外公',
   grandmother: '祖母/外婆',
   grandson: '孫子',
   granddaughter: '孫女',
+  uncle: '叔伯/舅舅',
+  aunt: '姑姑/阿姨',
+  nephew: '姪子/外甥',
+  niece: '姪女/外甥女',
+  cousin: '表/堂兄弟姐妹',
   other: '其他',
 };
 
@@ -190,7 +204,7 @@ export interface PolicyInfo {
   };
 
   // 連結（Step 2 家庭圖確認時綁定，Step 1 輸入時可為空）
-  familyMemberId?: string;
+  familyMemberId?: string | null;
 
   // 提醒
   nextPaymentDate?: string;

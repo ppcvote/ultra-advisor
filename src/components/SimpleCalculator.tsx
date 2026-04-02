@@ -808,7 +808,7 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
     className?: string;
   }) => {
     // 🆕 手機版：py-3 (較矮)，桌面版：aspect-square (正方形)
-    const baseClass = 'w-full py-3 md:py-0 md:aspect-square rounded-xl text-base md:text-lg font-bold transition-all active:scale-95';
+    const baseClass = 'w-full py-3 md:py-2.5 lg:py-0 lg:aspect-square rounded-xl text-base md:text-lg font-bold transition-all active:scale-95';
     const variants = {
       number: 'bg-slate-700 hover:bg-slate-600 text-white',
       operator: 'bg-blue-600 hover:bg-blue-500 text-white',
@@ -840,11 +840,11 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
   `;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-2">
       <style>{scrollbarStyles}</style>
       <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
-        <div className="text-center py-3">
+        <div className="text-center py-2">
           <h1 className="text-xl font-bold text-white flex items-center justify-center gap-2">
             <Calculator className="text-emerald-400" size={24} />
             智能計算機
@@ -877,7 +877,7 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
         {/* 主要內容區：左右兩欄 */}
         <div className="flex gap-4">
           {/* 左側：歷史記錄 */}
-          <div className="hidden md:flex md:flex-col w-64 bg-slate-800/50 rounded-2xl p-3 h-[480px] overflow-hidden">
+          <div className="hidden lg:flex lg:flex-col w-64 bg-slate-800/50 rounded-2xl p-3 h-[480px] overflow-hidden">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <History size={16} className="text-blue-400" />
@@ -1555,7 +1555,7 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
         </div>
 
         {/* Footer */}
-        <div className="text-center text-[10px] text-slate-600 py-4 mt-4 mb-16 md:mb-0">
+        <div className="text-center text-[10px] text-slate-600 py-4 mt-4 mb-16 lg:mb-0">
           © 2026 Ultra Advisor | 計算結果僅供參考
         </div>
       </div>
@@ -1637,7 +1637,7 @@ function MobileHistoryPanel({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-50">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50">
       {/* 展開的歷史面板 */}
       <div
         className={`bg-slate-900 border-t border-slate-700 transition-all duration-300 ease-in-out ${

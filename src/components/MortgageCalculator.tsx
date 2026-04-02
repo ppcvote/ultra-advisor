@@ -18,7 +18,8 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { doc, updateDoc, increment } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from '../firebase';
 // 不使用 Recharts，改用純 SVG 繪製
 
 // ============================================================
@@ -237,6 +238,41 @@ export default function MortgageCalculator() {
   }, []);
 
   // ==========================================
+  // AI 分析狀態
+  // ==========================================
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const handleAIAnalysis = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    setAiInsight(null);
+    try {
+      const callable = httpsCallable(functions, 'generateFinancialInsight', { timeout: 30000 });
+      const result = await callable({
+        type: 'mortgage',
+        payload: {
+          loanAmount,
+          annualRate: interestRate,
+          loanTerm,
+          method: repaymentMethod,
+          monthlyPayment: calculations.monthlyPayment,
+          totalInterest: calculations.totalInterest,
+          totalPayment: calculations.totalPayment,
+          interestRatio: calculations.interestRatio,
+        },
+      });
+      setAiInsight((result.data as any).insight);
+    } catch (err: any) {
+      console.error('AI analysis failed:', err);
+      setAiError(err.message || 'AI 分析暫時無法使用');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // ==========================================
   // 核心狀態
   // ==========================================
   const [activeTab, setActiveTab] = useState<'chart' | 'table'>('chart');
@@ -269,13 +305,15 @@ export default function MortgageCalculator() {
     const yearlySchedule = aggregateByYear(schedule);
     
     const lastItem = schedule[schedule.length - 1];
-    const monthlyPayment = repaymentMethod === 'equal_payment' 
+    const monthlyPaymentRaw = repaymentMethod === 'equal_payment'
       ? calculateEqualPayment(principal, interestRate, totalMonths)
       : calculateEqualPrincipalPayment(principal, interestRate, totalMonths, 1);
-    
-    const totalPayment = lastItem?.totalPaid || 0;
-    const totalInterest = lastItem?.totalInterest || 0;
+    const monthlyPayment = Math.round(monthlyPaymentRaw);
+
+    // 使用四捨五入後的月付金計算總還款，確保顯示數字一致（月付 × 期數 = 總還款）
     const actualMonths = schedule.length;
+    const totalPayment = monthlyPayment * actualMonths;
+    const totalInterest = totalPayment - principal;
     const actualYears = Math.ceil(actualMonths / 12);
     
     const interestRatio = totalPayment > 0 ? (totalInterest / totalPayment) * 100 : 0;
@@ -1073,6 +1111,84 @@ export default function MortgageCalculator() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* AI 智能分析 */}
+            <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 rounded-xl border border-cyan-500/20 overflow-hidden">
+              {!aiInsight && !aiLoading && (
+                <button
+                  onClick={handleAIAnalysis}
+                  disabled={aiLoading}
+                  className="w-full p-4 flex items-center justify-center gap-3 hover:bg-cyan-500/5 transition-all group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Zap size={20} className="text-cyan-400" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-white font-bold text-sm">AI 智能分析</p>
+                    <p className="text-slate-500 text-xs">Gemini AI 為你解讀這筆房貸</p>
+                  </div>
+                  <span className="ml-auto text-cyan-400 text-xs font-mono bg-cyan-500/10 px-2 py-1 rounded-full">FREE</span>
+                </button>
+              )}
+
+              {aiLoading && (
+                <div className="p-6 text-center">
+                  <div className="inline-flex items-center gap-3">
+                    <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-cyan-400 text-sm font-bold">AI 分析中...</span>
+                  </div>
+                  <p className="text-slate-600 text-xs mt-2">Gemini AI 正在分析你的房貸條件</p>
+                </div>
+              )}
+
+              {aiError && (
+                <div className="p-4">
+                  <div className="flex items-center gap-2 text-red-400 text-sm mb-2">
+                    <AlertTriangle size={14} />
+                    <span>{aiError}</span>
+                  </div>
+                  <button
+                    onClick={handleAIAnalysis}
+                    className="text-xs text-slate-400 hover:text-cyan-400 transition-colors"
+                  >
+                    點此重試
+                  </button>
+                </div>
+              )}
+
+              {aiInsight && (
+                <div className="p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center">
+                      <Zap size={14} className="text-white" />
+                    </div>
+                    <span className="text-white font-bold text-sm">AI 分析報告</span>
+                    <span className="text-[10px] text-slate-600 font-mono ml-auto">Powered by Gemini</span>
+                  </div>
+                  <div
+                    className="prose prose-invert prose-sm max-w-none
+                      [&_h3]:text-base [&_h3]:font-black [&_h3]:text-white [&_h3]:mt-4 [&_h3]:mb-2
+                      [&_p]:text-slate-300 [&_p]:text-sm [&_p]:leading-relaxed [&_p]:mb-2
+                      [&_strong]:text-cyan-400
+                      [&_ul]:text-slate-300 [&_ul]:text-sm
+                      [&_li]:mb-1"
+                    dangerouslySetInnerHTML={{
+                      __html: aiInsight
+                        .replace(/### /g, '<h3>')
+                        .replace(/\n(?=<h3>)/g, '</p>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\n/g, '<br/>')
+                    }}
+                  />
+                  <button
+                    onClick={() => { setAiInsight(null); setAiError(null); }}
+                    className="mt-4 text-xs text-slate-500 hover:text-cyan-400 transition-colors"
+                  >
+                    重新分析
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* CTA */}

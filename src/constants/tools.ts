@@ -51,7 +51,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
         id: 'free_dashboard',
         icon: LayoutDashboard,
         label: '自由組合戰情室',
-        description: '自由組合多種工具，打造客製化諮詢場景',
+        description: '自由組合多種工具，打造客製化分析場景',
         benefits: ['拖拉組合任意工具', '多種版面配置', '一鍵切換場景'],
         isFree: true
       },
@@ -198,9 +198,9 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
       {
         id: 'insurance_checkup',
         icon: HeartPulse,
-        label: '保單健診系統',
-        description: '家庭保單健檢，缺口分析一目了然',
-        benefits: ['OCR 保單辨識', '家庭保障總覽', '缺口分析報告'],
+        label: 'AI 保單健診系統',
+        description: 'AI 自動辨識保單、分析保障缺口',
+        benefits: ['Gemini AI OCR 辨識', '自動缺口分析', '視覺化分析報告'],
         isFree: false
       },
       {

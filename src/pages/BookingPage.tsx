@@ -322,7 +322,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ onBack, onLogin }) => {
           </div>
           <h2 className="text-2xl font-black text-white mb-4">預約成功！</h2>
           <p className="text-slate-400 mb-6">
-            我們已收到您的預約申請，專業顧問將在 24 小時內與您聯繫，為您安排免費 1:1 試算服務。
+            我們已收到您的預約申請，我們將在 24 小時內與您聯繫，為您安排免費 1:1 試算服務。
           </p>
           <div className="bg-slate-900/50 rounded-xl p-4 mb-4 text-left">
             <div className="text-sm text-slate-500 mb-2">預約資訊</div>
@@ -393,7 +393,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ onBack, onLogin }) => {
             預約 1:1 免費試算
           </h1>
           <p className="text-slate-400 text-lg">
-            專業顧問為您量身打造財務規劃方案
+            AI 平台為您量身分析財務規劃方案
           </p>
         </div>
 
@@ -883,7 +883,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ onBack, onLogin }) => {
 
         {/* Footer Note */}
         <p className="text-center text-slate-500 text-sm mt-6">
-          提交後，專業顧問將在 24 小時內與您聯繫
+          提交後，我們將在 24 小時內與您聯繫
         </p>
       </main>
     </div>

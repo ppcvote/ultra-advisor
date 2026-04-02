@@ -65,7 +65,7 @@ import CheckupClientSelector from './insurance/CheckupClientSelector';
 import { blogArticles } from '../data/blog/index';
 
 // 🆕 Threads 社群助理
-import ThreadsAssistant from './threads/ThreadsAssistant';
+// ThreadsAssistant 已移除，功能遷移至 MindThread.tw
 
 // ==========================================
 // 🏪 Ultra Alliance 模擬合作夥伴資料
@@ -764,6 +764,11 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
   const [todayShared, setTodayShared] = useState(false);
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
+  const [bgBase64, setBgBase64] = useState<string | null>(null);
+  // 市場報告模式
+  const [storyMode, setStoryMode] = useState<'quote' | 'market'>('quote');
+  const [marketReport, setMarketReport] = useState<any>(null);
+  const [marketLoading, setMarketLoading] = useState(false);
   // 隨機文案/背景 state
   const [customQuote, setCustomQuote] = useState<DailyQuote | null>(null);
   const [customBg, setCustomBg] = useState<ReturnType<typeof getTodayBackground> | null>(null);
@@ -1291,12 +1296,12 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
     }
   };
 
-  // 頭像尺寸對應的 CSS 配置
+  // 頭像尺寸對應的 CSS 配置（含明確像素尺寸，避免 html2canvas 壓扁）
   const getAvatarSizeConfig = () => {
     switch (avatarSize) {
-      case 'small': return { size: 'w-7 h-7', text: 'text-sm', nameText: 'text-xs' };
-      case 'large': return { size: 'w-14 h-14', text: 'text-xl', nameText: 'text-base' };
-      default: return { size: 'w-10 h-10', text: 'text-lg', nameText: 'text-sm' }; // medium
+      case 'small': return { size: 'w-8 h-8', px: 32, text: 'text-sm', nameText: 'text-xs' };
+      case 'large': return { size: 'w-16 h-16', px: 64, text: 'text-xl', nameText: 'text-base' };
+      default: return { size: 'w-11 h-11', px: 44, text: 'text-lg', nameText: 'text-sm' }; // medium
     }
   };
 
@@ -1338,40 +1343,145 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
     console.log('[MarketDataCard] 開始載入頭貼（透過代理）');
 
     const loadAvatarAsBase64 = async () => {
-      try {
-        // 透過 Cloud Functions 代理取得圖片（繞過 CORS）
-        const proxyUrl = `${IMAGE_PROXY_URL}?url=${encodeURIComponent(userPhotoURL!)}`;
-        const response = await fetch(proxyUrl);
+      // 嘗試多個 URL：高解析度優先，失敗回退原始 URL
+      const urlsToTry: string[] = [];
+      const originalUrl = userPhotoURL!;
 
-        if (!response.ok) {
-          throw new Error(`代理回應錯誤: ${response.status}`);
-        }
-
-        const blob = await response.blob();
-        const reader = new FileReader();
-
-        reader.onloadend = () => {
-          const base64 = reader.result as string;
-          setAvatarBase64(base64);
-          console.log('[MarketDataCard] 頭貼 base64 轉換成功（透過代理）');
-        };
-
-        reader.onerror = () => {
-          console.error('[MarketDataCard] FileReader 錯誤');
-          setAvatarBase64(null);
-          setAvatarLoadError(true);
-        };
-
-        reader.readAsDataURL(blob);
-      } catch (error) {
-        console.error('[MarketDataCard] 載入頭貼失敗:', error);
-        setAvatarBase64(null);
-        setAvatarLoadError(true);
+      // Google 大頭貼預設 96px，嘗試請求 512px
+      if (originalUrl.includes('googleusercontent.com') && /=s\d+-c/.test(originalUrl)) {
+        urlsToTry.push(originalUrl.replace(/=s\d+-c/, '=s512-c'));
       }
+      urlsToTry.push(originalUrl); // 原始 URL 作為 fallback
+
+      for (const avatarUrl of urlsToTry) {
+        try {
+          const proxyUrl = `${IMAGE_PROXY_URL}?url=${encodeURIComponent(avatarUrl)}`;
+          const response = await fetch(proxyUrl);
+
+          if (!response.ok) {
+            console.warn(`[Avatar] ${avatarUrl} 代理回應: ${response.status}，嘗試下一個`);
+            continue;
+          }
+
+          const blob = await response.blob();
+          if (blob.size < 100) {
+            console.warn(`[Avatar] ${avatarUrl} 回應太小 (${blob.size}B)，嘗試下一個`);
+            continue;
+          }
+
+          // 用 canvas 把頭像裁切成正方形並輸出高解析度 base64
+          // 這樣 <img> 不需要 object-fit，html2canvas 一定能渲染
+          const squareBase64 = await new Promise<string>((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              const size = 256; // 輸出 256x256，夠高解析度
+              const canvas = document.createElement('canvas');
+              canvas.width = size;
+              canvas.height = size;
+              const ctx = canvas.getContext('2d')!;
+              // 居中裁切成正方形
+              const srcSize = Math.min(img.width, img.height);
+              const sx = (img.width - srcSize) / 2;
+              const sy = (img.height - srcSize) / 2;
+              ctx.drawImage(img, sx, sy, srcSize, srcSize, 0, 0, size, size);
+              resolve(canvas.toDataURL('image/png'));
+            };
+            img.onerror = () => reject(new Error('Image load failed'));
+            // 從 blob 建立 object URL 載入
+            img.src = URL.createObjectURL(blob);
+          });
+
+          setAvatarBase64(squareBase64);
+          console.log(`[Avatar] 頭貼載入成功 (${avatarUrl === originalUrl ? '原始' : '高解析度'}, 256x256)`);
+          return; // 成功就結束
+        } catch (err) {
+          console.warn(`[Avatar] ${avatarUrl} 載入失敗:`, err);
+          continue;
+        }
+      }
+
+      // 全部失敗
+      console.error('[Avatar] 所有 URL 都載入失敗');
+      setAvatarBase64(null);
+      setAvatarLoadError(true);
     };
 
     loadAvatarAsBase64();
   }, [userPhotoURL]);
+
+  // 預載入背景圖為 base64（解決 html2canvas 無法渲染外部 URL background-image 導致截圖變暗的問題）
+  useEffect(() => {
+    if (!displayBg?.imageUrl) {
+      setBgBase64(null);
+      return;
+    }
+
+    // 自訂背景已經是 data URL，不需要轉換
+    if (displayBg.imageUrl.startsWith('data:')) {
+      setBgBase64(displayBg.imageUrl);
+      return;
+    }
+
+    setBgBase64(null); // 重置，等新圖載入
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        // 限制解析度以控制記憶體（最大 1200px 寬）
+        const maxW = 1200;
+        const scale = img.width > maxW ? maxW / img.width : 1;
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          setBgBase64(dataUrl);
+          console.log('[MarketDataCard] 背景圖 base64 轉換成功');
+        }
+      } catch (e) {
+        console.warn('[MarketDataCard] 背景圖 base64 轉換失敗（CORS）:', e);
+        setBgBase64(null);
+      }
+    };
+
+    img.onerror = () => {
+      console.warn('[MarketDataCard] 背景圖載入失敗');
+      setBgBase64(null);
+    };
+
+    // 設定超時
+    const timeout = setTimeout(() => {
+      if (!bgBase64) setBgBase64(null);
+    }, 8000);
+
+    img.src = displayBg.imageUrl;
+
+    return () => clearTimeout(timeout);
+  }, [displayBg?.imageUrl]);
+
+  // 載入今日市場報告（使用台灣時區日期）
+  useEffect(() => {
+    const now = new Date();
+    const twDate = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    const today = twDate.toISOString().split('T')[0];
+    console.log('[MarketReport] 查詢日期:', today);
+    const reportRef = doc(db, 'dailyMarketReports', today);
+
+    const unsubscribe = onSnapshot(reportRef, (snap) => {
+      if (snap.exists()) {
+        setMarketReport(snap.data());
+      } else {
+        setMarketReport(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // 載入使用者的累積分享天數
   useEffect(() => {
@@ -1481,7 +1591,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
       // 使用 html2canvas 截圖（最簡配置）
       const outputCanvas = await html2canvas(storyRef.current, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
         allowTaint: true,
         backgroundColor: null,
@@ -1583,7 +1693,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
       // 使用 html2canvas 截圖（最簡配置）
       const outputCanvas = await html2canvas(storyRef.current, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
         allowTaint: true,
         backgroundColor: null,
@@ -1704,11 +1814,34 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
   return (
     <div className="dark:bg-slate-900/50 bg-white border dark:border-slate-800 border-slate-200 rounded-2xl p-6">
-      {/* ===== 每日金句區塊 ===== */}
+      {/* ===== 每日金句 / 市場快訊 區塊 ===== */}
       <div className="mb-4">
         <div className="flex items-center gap-2 mb-3">
-          <Quote size={16} className="text-purple-400" />
-          <span className="text-xs font-bold dark:text-white text-slate-900">每日金句</span>
+          {/* Tab 切換 */}
+          <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-0.5">
+            <button
+              onClick={() => setStoryMode('quote')}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-all ${
+                storyMode === 'quote'
+                  ? 'bg-purple-500/30 text-purple-300'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Quote size={10} />
+              金句
+            </button>
+            <button
+              onClick={() => setStoryMode('market')}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-all ${
+                storyMode === 'market'
+                  ? 'bg-blue-500/30 text-blue-300'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <BarChart3 size={10} />
+              市場
+            </button>
+          </div>
           {totalShareDays > 0 && (
             <span className="ml-auto text-[10px] text-purple-400 font-bold">
               累積分享 {totalShareDays} 天
@@ -1717,6 +1850,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
         </div>
 
         {/* 金句預覽卡片 */}
+        {storyMode === 'quote' && (
         <div
           className="relative rounded-xl p-4 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform border border-white/10"
           onClick={() => setShowStoryPreview(true)}
@@ -1752,6 +1886,53 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
             </div>
           </div>
         </div>
+        )}
+
+        {/* 市場快訊預覽卡片 */}
+        {storyMode === 'market' && (
+          <div
+            className="relative rounded-xl p-4 overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform border border-white/10 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900"
+            onClick={() => { if (marketReport) setShowStoryPreview(true); }}
+          >
+            {marketReport ? (
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <BarChart3 size={14} className="text-blue-400" />
+                  <span className="text-blue-400 text-[10px] font-bold">盤後快訊</span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                    marketReport.aiSummary?.sentiment === 'bullish' ? 'bg-green-500/20 text-green-400' :
+                    marketReport.aiSummary?.sentiment === 'bearish' ? 'bg-red-500/20 text-red-400' :
+                    'bg-slate-500/20 text-slate-400'
+                  }`}>
+                    {marketReport.aiSummary?.sentiment === 'bullish' ? '偏多' :
+                     marketReport.aiSummary?.sentiment === 'bearish' ? '偏空' : '中性'}
+                  </span>
+                </div>
+                <p className="text-white font-bold text-sm mb-1">{marketReport.aiSummary?.headline}</p>
+                <p className="text-white/60 text-[11px] line-clamp-2">{marketReport.aiSummary?.summary}</p>
+                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-white/10">
+                  {marketReport.marketData?.twii && (
+                    <span className={`text-[10px] font-bold ${marketReport.marketData.twii.change >= 0 ? 'text-green-400' : 'text-blue-400'}`}>
+                      🇹🇼 {marketReport.marketData.twii.price?.toLocaleString()} ({marketReport.marketData.twii.change >= 0 ? '+' : ''}{marketReport.marketData.twii.changePercent}%)
+                    </span>
+                  )}
+                  {marketReport.marketData?.sp500 && (
+                    <span className={`text-[10px] font-bold ${marketReport.marketData.sp500.change >= 0 ? 'text-green-400' : 'text-blue-400'}`}>
+                      🇺🇸 {marketReport.marketData.sp500.price?.toLocaleString()} ({marketReport.marketData.sp500.change >= 0 ? '+' : ''}{marketReport.marketData.sp500.changePercent}%)
+                    </span>
+                  )}
+                </div>
+                <div className="text-white/30 text-[9px] mt-2 text-right">點擊預覽 & 分享</div>
+              </div>
+            ) : (
+              <div className="relative z-10 text-center py-4">
+                <BarChart3 size={24} className="text-slate-600 mx-auto mb-2" />
+                <p className="text-slate-500 text-xs">今日市場報告尚未產出</p>
+                <p className="text-slate-600 text-[10px] mt-1">每日 14:30 台股收盤後自動更新</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 快速分享按鈕 */}
         <div className="flex gap-2 mt-3">
@@ -1803,34 +1984,28 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
         </div>
       </div>
 
-      {/* ===== Threads 社群助理入口 ===== */}
+      {/* ===== MindThread 社群助理入口 ===== */}
       <div className="mt-3">
-        <button
-          onClick={() => {
-            if (membership?.isPaid && onOpenThreadsAssistant) {
-              onOpenThreadsAssistant();
-            }
-          }}
-          className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
-            membership?.isPaid
-              ? 'dark:bg-gradient-to-r dark:from-purple-900/30 dark:to-blue-900/30 bg-gradient-to-r from-purple-50 to-blue-50 border-purple-500/30 hover:border-purple-400 cursor-pointer'
-              : 'dark:bg-slate-800/50 bg-slate-100 border-slate-700/50 cursor-not-allowed opacity-60'
-          }`}
+        <a
+          href="https://mindthread.tw"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center gap-3 p-3 rounded-xl border transition-all
+            dark:bg-gradient-to-r dark:from-purple-900/30 dark:to-blue-900/30 bg-gradient-to-r from-purple-50 to-blue-50 border-purple-500/30 hover:border-purple-400 cursor-pointer"
         >
           <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
             <MessageCircle size={16} className="text-purple-400" />
           </div>
           <div className="flex-1 text-left">
             <span className="text-xs font-bold dark:text-white text-slate-800 block">
-              Threads 社群助理
+              MindThread 社群助理
             </span>
             <span className="text-[10px] text-slate-500">
-              {membership?.isPaid ? 'AI 自動生成 & 一鍵發佈' : '升級付費會員解鎖'}
+              AI 自動生成 Threads 貼文
             </span>
           </div>
-          {!membership?.isPaid && <Lock size={14} className="text-slate-500" />}
-          {membership?.isPaid && <Sparkles size={14} className="text-purple-400" />}
-        </button>
+          <ExternalLink size={14} className="text-purple-400" />
+        </a>
       </div>
 
       {/* ===== Ultra Alliance 戰術據點 ===== */}
@@ -1937,14 +2112,143 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
             {/* 限時動態預覽（這個會被截圖） */}
             <div
               ref={storyRef}
-              className={`aspect-[9/16] rounded-3xl overflow-hidden bg-gradient-to-br ${displayBg.fallbackGradient}
-                         flex flex-col items-center justify-center p-8 relative`}
+              className={`aspect-[9/16] rounded-3xl overflow-hidden ${
+                storyMode === 'market'
+                  ? 'bg-gradient-to-br from-[#0a1628] via-[#0d1f3c] to-[#0a1628]'
+                  : `bg-gradient-to-br ${displayBg.fallbackGradient}`
+              } flex flex-col items-center justify-center p-8 relative`}
             >
-              {/* 風景背景（套用濾鏡） */}
+              {/* ========== 市場快訊模板 ========== */}
+              {storyMode === 'market' && marketReport && (
+                <>
+                  {/* 深色科技感背景 */}
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(59,130,246,0.15),transparent_60%)]" />
+                  <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 20% 80%, rgba(59,130,246,0.08) 0%, transparent 50%)' }} />
+
+                  {/* 頂部標題 */}
+                  <div className="absolute top-6 left-6 right-6 z-10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                        <span className="text-blue-400 text-xs font-bold tracking-wider">盤後快訊</span>
+                      </div>
+                      <span className="text-white/40 text-[10px]">{marketReport.date}</span>
+                    </div>
+                  </div>
+
+                  {/* AI 標題 */}
+                  <div className="absolute top-16 left-6 right-6 z-10">
+                    <p className="text-white font-black text-xl leading-tight mb-2">
+                      {marketReport.aiSummary?.headline}
+                    </p>
+                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                      marketReport.aiSummary?.sentiment === 'bullish' ? 'bg-green-500/20 text-green-400' :
+                      marketReport.aiSummary?.sentiment === 'bearish' ? 'bg-red-500/20 text-red-400' :
+                      'bg-white/10 text-white/60'
+                    }`}>
+                      {marketReport.aiSummary?.sentiment === 'bullish' ? '📈 偏多' :
+                       marketReport.aiSummary?.sentiment === 'bearish' ? '📉 偏空' : '➡️ 中性'}
+                    </div>
+                  </div>
+
+                  {/* 指數數據卡片 */}
+                  <div className="absolute top-[120px] left-5 right-5 z-10 space-y-1.5">
+                    {[
+                      { key: 'twii', flag: '🇹🇼', label: '加權指數' },
+                      { key: 'sp500', flag: '🇺🇸', label: 'S&P 500' },
+                      { key: 'nasdaq', flag: '🇺🇸', label: 'NASDAQ' },
+                      { key: 'dji', flag: '🇺🇸', label: '道瓊' },
+                      { key: 'usdtwd', flag: '💱', label: 'USD/TWD' },
+                      { key: 'us10y', flag: '📊', label: '美 10Y 殖利率' },
+                    ].map(({ key, flag, label }) => {
+                      const d = marketReport.marketData?.[key];
+                      if (!d) return null;
+                      const isUp = d.change >= 0;
+                      return (
+                        <div key={key} className="flex items-center justify-between bg-white/[0.04] rounded-lg px-3 py-1.5 border border-white/[0.06]">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{flag}</span>
+                            <span className="text-white/70 text-[11px] font-medium">{label}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-bold text-sm">{
+                              key === 'usdtwd' || key === 'us10y'
+                                ? d.price?.toFixed(2)
+                                : d.price?.toLocaleString(undefined, { maximumFractionDigits: 0 })
+                            }</span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              isUp ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'
+                            }`}>
+                              {isUp ? '▲' : '▼'} {Math.abs(d.changePercent)}%
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* AI 摘要 */}
+                  <div className="absolute bottom-24 left-5 right-5 z-10">
+                    <div className="bg-white/[0.04] rounded-lg px-3 py-2.5 border border-white/[0.06]">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Sparkles size={10} className="text-blue-400" />
+                        <span className="text-blue-400 text-[9px] font-bold">AI 觀點</span>
+                      </div>
+                      <p className="text-white/80 text-[11px] leading-relaxed line-clamp-3">
+                        {marketReport.aiSummary?.outlook}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 底部：顧問資訊 + 品牌 */}
+                  <div className="absolute bottom-6 left-5 z-10 flex items-center gap-2">
+                    <div
+                      className="rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
+                      style={{
+                        width: getAvatarSizeConfig().px,
+                        height: getAvatarSizeConfig().px,
+                        minWidth: getAvatarSizeConfig().px,
+                        minHeight: getAvatarSizeConfig().px,
+                        borderRadius: '50%',
+                        background: (!avatarBase64 && !isValidImageUrl(userPhotoURL)) ? 'linear-gradient(135deg, #a855f7, #3b82f6)' : undefined,
+                      }}
+                    >
+                      {avatarBase64 ? (
+                        <img src={avatarBase64} alt="" style={{ width: '100%', height: '100%', display: 'block' }} />
+                      ) : !isValidImageUrl(userPhotoURL) ? (
+                        <span className={`text-white font-bold ${getAvatarSizeConfig().text}`}>
+                          {(userDisplayName || '顧')[0]}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className={`text-white font-bold ${getAvatarSizeConfig().nameText}`}
+                        style={{ fontFamily: NAME_FONT_STYLES[nameFontStyle].fontFamily }}>
+                        {userDisplayName || '財務顧問'}
+                      </span>
+                      <span className="text-white/40 text-[9px]">{todayDate}</span>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-6 right-5 z-10"
+                    style={{ lineHeight: '16px' }}>
+                    <img src="/logo.png" alt="Ultra Advisor"
+                      style={{ width: 14, height: 14, verticalAlign: 'middle', display: 'inline-block', marginRight: 4 }} />
+                    <span style={{ fontSize: 10, fontWeight: 'bold', verticalAlign: 'middle' }}>
+                      <span style={{ color: '#ef4444' }}>Ultra</span>
+                      <span style={{ color: '#60a5fa' }}> Advisor</span>
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {/* ========== 金句模式（原有內容） ========== */}
+              {storyMode === 'quote' && (
+              <>
+              {/* 風景背景（使用 base64 確保 html2canvas 能正確渲染，避免截圖變暗） */}
               <div
                 className="absolute inset-0 bg-cover bg-center"
                 style={{
-                  backgroundImage: `url(${displayBg.imageUrl})`,
+                  backgroundImage: `url(${bgBase64 || displayBg.imageUrl})`,
                   filter: FILTER_STYLES[filterStyle].css
                 }}
               />
@@ -1977,26 +2281,24 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
                   {/* 底部左側：顧問頭貼 + 名字 + 日期（獨立定位避免 flexbox justify-between 問題） */}
                   <div className="absolute bottom-6 left-5 z-10 flex items-center gap-2">
-                    <div className={`${getAvatarSizeConfig().size} rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-blue-500 flex-shrink-0 relative`}>
-                      {/* Fallback 文字（z-index 較低，會被圖片覆蓋） */}
-                      <div className="absolute inset-0 flex items-center justify-center z-0">
+                    <div
+                      className="rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
+                      style={{
+                        width: getAvatarSizeConfig().px,
+                        height: getAvatarSizeConfig().px,
+                        minWidth: getAvatarSizeConfig().px,
+                        minHeight: getAvatarSizeConfig().px,
+                        borderRadius: '50%',
+                        background: (!avatarBase64 && !isValidImageUrl(userPhotoURL)) ? 'linear-gradient(135deg, #a855f7, #3b82f6)' : undefined,
+                      }}
+                    >
+                      {avatarBase64 ? (
+                        <img src={avatarBase64} alt="" style={{ width: '100%', height: '100%', display: 'block' }} />
+                      ) : !isValidImageUrl(userPhotoURL) ? (
                         <span className={`text-white font-bold ${getAvatarSizeConfig().text}`}>
                           {(userDisplayName || '顧')[0]}
                         </span>
-                      </div>
-                      {/* 頭貼圖片（z-index 較高，會覆蓋文字） */}
-                      {(avatarBase64 || isValidImageUrl(userPhotoURL)) && (
-                        <img
-                          src={avatarBase64 || userPhotoURL}
-                          alt={userDisplayName || '顧問'}
-                          className="absolute inset-0 w-full h-full object-cover z-10"
-                          crossOrigin="anonymous"
-                          onError={(e) => {
-                            // 圖片載入失敗時隱藏，露出下面的文字
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex flex-col">
                       <span
@@ -2005,24 +2307,23 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                       >
                         {userDisplayName || '財務顧問'}
                       </span>
-                      <span className="text-white/50 text-[10px] flex items-center gap-1">
-                        <Calendar size={10} />
+                      <span className="text-white/50 text-[10px]">
                         {todayDate}
                       </span>
                     </div>
                   </div>
 
-                  {/* 底部右側：品牌浮水印（獨立定位） */}
-                  <div className="absolute bottom-6 right-5 z-10 flex items-center gap-1">
+                  {/* 底部右側：品牌浮水印（與左側頭像區垂直置中對齊） */}
+                  <div className="absolute right-5 z-10"
+                    style={{ bottom: 24, height: getAvatarSizeConfig().px, lineHeight: `${getAvatarSizeConfig().px}px` }}>
                     <img
                       src="/logo.png"
                       alt="Ultra Advisor"
-                      className="w-4 h-4 object-contain"
-                      style={{ width: 16, height: 16, minWidth: 16, minHeight: 16 }}
+                      style={{ width: 14, height: 14, verticalAlign: 'middle', display: 'inline-block', marginRight: 4 }}
                     />
-                    <span className="text-[10px] font-bold leading-none" style={{ lineHeight: 1 }}>
-                      <span className="text-red-500">Ultra</span>
-                      <span className="text-blue-400"> Advisor</span>
+                    <span style={{ fontSize: 10, fontWeight: 'bold', verticalAlign: 'middle', lineHeight: `${getAvatarSizeConfig().px}px` }}>
+                      <span style={{ color: '#ef4444' }}>Ultra</span>
+                      <span style={{ color: '#60a5fa' }}> Advisor</span>
                     </span>
                   </div>
 
@@ -2088,25 +2389,24 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
                   {/* 底部左側：顧問頭貼 + 名字（獨立定位） */}
                   <div className="absolute bottom-6 left-4 z-10 flex items-center gap-2">
-                    <div className={`${getAvatarSizeConfig().size} rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-blue-500 flex-shrink-0 relative`}>
-                      {/* Fallback 文字 */}
-                      <div className="absolute inset-0 flex items-center justify-center z-0">
+                    <div
+                      className="rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
+                      style={{
+                        width: getAvatarSizeConfig().px,
+                        height: getAvatarSizeConfig().px,
+                        minWidth: getAvatarSizeConfig().px,
+                        minHeight: getAvatarSizeConfig().px,
+                        borderRadius: '50%',
+                        background: (!avatarBase64 && !isValidImageUrl(userPhotoURL)) ? 'linear-gradient(135deg, #a855f7, #3b82f6)' : undefined,
+                      }}
+                    >
+                      {avatarBase64 ? (
+                        <img src={avatarBase64} alt="" style={{ width: '100%', height: '100%', display: 'block' }} />
+                      ) : !isValidImageUrl(userPhotoURL) ? (
                         <span className={`text-white font-bold ${getAvatarSizeConfig().text}`}>
                           {(userDisplayName || '顧')[0]}
                         </span>
-                      </div>
-                      {/* 頭貼圖片 */}
-                      {(avatarBase64 || isValidImageUrl(userPhotoURL)) && (
-                        <img
-                          src={avatarBase64 || userPhotoURL}
-                          alt={userDisplayName || '顧問'}
-                          className="absolute inset-0 w-full h-full object-cover z-10"
-                          crossOrigin="anonymous"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex flex-col">
                       <span
@@ -2121,17 +2421,17 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                     </div>
                   </div>
 
-                  {/* 底部右側：品牌浮水印（獨立定位） */}
-                  <div className="absolute bottom-6 right-4 z-10 flex items-center gap-1">
+                  {/* 底部右側：品牌浮水印（與左側頭像區垂直置中對齊） */}
+                  <div className="absolute right-4 z-10"
+                    style={{ bottom: 24, height: getAvatarSizeConfig().px, lineHeight: `${getAvatarSizeConfig().px}px` }}>
                     <img
                       src="/logo.png"
                       alt="Ultra Advisor"
-                      className="w-4 h-4 object-contain"
-                      style={{ width: 16, height: 16, minWidth: 16, minHeight: 16 }}
+                      style={{ width: 14, height: 14, verticalAlign: 'middle', display: 'inline-block', marginRight: 4 }}
                     />
-                    <span className="text-[10px] font-bold whitespace-nowrap leading-none" style={{ lineHeight: 1 }}>
-                      <span className="text-red-500">Ultra</span>
-                      <span className="text-blue-400"> Advisor</span>
+                    <span style={{ fontSize: 10, fontWeight: 'bold', verticalAlign: 'middle', lineHeight: `${getAvatarSizeConfig().px}px` }}>
+                      <span style={{ color: '#ef4444' }}>Ultra</span>
+                      <span style={{ color: '#60a5fa' }}> Advisor</span>
                     </span>
                   </div>
 
@@ -2201,23 +2501,24 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                   {/* 左側：顧問資訊 */}
                   <div className="absolute bottom-5 left-4 z-10">
                     <div className="flex items-center gap-2">
-                      <div className={`${getAvatarSizeConfig().size} rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-blue-500 flex-shrink-0 relative border-2 border-white/30`}>
-                        <div className="absolute inset-0 flex items-center justify-center z-0">
+                      <div
+                        className="rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden border-2 border-white/30"
+                        style={{
+                          width: getAvatarSizeConfig().px,
+                          height: getAvatarSizeConfig().px,
+                          minWidth: getAvatarSizeConfig().px,
+                          minHeight: getAvatarSizeConfig().px,
+                          borderRadius: '50%',
+                          background: (!avatarBase64 && !isValidImageUrl(userPhotoURL)) ? 'linear-gradient(135deg, #a855f7, #3b82f6)' : undefined,
+                        }}
+                      >
+                        {avatarBase64 ? (
+                          <img src={avatarBase64} alt="" style={{ width: '100%', height: '100%', display: 'block' }} />
+                        ) : !isValidImageUrl(userPhotoURL) ? (
                           <span className={`text-white font-bold ${getAvatarSizeConfig().text}`}>
                             {(userDisplayName || '顧')[0]}
                           </span>
-                        </div>
-                        {(avatarBase64 || isValidImageUrl(userPhotoURL)) && (
-                          <img
-                            src={avatarBase64 || userPhotoURL}
-                            alt={userDisplayName || '顧問'}
-                            className="absolute inset-0 w-full h-full object-cover z-10"
-                            crossOrigin="anonymous"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        )}
+                        ) : null}
                       </div>
                       <div className="flex flex-col">
                         <span
@@ -2235,16 +2536,15 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
                   {/* 中間：品牌浮水印 */}
                   <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
-                    <div className="flex items-center gap-1">
+                    <div style={{ lineHeight: '16px', whiteSpace: 'nowrap' }}>
                       <img
                         src="/logo.png"
                         alt="Ultra Advisor"
-                        className="w-4 h-4 object-contain"
-                        style={{ width: 16, height: 16, minWidth: 16, minHeight: 16 }}
+                        style={{ width: 14, height: 14, verticalAlign: 'middle', display: 'inline-block', marginRight: 4 }}
                       />
-                      <span className="text-[10px] font-bold whitespace-nowrap leading-none" style={{ lineHeight: 1 }}>
-                        <span className="text-red-500">Ultra</span>
-                        <span className="text-blue-400"> Advisor</span>
+                      <span style={{ fontSize: 10, fontWeight: 'bold', verticalAlign: 'middle' }}>
+                        <span style={{ color: '#ef4444' }}>Ultra</span>
+                        <span style={{ color: '#60a5fa' }}> Advisor</span>
                       </span>
                     </div>
                   </div>
@@ -2308,23 +2608,24 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                       <div className="relative w-full h-10">
                         {/* 左側：顧問資訊 */}
                         <div className="absolute left-0 top-0 flex items-center gap-2">
-                          <div className={`${getAvatarSizeConfig().size} rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-blue-500 flex-shrink-0 relative`}>
-                            <div className="absolute inset-0 flex items-center justify-center z-0">
+                          <div
+                            className="rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
+                            style={{
+                              width: getAvatarSizeConfig().px,
+                              height: getAvatarSizeConfig().px,
+                              minWidth: getAvatarSizeConfig().px,
+                              minHeight: getAvatarSizeConfig().px,
+                              borderRadius: '50%',
+                              background: (!avatarBase64 && !isValidImageUrl(userPhotoURL)) ? 'linear-gradient(135deg, #a855f7, #3b82f6)' : undefined,
+                            }}
+                          >
+                            {avatarBase64 ? (
+                              <img src={avatarBase64} alt="" style={{ width: '100%', height: '100%', display: 'block' }} />
+                            ) : !isValidImageUrl(userPhotoURL) ? (
                               <span className={`text-white font-bold ${getAvatarSizeConfig().text}`}>
                                 {(userDisplayName || '顧')[0]}
                               </span>
-                            </div>
-                            {(avatarBase64 || isValidImageUrl(userPhotoURL)) && (
-                              <img
-                                src={avatarBase64 || userPhotoURL}
-                                alt={userDisplayName || '顧問'}
-                                className="absolute inset-0 w-full h-full object-cover z-10"
-                                crossOrigin="anonymous"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                              />
-                            )}
+                            ) : null}
                           </div>
                           <div className="flex flex-col">
                             <span
@@ -2340,22 +2641,24 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
                         </div>
 
                         {/* 右側：品牌浮水印 */}
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2"
+                          style={{ lineHeight: '16px' }}>
                           <img
                             src="/logo.png"
                             alt="Ultra Advisor"
-                            className="w-4 h-4 object-contain"
-                            style={{ width: 16, height: 16, minWidth: 16, minHeight: 16 }}
+                            style={{ width: 14, height: 14, verticalAlign: 'middle', display: 'inline-block', marginRight: 4 }}
                           />
-                          <span className="text-[10px] font-bold leading-none" style={{ lineHeight: 1 }}>
-                            <span className="text-red-500">Ultra</span>
-                            <span className="text-blue-400"> Advisor</span>
+                          <span style={{ fontSize: 10, fontWeight: 'bold', verticalAlign: 'middle' }}>
+                            <span style={{ color: '#ef4444' }}>Ultra</span>
+                            <span style={{ color: '#60a5fa' }}> Advisor</span>
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
                 </>
+              )}
+              </>
               )}
             </div>
 
@@ -3033,13 +3336,14 @@ const QuickCalculator = () => {
   const getMortgageEqualPayment = () => {
     const i = mortgageRate / 100 / 12;
     const n = mortgageYears * 12;
-    if (i === 0) return { monthly: mortgageAmount / n, totalInterest: 0, totalPayment: mortgageAmount };
+    if (i === 0) return { monthly: Math.round(mortgageAmount / n), totalInterest: 0, totalPayment: mortgageAmount };
     const m = (mortgageAmount * i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1);
-    const totalPayment = m * n;
+    const monthlyRounded = Math.round(m);
+    const totalPayment = monthlyRounded * n; // 用四捨五入後的月付金計算，確保數字一致
     return {
-      monthly: Math.round(m),
-      totalInterest: Math.round(totalPayment - mortgageAmount),
-      totalPayment: Math.round(totalPayment)
+      monthly: monthlyRounded,
+      totalInterest: totalPayment - mortgageAmount,
+      totalPayment: totalPayment
     };
   };
 
@@ -3063,15 +3367,16 @@ const QuickCalculator = () => {
   const getCreditResult = () => {
     const i = creditRate / 100 / 12;
     const n = creditYears * 12;
-    if (i === 0) return { monthly: creditAmount / n, totalInterest: 0, totalPayment: creditAmount, apr: 0 };
+    if (i === 0) return { monthly: Math.round(creditAmount / n), totalInterest: 0, totalPayment: creditAmount, apr: 0 };
     const m = (creditAmount * i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1);
-    const totalPayment = m * n;
+    const monthlyRounded = Math.round(m);
+    const totalPayment = monthlyRounded * n; // 用四捨五入後的月付金計算，確保數字一致
     // 計算實質年利率 APR（考慮複利）
     const apr = Math.pow(1 + i, 12) - 1;
     return {
-      monthly: Math.round(m),
-      totalInterest: Math.round(totalPayment - creditAmount),
-      totalPayment: Math.round(totalPayment),
+      monthly: monthlyRounded,
+      totalInterest: totalPayment - creditAmount,
+      totalPayment: totalPayment,
       apr: (apr * 100).toFixed(2)
     };
   };
@@ -5692,7 +5997,7 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
   const [showCheckupClientSelector, setShowCheckupClientSelector] = useState(false);
 
   // 🆕 Threads 社群助理
-  const [showThreadsAssistant, setShowThreadsAssistant] = useState(false);
+  // Threads 功能已移除
 
   // 🆕 LOGO 五連點進入後台
   const [logoClickCount, setLogoClickCount] = useState(0);
@@ -5992,7 +6297,7 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
             title="Ultra 戰情室"
           >
             <img
-              src="https://lh3.googleusercontent.com/d/1CEFGRByRM66l-4sMMM78LUBUvAMiAIaJ"
+              src="/logo.png"
               alt="Ultra Advisor"
               className="h-10 w-10 rounded-xl object-cover"
               onError={(e: any) => {
@@ -6342,7 +6647,7 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
             userDisplayName={profileData.displayName || user?.displayName}
             userPhotoURL={profileData.photoURL || user?.photoURL}
             membership={membership}
-            onOpenThreadsAssistant={() => setShowThreadsAssistant(true)}
+            onOpenThreadsAssistant={() => window.open('https://mindthread.tw', '_blank')}
           />
 
           {/* Quick Calculator */}
@@ -6545,15 +6850,6 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
         />
       )}
 
-      {/* 🆕 Threads 社群助理 Modal */}
-      {showThreadsAssistant && user?.uid && (
-        <ThreadsAssistant
-          isOpen={showThreadsAssistant}
-          onClose={() => setShowThreadsAssistant(false)}
-          userId={user.uid}
-        />
-      )}
-
       {/* 🆕 功能建議 Modal */}
       {showFeedback && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -6659,4 +6955,6 @@ const UltraWarRoom: React.FC<UltraWarRoomProps> = ({ user, onSelectClient, onLog
   );
 };
 
+export { MarketDataCard };
+export type { MarketDataCardProps };
 export default UltraWarRoom;

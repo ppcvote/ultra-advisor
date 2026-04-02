@@ -10,6 +10,7 @@ import React, { memo, useState, useRef, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Sun, Heart, Baby, Users, Trash2 } from 'lucide-react';
 import type { FamilyMember } from '../../../types/insurance';
+import { RELATION_LABELS } from '../../../types/insurance';
 
 export interface MemberNodeData {
   member: FamilyMember;
@@ -20,22 +21,6 @@ export interface MemberNodeData {
   onQuickAdd?: (memberId: string, position: 'spouse' | 'child' | 'parent') => void;
   onDelete?: (memberId: string) => void;
 }
-
-const RELATION_DISPLAY: Record<string, string> = {
-  self: '本人',
-  spouse: '配偶',
-  father: '父',
-  mother: '母',
-  son: '子',
-  daughter: '女',
-  brother: '兄弟',
-  sister: '姊妹',
-  grandfather_p: '祖父',
-  grandmother_p: '祖母',
-  grandfather_m: '外祖父',
-  grandmother_m: '外祖母',
-  other: '其他',
-};
 
 function MemberNode({ data }: NodeProps<MemberNodeData>) {
   const { member, policyCount, onEdit, onSelect, onQuickAdd, onDelete } = data;
@@ -70,10 +55,10 @@ function MemberNode({ data }: NodeProps<MemberNodeData>) {
   const borderColor = isMain ? 'border-amber-400' : 'border-slate-300';
   const bgColor = isMale ? 'bg-blue-50' : 'bg-pink-50';
   const shadowClass = isMain ? 'shadow-lg shadow-amber-400/30' : '';
-  const relationLabel = RELATION_DISPLAY[member.relationship] || member.relationship;
+  const relationLabel = RELATION_LABELS[member.relationship as keyof typeof RELATION_LABELS] || member.relationship;
 
   return (
-    <>
+    <div className="nodrag nopan" style={{ overflow: 'visible', position: 'relative' }}>
       {/* 連接點放在外層，不受 overflow 影響 */}
       <Handle type="target" position={Position.Top} className="!w-2 !h-2 !bg-slate-400 !border-0" />
       <Handle type="source" position={Position.Bottom} className="!w-2 !h-2 !bg-slate-400 !border-0" />
@@ -159,14 +144,14 @@ function MemberNode({ data }: NodeProps<MemberNodeData>) {
               style={{ pointerEvents: 'auto', position: 'absolute', top: '50%', left: -36, transform: 'translateY(-50%)' }}
               className="nodrag nopan flex items-center gap-1 px-2 py-1 rounded-full bg-red-500 text-white text-[10px] font-bold shadow-lg hover:bg-red-600 whitespace-nowrap"
               onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); console.log('[MemberNode] delete clicked:', member.id); setShowBubbles(false); onDelete(member.id); }}
+              onClick={(e) => { e.stopPropagation(); setShowBubbles(false); onDelete(member.id); }}
             >
               <Trash2 size={11} /> 刪除
             </button>
           )}
         </div>
       )}
-    </>
+    </div>
   );
 }
 

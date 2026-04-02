@@ -10,7 +10,7 @@ import DOMPurify from 'dompurify';
 import {
   ArrowLeft, Calendar, Clock, ChevronRight, Search, Tag, User,
   TrendingUp, BookOpen, Calculator, Home, Landmark, PiggyBank,
-  Share2, ArrowUp, MessageSquare, List
+  Share2, ArrowUp, MessageSquare, List, ShieldCheck
 } from 'lucide-react';
 import {
   blogArticles,
@@ -32,7 +32,7 @@ const categories = [
   { id: 'tax', name: '稅務傳承', icon: Landmark },
   { id: 'investment', name: '投資理財', icon: TrendingUp },
   { id: 'tools', name: '工具教學', icon: Calculator },
-  { id: 'sales', name: '銷售技巧', icon: MessageSquare },
+  { id: 'sales', name: '理財觀點', icon: MessageSquare },
 ];
 
 // 從 HTML 內容提取標題結構（用於生成目錄）
@@ -220,7 +220,12 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
         "image": "https://ultra-advisor.tw/og-image.png",
         "keywords": currentArticle.tags.join(', '),
         "articleSection": getCategoryInfo(currentArticle.category).name,
-        "wordCount": Math.round(currentArticle.readTime * 200) // 估算字數
+        "wordCount": Math.round(currentArticle.readTime * 200), // 估算字數
+        "inLanguage": "zh-TW",
+        "speakable": {
+          "@type": "SpeakableSpecification",
+          "cssSelector": ["h1", ".article-excerpt"]
+        }
       };
 
       // 移除舊的 article schema（如果存在）
@@ -310,7 +315,7 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
       // 文章列表頁 SEO
       const seoConfig = {
         title: '理財知識庫 | 房貸、退休、稅務專業文章 - Ultra Advisor',
-        description: '免費學習房貸計算、退休規劃、稅務傳承知識。專業財務顧問撰寫，淺顯易懂的理財文章，幫助您做出更好的財務決策。',
+        description: '免費學習房貸計算、退休規劃、稅務傳承知識。持照理財專家審閱，淺顯易懂的理財文章，幫助您做出更好的財務決策。',
         url: 'https://ultra-advisor.tw/blog'
       };
 
@@ -328,6 +333,46 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
 
       const canonical = document.querySelector('link[rel="canonical"]');
       if (canonical) canonical.setAttribute('href', seoConfig.url);
+
+      // 注入 CollectionPage JSON-LD（讓搜尋引擎理解這是文章列表）
+      const collectionSchema = {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": "Ultra Advisor 知識庫",
+        "description": seoConfig.description,
+        "url": seoConfig.url,
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "Ultra Advisor",
+          "url": "https://ultra-advisor.tw"
+        },
+        "mainEntity": {
+          "@type": "ItemList",
+          "numberOfItems": blogArticles.length,
+          "itemListElement": blogArticles.slice(0, 10).map((article, i) => ({
+            "@type": "ListItem",
+            "position": i + 1,
+            "url": `https://ultra-advisor.tw/blog/${article.slug}`,
+            "name": article.title
+          }))
+        },
+        "breadcrumb": {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "首頁", "item": "https://ultra-advisor.tw/" },
+            { "@type": "ListItem", "position": 2, "name": "知識庫", "item": "https://ultra-advisor.tw/blog" }
+          ]
+        }
+      };
+
+      const existingCollection = document.getElementById('collection-schema');
+      if (existingCollection) existingCollection.remove();
+
+      const collectionScript = document.createElement('script');
+      collectionScript.id = 'collection-schema';
+      collectionScript.type = 'application/ld+json';
+      collectionScript.textContent = JSON.stringify(collectionSchema);
+      document.head.appendChild(collectionScript);
     }
 
     return () => {
@@ -336,9 +381,11 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
       const articleSchema = document.getElementById('article-schema');
       const breadcrumbSchema = document.getElementById('article-breadcrumb-schema');
       const faqSchema = document.getElementById('article-faq-schema');
+      const collectionSchema = document.getElementById('collection-schema');
       if (articleSchema) articleSchema.remove();
       if (breadcrumbSchema) breadcrumbSchema.remove();
       if (faqSchema) faqSchema.remove();
+      if (collectionSchema) collectionSchema.remove();
     };
   }, [currentArticle]);
 
@@ -494,10 +541,10 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
                   <Share2 size={20} />
                 </button>
                 <button
-                  onClick={onLogin}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2 rounded-lg transition-all"
+                  onClick={backToList}
+                  className="bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold px-4 py-2 rounded-lg transition-all"
                 >
-                  免費試用
+                  更多文章
                 </button>
               </div>
             </div>
@@ -550,6 +597,14 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
               ))}
             </div>
           </header>
+
+          {/* 持照顧問審閱標記 */}
+          <div className="flex items-center gap-2 bg-emerald-900/20 border border-emerald-500/20 rounded-xl px-4 py-3 mb-8">
+            <ShieldCheck size={18} className="text-emerald-400 flex-shrink-0" />
+            <p className="text-emerald-300 text-sm font-medium">
+              本文內容經 RFC・CHRP・FCHFP・CFP 國際證照持照專家審閱
+            </p>
+          </div>
 
           {/* 文章摘要 */}
           <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 mb-8">
@@ -692,30 +747,24 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
             </div>
           </div>
 
-          {/* CTA 區塊 */}
-          <div className="bg-gradient-to-r from-blue-900 to-purple-900 rounded-2xl p-8 mt-8">
+          {/* 免費工具引導區塊 */}
+          <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8 mt-8">
             <h3 className="text-2xl font-bold text-white mb-4 text-center">
-              想要更專業的理財工具？
+              想實際算算看？
             </h3>
-            <p className="text-slate-300 text-center mb-6">
-              Ultra Advisor 提供 18 種專業財務工具<br />
-              免費試用 7 天，無需信用卡
+            <p className="text-slate-400 text-center mb-6">
+              免費房貸計算機，不需註冊、不需登入，直接試算
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex justify-center">
               <button
                 onClick={() => {
                   window.history.pushState({}, '', '/calculator');
                   window.location.reload();
                 }}
-                className="bg-white text-blue-600 font-bold px-8 py-3 rounded-xl hover:bg-blue-50 transition-all"
+                className="bg-slate-700 hover:bg-slate-600 text-white font-bold px-8 py-3 rounded-xl transition-all flex items-center gap-2"
               >
-                免費房貸計算機
-              </button>
-              <button
-                onClick={onLogin}
-                className="bg-blue-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-blue-700 transition-all border border-blue-500"
-              >
-                免費試用 7 天
+                <Calculator size={18} />
+                開啟免費計算機
               </button>
             </div>
           </div>
@@ -851,10 +900,14 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
             <h1 className="text-xl font-bold text-white">理財知識庫</h1>
 
             <button
-              onClick={onLogin}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2 rounded-lg transition-all"
+              onClick={() => {
+                window.history.pushState({}, '', '/calculator');
+                window.location.reload();
+              }}
+              className="bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold px-4 py-2 rounded-lg transition-all flex items-center gap-1"
             >
-              免費試用
+              <Calculator size={14} />
+              免費計算機
             </button>
           </div>
         </div>
@@ -1038,31 +1091,25 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
         </div>
       </section>
 
-      {/* CTA 區域 */}
-      <section className="bg-gradient-to-r from-blue-900 to-purple-900 py-12 px-4">
+      {/* 免費工具引導區域 */}
+      <section className="bg-slate-900 border-t border-slate-800 py-12 px-4">
         <div className="max-w-2xl mx-auto text-center">
           <h3 className="text-2xl font-bold text-white mb-4">
-            用專業工具實踐理財知識
+            看完文章，想實際試算看看？
           </h3>
-          <p className="text-slate-300 mb-6">
-            Ultra Advisor 提供 18 種專業財務工具<br />
-            將理財知識轉化為實際行動方案
+          <p className="text-slate-400 mb-6">
+            免費房貸計算機，不需註冊，直接使用
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex justify-center">
             <button
               onClick={() => {
                 window.history.pushState({}, '', '/calculator');
                 window.location.reload();
               }}
-              className="bg-white text-blue-600 font-bold px-8 py-3 rounded-xl hover:bg-blue-50 transition-all"
+              className="bg-slate-700 hover:bg-slate-600 text-white font-bold px-8 py-3 rounded-xl transition-all flex items-center gap-2"
             >
-              免費房貸計算機
-            </button>
-            <button
-              onClick={onLogin}
-              className="bg-blue-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-blue-700 transition-all border border-blue-500"
-            >
-              免費試用 7 天
+              <Calculator size={18} />
+              開啟免費計算機
             </button>
           </div>
         </div>

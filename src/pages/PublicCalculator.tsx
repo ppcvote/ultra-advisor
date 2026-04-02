@@ -7,9 +7,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Zap, LogIn, Building2, Calculator, User } from 'lucide-react';
+import { ArrowLeft, Zap, LogIn, Building2, Calculator, User, TrendingUp } from 'lucide-react';
 import MortgageCalculator from '../components/MortgageCalculator';
 import SimpleCalculator from '../components/SimpleCalculator';
+import CashFlowVisualizer from '../components/CashFlowVisualizer';
 import { User as FirebaseUser } from 'firebase/auth';
 
 interface PublicCalculatorProps {
@@ -18,13 +19,13 @@ interface PublicCalculatorProps {
   user?: FirebaseUser | null;  // 🆕 可選的用戶資訊
 }
 
-type ToolTab = 'mortgage' | 'calculator';
+type ToolTab = 'mortgage' | 'calculator' | 'cashflow';
 
 const PublicCalculator: React.FC<PublicCalculatorProps> = ({ onBack, onLogin, user }) => {
   // 🆕 持久化 activeTab：重新整理後保持在原工具
   const [activeTab, setActiveTab] = useState<ToolTab>(() => {
     const saved = localStorage.getItem('public_calculator_tab');
-    if (saved === 'mortgage' || saved === 'calculator') {
+    if (saved === 'mortgage' || saved === 'calculator' || saved === 'cashflow') {
       return saved;
     }
     return 'mortgage';
@@ -45,7 +46,12 @@ const PublicCalculator: React.FC<PublicCalculatorProps> = ({ onBack, onLogin, us
       },
       calculator: {
         title: '智能計算機 | 專業理財計算工具 - Ultra Advisor',
-        description: '智能理財計算機：快速計算複利、年化報酬率、投資收益。專為財務顧問設計的專業計算工具。',
+        description: '智能理財計算機：快速計算複利、年化報酬率、投資收益。AI 驅動的專業理財計算工具。',
+        url: 'https://ultra-advisor.tw/calculator'
+      },
+      cashflow: {
+        title: '收入流 vs 支出流 | 即時金錢流動視覺化 - Ultra Advisor',
+        description: '即時視覺化你的收入與支出流動：每秒、每分鐘、每小時賺多少、花多少？一鍵掌握收支平衡。',
         url: 'https://ultra-advisor.tw/calculator'
       }
     };
@@ -166,6 +172,20 @@ const PublicCalculator: React.FC<PublicCalculatorProps> = ({ onBack, onLogin, us
               <span className="hidden sm:inline">智能計算機</span>
               <span className="sm:hidden">計算機</span>
             </button>
+            <button
+              onClick={() => setActiveTab('cashflow')}
+              className={`
+                flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all
+                ${activeTab === 'cashflow'
+                  ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                }
+              `}
+            >
+              <TrendingUp size={18} />
+              <span className="hidden sm:inline">收支流動</span>
+              <span className="sm:hidden">收支</span>
+            </button>
           </div>
         </div>
       </div>
@@ -173,6 +193,7 @@ const PublicCalculator: React.FC<PublicCalculatorProps> = ({ onBack, onLogin, us
       {/* 工具主體 */}
       {activeTab === 'mortgage' && <MortgageCalculator />}
       {activeTab === 'calculator' && <SimpleCalculator user={user} onLogin={onLogin} />}
+      {activeTab === 'cashflow' && <CashFlowVisualizer />}
 
       {/* 底部 CTA */}
       <div className="bg-gradient-to-r from-blue-900 to-purple-900 py-8 px-4">

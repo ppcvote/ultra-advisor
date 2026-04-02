@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   Wallet, Building2, Coins, Check, ShieldAlert, Menu, X, LogOut, FileBarChart,
   GraduationCap, Umbrella, Waves, Landmark, Lock, Rocket, Car, Loader2,
@@ -25,54 +25,43 @@ import { Tool } from './constants/tools';
 import { getMembershipInfo, MembershipInfo, defaultMembershipInfo } from './utils/membership'; 
 
 // ✅ 新版戰情室（整合個人資料、密碼修改、客戶管理）
-import UltraWarRoom from './components/UltraWarRoom';
+// 新版 WarRoom（Tab 架構）
+import UltraWarRoom from './components/WarRoom';
 
-import { FinancialRealEstateTool } from './components/FinancialRealEstateTool';
-import { StudentLoanTool } from './components/StudentLoanTool';
-import { SuperActiveSavingTool } from './components/SuperActiveSavingTool';
-import { CarReplacementTool } from './components/CarReplacementTool';
-import { LaborPensionTool } from './components/LaborPensionTool';
-import { BigSmallReservoirTool } from './components/BigSmallReservoirTool';
-import { TaxPlannerTool } from './components/TaxPlannerTool';
-import MillionDollarGiftTool from './components/MillionDollarGiftTool';
-import FreeDashboardTool from './components/FreeDashboardTool';
-import MarketDataZone from './components/MarketDataZone'; 
-import GoldenSafeVault from './components/GoldenSafeVault'; 
-import FundTimeMachine from './components/FundTimeMachine';
-import InsuranceCheckupTool from './components/insurance/InsuranceCheckupTool';
-import FamilyTreeTool from './components/insurance/FamilyTreeTool';
+// Lazy-loaded 工具元件（Code Splitting）
+const FinancialRealEstateTool = lazy(() => import('./components/FinancialRealEstateTool'));
+const StudentLoanTool = lazy(() => import('./components/StudentLoanTool'));
+const SuperActiveSavingTool = lazy(() => import('./components/SuperActiveSavingTool').then(m => ({ default: m.SuperActiveSavingTool })));
+const CarReplacementTool = lazy(() => import('./components/CarReplacementTool').then(m => ({ default: m.CarReplacementTool })));
+const LaborPensionTool = lazy(() => import('./components/LaborPensionTool').then(m => ({ default: m.LaborPensionTool })));
+const BigSmallReservoirTool = lazy(() => import('./components/BigSmallReservoirTool'));
+const TaxPlannerTool = lazy(() => import('./components/TaxPlannerTool'));
+const MillionDollarGiftTool = lazy(() => import('./components/MillionDollarGiftTool'));
+const FreeDashboardTool = lazy(() => import('./components/FreeDashboardTool'));
+const MarketDataZone = lazy(() => import('./components/MarketDataZone'));
+const GoldenSafeVault = lazy(() => import('./components/GoldenSafeVault'));
+const FundTimeMachine = lazy(() => import('./components/FundTimeMachine'));
+const InsuranceCheckupTool = lazy(() => import('./components/insurance/InsuranceCheckupTool'));
+const FamilyTreeTool = lazy(() => import('./components/insurance/FamilyTreeTool'));
 import type { InsuranceCheckupData } from './types/insurance';
 
-// 🆕 點數系統與會員權限
+// 點數系統與會員權限
 import { pointsApi } from './hooks/usePoints';
 import { useMembership } from './hooks/useMembership';
-import PointsDashboard from './components/PointsDashboard';
+const PointsDashboard = lazy(() => import('./components/PointsDashboard'));
 import PointsNotification from './components/PointsNotification';
 import ToolLockedOverlay from './components/ToolLockedOverlay';
 
-// 🆕 公開計算機（傲創計算機）
-import PublicCalculator from './pages/PublicCalculator';
-
-// 🆕 LIFF 註冊頁面
-import LiffRegister from './pages/LiffRegister';
-
-// 🆕 公開註冊頁面
-import RegisterPage from './pages/RegisterPage';
-
-// 🆕 部落格頁面（SEO 內容行銷）
-import BlogPage from './pages/BlogPage';
-
-// 🆕 預約試算頁面
-import BookingPage from './pages/BookingPage';
-
-// 🆕 傲創聯盟頁面
-import AlliancePage from './pages/AlliancePage';
-
-// 🆕 合作夥伴申請頁面
-import PartnerApplicationPage from './pages/PartnerApplicationPage';
-
-// 🆕 UltraCloud Logo 展示頁面
-import UltraCloudDemo from './pages/UltraCloudDemo';
+// Lazy-loaded 頁面
+const PublicCalculator = lazy(() => import('./pages/PublicCalculator'));
+const LiffRegister = lazy(() => import('./pages/LiffRegister'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const BlogPage = lazy(() => import('./pages/BlogPage'));
+const BookingPage = lazy(() => import('./pages/BookingPage'));
+const AlliancePage = lazy(() => import('./pages/AlliancePage'));
+const PartnerApplicationPage = lazy(() => import('./pages/PartnerApplicationPage'));
+const UltraCloudDemo = lazy(() => import('./pages/UltraCloudDemo'));
+const EnglishLandingPage = lazy(() => import('./pages/EnglishLandingPage'));
 
 // 🆕 主題切換
 import { ThemeProvider } from './context/ThemeContext';
@@ -97,36 +86,48 @@ const PrintStyles = () => (
 
 const Toast = ({ message, type = 'success', onClose }: { message: string, type: string, onClose: () => void }) => {
   useEffect(() => {
-    const timer = setTimeout(() => { onClose(); }, 4000); 
+    const timer = setTimeout(() => { onClose(); }, 4000);
     return () => clearTimeout(timer);
   }, [onClose]);
   const bgColors: Record<string, string> = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600' };
   return (
-    <div className={`fixed bottom-6 right-6 ${bgColors[type] || 'bg-blue-600'} text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3 animate-bounce-in z-[200] toast-container max-w-[90vw]`}>
+    <div className={`fixed bottom-6 right-6 ${bgColors[type] || 'bg-blue-600'} text-white pl-5 pr-3 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-fade-in z-[200] toast-container max-w-[90vw]`}>
       {type === 'success' && <Check size={20} className="shrink-0" />}
       {type === 'error' && <ShieldAlert size={20} className="shrink-0" />}
-      <span className="font-bold text-sm md:text-base break-words">{message}</span>
+      <span className="font-bold text-sm md:text-base break-words flex-1">{message}</span>
+      <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg transition-colors shrink-0">
+        <X size={16} />
+      </button>
     </div>
   );
 };
 
 // 🆕 修改 NavItem 支援 locked 屬性
 const NavItem = ({ icon: Icon, label, active, onClick, disabled = false, locked = false }: any) => (
-  <button
-    onClick={locked ? undefined : onClick}
-    disabled={disabled || locked}
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-      locked ? 'opacity-60 cursor-not-allowed text-slate-500' :
-      disabled ? 'opacity-50 cursor-not-allowed text-slate-500' : 
-      active ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' : 
-      'text-slate-400 hover:bg-slate-800 hover:text-white'
-    }`}
-  >
-    <Icon size={20} />
-    <span className="font-medium flex-1 text-left">{label}</span>
-    {locked && <Lock size={14} className="text-amber-500" />}
-    {disabled && !locked && <Lock size={14} className="opacity-50" />}
-  </button>
+  <div className="relative group">
+    <button
+      onClick={locked ? undefined : onClick}
+      disabled={disabled || locked}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+        locked ? 'opacity-60 cursor-not-allowed text-slate-500' :
+        disabled ? 'opacity-50 cursor-not-allowed text-slate-500' :
+        active ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' :
+        'text-slate-400 hover:bg-slate-800 hover:text-white'
+      }`}
+    >
+      <Icon size={20} />
+      <span className="font-medium flex-1 text-left">{label}</span>
+      {locked && <Lock size={14} className="text-amber-500" />}
+      {disabled && !locked && <Lock size={14} className="opacity-50" />}
+    </button>
+    {locked && (
+      <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-800 border border-slate-700
+                      rounded-lg text-xs text-amber-400 font-medium whitespace-nowrap opacity-0 group-hover:opacity-100
+                      transition-opacity pointer-events-none z-50 shadow-xl">
+        升級解鎖此工具
+      </div>
+    )}
+  </div>
 );
 
 export default function App() {
@@ -162,6 +163,7 @@ export default function App() {
   const [isAllianceRoute, setIsAllianceRoute] = useState(() => window.location.pathname === '/alliance'); // 🆕 傲創聯盟路由
   const [isPartnerApplyRoute, setIsPartnerApplyRoute] = useState(() => window.location.pathname === '/partner-apply'); // 🆕 合作夥伴申請路由
   const [isUltraCloudDemoRoute, setIsUltraCloudDemoRoute] = useState(() => window.location.pathname === '/ultracloud'); // 🆕 UltraCloud Demo 路由
+  const [isEnglishRoute, setIsEnglishRoute] = useState(() => window.location.pathname === '/en'); // 🆕 英文版
   const [clientLoading, setClientLoading] = useState(false); 
   const [currentClient, setCurrentClient] = useState<any>(null);
   // 🆕 activeTab 持久化：重新整理後保持在原工具介面
@@ -381,7 +383,8 @@ export default function App() {
       setIsAllianceRoute(path === '/alliance'); // 🆕 傲創聯盟
       setIsPartnerApplyRoute(path === '/partner-apply'); // 🆕 合作夥伴申請
       setIsUltraCloudDemoRoute(path === '/ultracloud'); // 🆕 UltraCloud Demo
-      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); }
+      setIsEnglishRoute(path === '/en'); // 🆕 英文版
+      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsEnglishRoute(false); }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -399,6 +402,7 @@ export default function App() {
     else if (path === '/alliance') setIsAllianceRoute(true); // 🆕 傲創聯盟
     else if (path === '/partner-apply') setIsPartnerApplyRoute(true); // 🆕 合作夥伴申請
     else if (path === '/ultracloud') setIsUltraCloudDemoRoute(true); // 🆕 UltraCloud Demo
+    else if (path === '/en') setIsEnglishRoute(true); // 🆕 英文版
 
     // 🆕 SplashScreen 只在這個 session 第一次進入時顯示
     if (sessionStorage.getItem('splash_shown') !== 'true') {
@@ -534,18 +538,21 @@ export default function App() {
   // 🆕 LIFF 註冊頁面（不需登入，從 LINE 開啟，跳過 SplashScreen）
   if (isLiffRegisterRoute) {
     return (
+      <Suspense fallback={<SplashScreen />}>
       <LiffRegister
         onSuccess={() => {
           setIsLiffRegisterRoute(false);
           window.history.pushState({}, '', '/');
         }}
       />
+      </Suspense>
     );
   }
 
   // 🆕 公開註冊頁面（不需登入，跳過 SplashScreen）
   if (isRegisterRoute) {
     return (
+      <Suspense fallback={<SplashScreen />}>
       <RegisterPage
         onSuccess={() => {
           setIsRegisterRoute(false);
@@ -562,12 +569,14 @@ export default function App() {
           window.history.pushState({}, '', '/login');
         }}
       />
+      </Suspense>
     );
   }
 
   // 🆕 預約試算頁面（不需登入）
   if (isBookingRoute || window.location.pathname === '/booking') {
     return (
+      <Suspense fallback={<SplashScreen />}>
       <BookingPage
         onBack={() => {
           setIsBookingRoute(false);
@@ -580,12 +589,14 @@ export default function App() {
           window.history.pushState({}, '', '/login');
         }}
       />
+      </Suspense>
     );
   }
 
   // 🆕 傲創聯盟頁面（不需登入）
   if (isAllianceRoute || window.location.pathname === '/alliance') {
     return (
+      <Suspense fallback={<SplashScreen />}>
       <AlliancePage
         onBack={() => {
           setIsAllianceRoute(false);
@@ -598,12 +609,14 @@ export default function App() {
           window.history.pushState({}, '', '/login');
         }}
       />
+      </Suspense>
     );
   }
 
   // 🆕 合作夥伴申請頁面（不需登入）
   if (isPartnerApplyRoute || window.location.pathname === '/partner-apply') {
     return (
+      <Suspense fallback={<SplashScreen />}>
       <PartnerApplicationPage
         onBack={() => {
           setIsPartnerApplyRoute(false);
@@ -611,12 +624,29 @@ export default function App() {
           window.history.pushState({}, '', '/alliance');
         }}
       />
+      </Suspense>
     );
   }
 
   // 🆕 UltraCloud Logo 展示頁面（不需登入）
+  // 🆕 英文版首頁（不需登入，跳過 SplashScreen）
+  if (isEnglishRoute || window.location.pathname === '/en') {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-[#030712]" />}>
+        <EnglishLandingPage
+          onBack={() => {
+            setIsEnglishRoute(false);
+            window.history.pushState({}, '', '/');
+            window.location.reload();
+          }}
+        />
+      </Suspense>
+    );
+  }
+
   if (isUltraCloudDemoRoute || window.location.pathname === '/ultracloud') {
     return (
+      <Suspense fallback={<SplashScreen />}>
       <UltraCloudDemo
         onBack={() => {
           setIsUltraCloudDemoRoute(false);
@@ -624,6 +654,7 @@ export default function App() {
           window.location.reload();
         }}
       />
+      </Suspense>
     );
   }
 
@@ -631,11 +662,12 @@ export default function App() {
   // 使用雙重檢查：state 或直接檢查 URL
   if (isBlogRoute || window.location.pathname.startsWith('/blog')) {
     return (
+      <Suspense fallback={<SplashScreen />}>
       <BlogPage
         onBack={() => {
           setIsBlogRoute(false);
           window.history.pushState({}, '', '/');
-          window.location.reload(); // 強制重載以確保狀態正確
+          window.location.reload();
         }}
         onLogin={() => {
           setIsBlogRoute(false);
@@ -643,6 +675,7 @@ export default function App() {
           window.history.pushState({}, '', '/register');
         }}
       />
+      </Suspense>
     );
   }
 
@@ -651,19 +684,20 @@ export default function App() {
   // 🆕 公開計算機（不需登入，但會員可使用額外功能）
   if (isCalculatorRoute) {
     return (
+      <Suspense fallback={<SplashScreen />}>
       <PublicCalculator
         onBack={() => {
           setIsCalculatorRoute(false);
           window.history.pushState({}, '', '/');
         }}
         onLogin={() => {
-          // 🔥 LINE 免費訊息額度已滿，改導向公開註冊頁
           setIsCalculatorRoute(false);
           setIsRegisterRoute(true);
           window.history.pushState({}, '', '/register');
         }}
-        user={user}  // 🆕 傳遞用戶資訊
+        user={user}
       />
+      </Suspense>
     );
   }
 
@@ -740,10 +774,12 @@ export default function App() {
               />
             )}
             {/* 🆕 點數儀表板 */}
+            <Suspense fallback={null}>
             <PointsDashboard
               isOpen={isPointsDashboardOpen}
               onClose={() => setIsPointsDashboardOpen(false)}
             />
+            </Suspense>
             <UltraWarRoom
               user={user}
               onSelectClient={setCurrentClient}
@@ -914,7 +950,8 @@ export default function App() {
         </div>
         <div className="flex-1 overflow-y-auto p-4 md:p-8 relative">
             <div className="max-w-5xl mx-auto pb-20 md:pb-0">
-              {/* 🆕 帶權限檢查的工具渲染 */}
+              <Suspense fallback={<div className="flex items-center justify-center py-32"><Loader2 size={32} className="animate-spin text-blue-400" /></div>}>
+              {/* 帶權限檢查的工具渲染 */}
               {activeTab === 'market_data' && renderTool('market_data', <MarketDataZone />, '市場數據戰情室')}
               {activeTab === 'golden_safe' && renderTool('golden_safe', <GoldenSafeVault data={goldenSafeData} setData={setGoldenSafeData} userId={user?.uid} />, '黃金保險箱理論')}
               {activeTab === 'fund_machine' && renderTool('fund_machine', <FundTimeMachine />, '基金時光機')}
@@ -951,6 +988,7 @@ export default function App() {
                 />,
                 '家庭圖管理'
               )}
+              </Suspense>
             </div>
         </div>
       </main>

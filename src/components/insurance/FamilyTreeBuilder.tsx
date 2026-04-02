@@ -73,7 +73,7 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
   const {
     trees, activeTree, loading,
     createTree, selectTree,
-    addMember, updateMember, removeMember,
+    addMember, addMemberWithLinks, updateMember, removeMember,
     linkSpouse, linkParentChild,
     deleteTree, togglePlanning,
   } = useFamilyTree(userId || null, clientId);
@@ -113,12 +113,10 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
   }, []);
 
   /**
-   * 智慧關係推定：
-   * 1. 配偶：如果 source 是 father → 新配偶自動為 mother（反之亦然）
-   *    如果 source 是本人 → 配偶
-   * 2. 子女：如果 source 是本人的父母 → 新子女 = 本人的兄弟/姊妹
-   *    否則 → son/daughter
-   * 3. 父母：根據來源推定（父親的父親 → 祖父、母親的父親 → 外祖父）
+   * 智慧關係推定（相對於主被保人）：
+   * 1. 配偶：source 是 father → mother；son → daughter_in_law / son_in_law
+   * 2. 子女：source 是主被保人的父母 → 兄弟姊妹；兄弟姊妹 → 姪子姪女
+   * 3. 父母：father 的父母 → grandfather；配偶的父母 → father/mother_in_law
    */
   const inferRelationship = (
     position: 'spouse' | 'child' | 'parent',
@@ -128,17 +126,38 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
     allMembers: FamilyMember[] = [],
   ): RelationType => {
     if (position === 'parent') {
-      // 判斷 source 是誰，來決定新增的父母是什麼身份
-      if (source?.relationship === 'father') {
-        // 父親的父母 → 祖父/祖母
-        return gender === 'male' ? 'grandfather' : 'grandmother';
-      }
-      if (source?.relationship === 'mother') {
-        // 母親的父母 → 外公/外婆（也用 grandfather/grandmother）
+      if (source?.relationship === 'father' || source?.relationship === 'mother') {
         return gender === 'male' ? 'grandfather' : 'grandmother';
       }
       if (source?.relationship === 'grandfather' || source?.relationship === 'grandmother') {
-        // 祖父母的父母 → 曾祖父母（用 other 表示）
+        return 'other';
+      }
+      // 叔伯/姑姑新增父母 → 祖父/祖母
+      if (source?.relationship === 'uncle' || source?.relationship === 'aunt') {
+        return gender === 'male' ? 'grandfather' : 'grandmother';
+      }
+      // 配偶新增父母 → 公婆/岳父母
+      if (source?.relationship === 'spouse') {
+        return gender === 'male' ? 'father_in_law' : 'mother_in_law';
+      }
+      // 兄弟姊妹新增父母 → 父/母（與本人共用父母）
+      if (source?.relationship === 'brother' || source?.relationship === 'sister') {
+        return gender === 'male' ? 'father' : 'mother';
+      }
+      // 姪子姪女新增父母 → 兄弟/姊妹
+      if (source?.relationship === 'nephew' || source?.relationship === 'niece') {
+        return gender === 'male' ? 'brother' : 'sister';
+      }
+      // 堂表兄弟姊妹新增父母 → 叔伯/姑姑阿姨
+      if (source?.relationship === 'cousin') {
+        return gender === 'male' ? 'uncle' : 'aunt';
+      }
+      // 孫子孫女新增父母 → 兒子/女兒
+      if (source?.relationship === 'grandson' || source?.relationship === 'granddaughter') {
+        return gender === 'male' ? 'son' : 'daughter';
+      }
+      // 女婿/媳婦新增父母 → 其他（對方家長）
+      if (source?.relationship === 'son_in_law' || source?.relationship === 'daughter_in_law') {
         return 'other';
       }
       // 本人新增父母
@@ -146,26 +165,66 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
     }
 
     if (position === 'spouse') {
-      // 如果 source 是「父」，配偶自動為「母」
       if (source?.relationship === 'father') return 'mother';
       if (source?.relationship === 'mother') return 'father';
       if (source?.relationship === 'grandfather') return 'grandmother';
       if (source?.relationship === 'grandmother') return 'grandfather';
-      if (source?.relationship === 'son') return 'spouse';
-      if (source?.relationship === 'daughter') return 'spouse';
-      if (source?.relationship === 'brother') return 'spouse';
-      if (source?.relationship === 'sister') return 'spouse';
+      if (source?.relationship === 'father_in_law') return 'mother_in_law';
+      if (source?.relationship === 'mother_in_law') return 'father_in_law';
+      // 兒女的配偶 → 媳婦/女婿
+      if (source?.relationship === 'son') return gender === 'female' ? 'daughter_in_law' : 'son_in_law';
+      if (source?.relationship === 'daughter') return gender === 'male' ? 'son_in_law' : 'daughter_in_law';
+      // 叔伯的配偶 → 阿姨；姑姑阿姨的配偶 → 叔伯
+      if (source?.relationship === 'uncle') return gender === 'female' ? 'aunt' : 'other';
+      if (source?.relationship === 'aunt') return gender === 'male' ? 'uncle' : 'other';
+      // 兄弟姊妹/姪子姪女/堂表兄弟姊妹的配偶 → 其他（無專屬型別）
+      if (['brother', 'sister', 'nephew', 'niece', 'cousin', 'grandson', 'granddaughter'].includes(source?.relationship || '')) {
+        return 'other';
+      }
       return 'spouse';
     }
 
     // position === 'child'
-    // 如果 source 是本人的父母（或本人父母的配偶），新子女 = 本人的兄弟姊妹
     if (source && mainInsured) {
+      // source 是主被保人的父母 → 新子女是兄弟姊妹
       const isParentOfMain = mainInsured.parentIds?.includes(source.id);
       const sourceSpouse = source.spouseId;
       const isSpouseOfParent = sourceSpouse && mainInsured.parentIds?.includes(sourceSpouse);
       if (isParentOfMain || isSpouseOfParent) {
         return gender === 'male' ? 'brother' : 'sister';
+      }
+      // source 是配偶的父母 → 新子女是配偶的兄弟姊妹（other）
+      const mainSpouse = allMembers.find(m => m.id === mainInsured.spouseId);
+      if (mainSpouse) {
+        const isParentOfSpouse = mainSpouse.parentIds?.includes(source.id);
+        const isSpouseOfSpouseParent = sourceSpouse && mainSpouse.parentIds?.includes(sourceSpouse);
+        if (isParentOfSpouse || isSpouseOfSpouseParent) {
+          return 'other';
+        }
+      }
+      // source 是祖父母 → 新子女是叔伯姑舅姨
+      if (source.relationship === 'grandfather' || source.relationship === 'grandmother') {
+        return gender === 'male' ? 'uncle' : 'aunt';
+      }
+      // source 是兄弟姊妹 → 新子女是姪子姪女
+      if (source.relationship === 'brother' || source.relationship === 'sister') {
+        return gender === 'male' ? 'nephew' : 'niece';
+      }
+      // source 是兒女 → 新子女是孫子孫女
+      if (source.relationship === 'son' || source.relationship === 'daughter') {
+        return gender === 'male' ? 'grandson' : 'granddaughter';
+      }
+      // source 是叔伯姑舅姨 → 新子女是堂/表兄弟姊妹
+      if (source.relationship === 'uncle' || source.relationship === 'aunt') {
+        return 'cousin';
+      }
+      // source 是女婿/媳婦 → 新子女是孫子孫女
+      if (source.relationship === 'son_in_law' || source.relationship === 'daughter_in_law') {
+        return gender === 'male' ? 'grandson' : 'granddaughter';
+      }
+      // source 是姪子姪女/堂表兄弟姊妹/孫子女 → 其他
+      if (['nephew', 'niece', 'cousin', 'grandson', 'granddaughter'].includes(source.relationship)) {
+        return 'other';
       }
     }
     return gender === 'male' ? 'son' : 'daughter';
@@ -176,50 +235,33 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
     const source = activeTree.members.find(m => m.id === quickAdd.sourceId);
     const mainInsured = activeTree.members.find(m => m.isMainInsured);
 
-    const relationship = inferRelationship(quickAdd.position, gender, source, mainInsured);
+    const relationship = inferRelationship(quickAdd.position, gender, source, mainInsured, activeTree.members);
 
-    const newMember = await addMember({
-      name: '',
-      relationship,
-      gender,
-      isMainInsured: false,
-      isSelectedForPlanning: true,
-      policyIds: [],
-      childrenIds: [],
-      parentIds: [],
-    });
+    // 使用原子操作：一次 Firestore 寫入完成新增 + 關係連結
+    const links: { spouseOf?: string; childOf?: string; parentOf?: string } = {};
+    if (quickAdd.position === 'spouse') links.spouseOf = quickAdd.sourceId;
+    else if (quickAdd.position === 'child') links.childOf = quickAdd.sourceId;
+    else if (quickAdd.position === 'parent') links.parentOf = quickAdd.sourceId;
 
-    if (newMember) {
-      if (quickAdd.position === 'spouse') {
-        await linkSpouse(quickAdd.sourceId, newMember.id);
-      } else if (quickAdd.position === 'child') {
-        await linkParentChild(quickAdd.sourceId, newMember.id);
-        // 如果 source 有配偶，子女也自動連到另一個家長
-        if (source?.spouseId) {
-          await linkParentChild(source.spouseId, newMember.id);
-        }
-      } else if (quickAdd.position === 'parent') {
-        await linkParentChild(newMember.id, quickAdd.sourceId);
-        // 如果這是第二位父母，自動建立配偶關係
-        const existingParents = activeTree.members.filter(
-          m => quickAdd.sourceId && source?.parentIds?.includes(m.id)
-        );
-        // 注意：source 的 parentIds 可能還沒更新，但 activeTree 已有 child 的 parentIds
-        const child = activeTree.members.find(m => m.id === quickAdd.sourceId);
-        const otherParentIds = child?.parentIds || [];
-        if (otherParentIds.length === 1) {
-          // 已經有一位父母了，新的這位自動成為配偶
-          await linkSpouse(otherParentIds[0], newMember.id);
-        }
-      }
-    }
+    await addMemberWithLinks(
+      {
+        name: '',
+        relationship,
+        gender,
+        isMainInsured: false,
+        isSelectedForPlanning: true,
+        policyIds: [],
+        childrenIds: [],
+        parentIds: [],
+      },
+      links,
+    );
 
     setQuickAdd(null);
   };
 
   // ─── 刪除成員 ───
   const handleDeleteMember = useCallback(async (memberId: string) => {
-    console.log('[FamilyTree] handleDeleteMember called for:', memberId);
     await removeMember(memberId);
   }, [removeMember]);
 
@@ -242,7 +284,28 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
     setShowMemberForm(true);
   }, [activeTree]);
 
+  const [formErrors, setFormErrors] = useState<string[]>([]);
+
   const handleSaveMember = async () => {
+    // 輸入驗證
+    const errors: string[] = [];
+    if (formData.birthDate) {
+      const birth = new Date(formData.birthDate);
+      if (birth > new Date()) errors.push('出生日期不可為未來日期');
+    }
+    if (formData.annualIncome && parseInt(formData.annualIncome) < 0) {
+      errors.push('年收入不可為負數');
+    }
+    if (formData.occupationClass) {
+      const oc = parseInt(formData.occupationClass);
+      if (oc < 1 || oc > 6) errors.push('職業等級需介於 1-6');
+    }
+    if (errors.length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors([]);
+
     const memberData: Partial<FamilyMember> = {
       name: formData.name,
       relationship: formData.relationship,
@@ -272,10 +335,13 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
     if (!main) return result;
 
     const NODE = 80;
-    const GAP_X = 40;     // 同層間距
+    // 動態間距：成員越多，間距適當加大避免重疊
+    const memberCount = members.length;
+    const GAP_X = memberCount > 8 ? 60 : 40;
     const GAP_Y = 80;     // 世代間距
     const COUPLE_GAP = 30; // 夫妻間距
-    const CX = 400;
+    // 動態中心：成員多時往右移，避免左邊擠在一起
+    const CX = Math.max(400, memberCount * 30);
     const CY = 300;
 
     // 放置一對夫妻（男左女右），回傳夫妻中心 X
@@ -328,8 +394,14 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
 
     // === Step 2: 放父母（上方）===
     const parentY = CY - NODE - GAP_Y;
-    const parentIds = main.parentIds || [];
-    const parentMembers = members.filter(m => parentIds.includes(m.id));
+    // 雙向查找父母：main.parentIds + member.childrenIds 包含 main.id
+    const parentIdSet = new Set(main.parentIds || []);
+    members.forEach(m => {
+      if (!parentIdSet.has(m.id) && (m.childrenIds || []).includes(main.id)) {
+        parentIdSet.add(m.id);
+      }
+    });
+    const parentMembers = members.filter(m => parentIdSet.has(m.id));
 
     let parentCenterX = selfCenterX;
     if (parentMembers.length === 2) {
@@ -346,132 +418,397 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
       parentCenterX = placeCouple(p, selfCenterX, parentY);
     }
 
-    // === Step 3: 放祖父母（再上方）===
+    // === Step 3: 放祖父母（再上方，含碰撞偵測）===
     const gpY = parentY - NODE - GAP_Y;
-    parentMembers.forEach(parent => {
-      const gpIds = parent.parentIds || [];
-      const gps = members.filter(m => gpIds.includes(m.id) && !placed.has(m.id));
-      if (gps.length > 0) {
-        const parentNode = result.find(r => r.member.id === parent.id);
-        const pcx = parentNode ? parentNode.x + NODE / 2 : parentCenterX;
-        if (gps.length === 2) {
-          const grandpa = gps.find(g => g.gender === 'male') || gps[0];
-          const grandma = gps.find(g => g.gender === 'female') || gps[1];
-          if (!placed.has(grandpa.id)) { result.push({ member: grandpa, x: pcx - (NODE + COUPLE_GAP) / 2, y: gpY }); placed.add(grandpa.id); }
-          if (!placed.has(grandma.id)) { result.push({ member: grandma, x: pcx + (NODE + COUPLE_GAP) / 2, y: gpY }); placed.add(grandma.id); }
-        } else {
-          gps.forEach(gp => {
-            if (!placed.has(gp.id)) placeCouple(gp, pcx, gpY);
-          });
-        }
-      }
-      // 祖父母的配偶（如果還沒放）
-      const gpAll = members.filter(m => gpIds.includes(m.id));
-      gpAll.forEach(gp => {
-        if (gp.spouseId && !placed.has(gp.spouseId)) {
-          const gpSpouse = members.find(m => m.id === gp.spouseId);
-          const gpNode = result.find(r => r.member.id === gp.id);
-          if (gpSpouse && gpNode) {
-            const sx = gpSpouse.gender === 'male'
-              ? gpNode.x - NODE - COUPLE_GAP
-              : gpNode.x + NODE + COUPLE_GAP;
-            result.push({ member: gpSpouse, x: sx, y: gpY });
-            placed.add(gpSpouse.id);
+    function placeGrandparents(parentList: FamilyMember[], centerX: number) {
+      parentList.forEach(parent => {
+        // 雙向查找祖父母：parent.parentIds + member.childrenIds 包含 parent.id
+        const gpIdSet = new Set(parent.parentIds || []);
+        members.forEach(m => {
+          if (!gpIdSet.has(m.id) && (m.childrenIds || []).includes(parent.id)) {
+            gpIdSet.add(m.id);
+          }
+        });
+        const gps = members.filter(m => gpIdSet.has(m.id) && !placed.has(m.id));
+        if (gps.length > 0) {
+          const parentNode = result.find(r => r.member.id === parent.id);
+          let pcx = parentNode ? parentNode.x + NODE / 2 : centerX;
+
+          // 碰撞偵測：檢查 gpY 層已放置的節點，避免重疊
+          const gpYNodes = result.filter(r => r.y === gpY);
+          if (gpYNodes.length > 0) {
+            const pairWidth = gps.length === 2 ? NODE * 2 + COUPLE_GAP : NODE;
+            const halfW = pairWidth / 2;
+            const myLeft = pcx - halfW;
+            const myRight = pcx + halfW;
+            const hasCollision = gpYNodes.some(n =>
+              myLeft < n.x + NODE + GAP_X && myRight > n.x - GAP_X
+            );
+            if (hasCollision) {
+              // 往外推：parent 在 centerX 右邊就往右推，否則往左推
+              if (pcx >= centerX) {
+                const maxRight = Math.max(...gpYNodes.map(n => n.x + NODE));
+                pcx = maxRight + GAP_X + halfW;
+              } else {
+                const minLeft = Math.min(...gpYNodes.map(n => n.x));
+                pcx = minLeft - GAP_X - halfW;
+              }
+            }
+          }
+
+          if (gps.length === 2) {
+            const grandpa = gps.find(g => g.gender === 'male') || gps[0];
+            const grandma = gps.find(g => g.gender === 'female') || gps[1];
+            if (!placed.has(grandpa.id)) { result.push({ member: grandpa, x: pcx - (NODE + COUPLE_GAP) / 2, y: gpY }); placed.add(grandpa.id); }
+            if (!placed.has(grandma.id)) { result.push({ member: grandma, x: pcx + (NODE + COUPLE_GAP) / 2, y: gpY }); placed.add(grandma.id); }
+          } else {
+            gps.forEach(gp => { if (!placed.has(gp.id)) placeCouple(gp, pcx, gpY); });
           }
         }
+        // 祖父母的配偶
+        const gpAll = members.filter(m => gpIdSet.has(m.id));
+        gpAll.forEach(gp => {
+          if (gp.spouseId && !placed.has(gp.spouseId)) {
+            const gpSpouse = members.find(m => m.id === gp.spouseId);
+            const gpNode = result.find(r => r.member.id === gp.id);
+            if (gpSpouse && gpNode) {
+              const sx = gpSpouse.gender === 'male'
+                ? gpNode.x - NODE - COUPLE_GAP
+                : gpNode.x + NODE + COUPLE_GAP;
+              result.push({ member: gpSpouse, x: sx, y: gpY });
+              placed.add(gpSpouse.id);
+            }
+          }
+        });
       });
+    }
+    placeGrandparents(parentMembers, parentCenterX);
+
+    // === 通用 helper：在指定 Y 層放一組成員（含配偶），回傳放置後的 cursor ===
+    function placeGroupAtY(group: FamilyMember[], startX: number, yLevel: number): number {
+      let cursorX = startX;
+      group.forEach(m => {
+        const mSpouse = m.spouseId && !placed.has(m.spouseId)
+          ? members.find(s => s.id === m.spouseId) : null;
+        if (mSpouse) {
+          const left = m.gender === 'male' ? m : mSpouse;
+          const right = m.gender === 'male' ? mSpouse : m;
+          if (!placed.has(left.id)) { result.push({ member: left, x: cursorX, y: yLevel }); placed.add(left.id); }
+          if (!placed.has(right.id)) { result.push({ member: right, x: cursorX + NODE + COUPLE_GAP, y: yLevel }); placed.add(right.id); }
+          cursorX += NODE * 2 + COUPLE_GAP + GAP_X;
+        } else {
+          if (!placed.has(m.id)) {
+            result.push({ member: m, x: cursorX, y: yLevel });
+            placed.add(m.id);
+          }
+          cursorX += NODE + GAP_X;
+        }
+      });
+      return cursorX;
+    }
+
+    // 計算一組成員（含配偶）的總寬度
+    function groupWidth(group: FamilyMember[]): number {
+      return group.reduce((w, m) => {
+        const hasSpouse = m.spouseId && !placed.has(m.spouseId) && members.some(s => s.id === m.spouseId);
+        return w + (hasSpouse ? NODE * 2 + COUPLE_GAP : NODE);
+      }, 0) + Math.max(0, group.length - 1) * GAP_X;
+    }
+
+    // 碰撞安全起始 X
+    function safeStartX(desiredX: number, totalW: number, yLevel: number, centerRef: number): number {
+      const yNodes = result.filter(r => r.y === yLevel);
+      if (yNodes.length === 0) return desiredX;
+      const hasCollision = yNodes.some(n =>
+        desiredX < n.x + NODE + GAP_X && desiredX + totalW > n.x - GAP_X
+      );
+      if (!hasCollision) return desiredX;
+      if (desiredX + totalW / 2 >= centerRef) {
+        return Math.max(...yNodes.map(n => n.x + NODE)) + GAP_X;
+      } else {
+        return Math.min(...yNodes.map(n => n.x)) - GAP_X - totalW;
+      }
+    }
+
+    // === Step 3.2: 祖父母的其他子女（叔伯姑舅姨 + 配偶，放在 parentY）===
+    const uncleAuntList: FamilyMember[] = [];
+    {
+      const gpNodesPlaced = result.filter(r => r.y === gpY);
+      const processedCouples = new Set<string>();
+      gpNodesPlaced.forEach(gpNode => {
+        const gp = gpNode.member;
+        const coupleKey = [gp.id, gp.spouseId].filter(Boolean).sort().join('-');
+        if (processedCouples.has(coupleKey)) return;
+        processedCouples.add(coupleKey);
+
+        const unplacedGpChildren = getChildren(gp).filter(c => !placed.has(c.id));
+        if (unplacedGpChildren.length === 0) return;
+
+        let gpCX = gpNode.x + NODE / 2;
+        if (gp.spouseId) {
+          const spNode = result.find(r => r.member.id === gp.spouseId);
+          if (spNode) gpCX = (gpNode.x + spNode.x + NODE) / 2;
+        }
+
+        const totalW = groupWidth(unplacedGpChildren);
+        const startX = safeStartX(gpCX - totalW / 2, totalW, parentY, parentCenterX);
+        unplacedGpChildren.forEach(c => uncleAuntList.push(c));
+        placeGroupAtY(unplacedGpChildren, startX, parentY);
+      });
+    }
+
+    // === Step 3.5: 配偶的父母（公婆/岳父母，parentY 右側）===
+    const spouse = main.spouseId ? members.find(m => m.id === main.spouseId) : null;
+    // 雙向查找配偶的父母（提升到外層，Step 4.5 也需要用）
+    const spouseParentIdSet = new Set<string>();
+    if (spouse) {
+      (spouse.parentIds || []).forEach(id => spouseParentIdSet.add(id));
+      members.forEach(m => {
+        if (!spouseParentIdSet.has(m.id) && (m.childrenIds || []).includes(spouse.id)) {
+          spouseParentIdSet.add(m.id);
+        }
+      });
+    }
+    let inlawCenterX = selfCenterX + NODE * 3 + GAP_X * 2;
+    if (spouse) {
+      const spouseParents = members.filter(m => spouseParentIdSet.has(m.id) && !placed.has(m.id));
+      if (spouseParents.length > 0) {
+        const spouseNode = result.find(r => r.member.id === spouse.id);
+        const spouseX = spouseNode ? spouseNode.x + NODE / 2 : selfCenterX + NODE + COUPLE_GAP;
+        inlawCenterX = spouseX + NODE * 2 + GAP_X;
+
+        // 碰撞偵測：確保不和 Step 3.2 放的叔伯姑舅姨重疊
+        const inlawW = spouseParents.length === 2 ? NODE * 2 + COUPLE_GAP : NODE;
+        const parentYNodes = result.filter(r => r.y === parentY);
+        if (parentYNodes.length > 0) {
+          const inlawLeft = inlawCenterX - inlawW / 2;
+          const inlawRight = inlawCenterX + inlawW / 2;
+          const hasCollision = parentYNodes.some(n =>
+            inlawLeft < n.x + NODE + GAP_X && inlawRight > n.x - GAP_X
+          );
+          if (hasCollision) {
+            const maxRight = Math.max(...parentYNodes.map(n => n.x + NODE));
+            inlawCenterX = maxRight + GAP_X + inlawW / 2;
+          }
+        }
+
+        if (spouseParents.length === 2) {
+          const dad = spouseParents.find(p => p.gender === 'male') || spouseParents[0];
+          const mom = spouseParents.find(p => p.gender === 'female') || spouseParents[1];
+          if (!placed.has(dad.id)) { result.push({ member: dad, x: inlawCenterX - (NODE + COUPLE_GAP) / 2, y: parentY }); placed.add(dad.id); }
+          if (!placed.has(mom.id)) { result.push({ member: mom, x: inlawCenterX + (NODE + COUPLE_GAP) / 2, y: parentY }); placed.add(mom.id); }
+        } else {
+          inlawCenterX = placeCouple(spouseParents[0], inlawCenterX, parentY);
+        }
+        // 配偶的祖父母
+        placeGrandparents(spouseParents, inlawCenterX);
+      }
+    }
+
+    // === Step 3.6: 配偶祖父母的其他子女（配偶的叔伯姑舅姨 + 配偶，放在 parentY）===
+    {
+      // 只處理 Step 3.5 之後新增到 gpY 的節點（配偶方的祖父母）
+      const gpNodesAll = result.filter(r => r.y === gpY);
+      const processedCouples = new Set<string>();
+      gpNodesAll.forEach(gpNode => {
+        const gp = gpNode.member;
+        const coupleKey = [gp.id, gp.spouseId].filter(Boolean).sort().join('-');
+        if (processedCouples.has(coupleKey)) return;
+        processedCouples.add(coupleKey);
+
+        const unplacedGpChildren = getChildren(gp).filter(c => !placed.has(c.id));
+        if (unplacedGpChildren.length === 0) return;
+
+        let gpCX = gpNode.x + NODE / 2;
+        if (gp.spouseId) {
+          const spNode = result.find(r => r.member.id === gp.spouseId);
+          if (spNode) gpCX = (gpNode.x + spNode.x + NODE) / 2;
+        }
+
+        const totalW = groupWidth(unplacedGpChildren);
+        const startX = safeStartX(gpCX - totalW / 2, totalW, parentY, parentCenterX);
+        unplacedGpChildren.forEach(c => uncleAuntList.push(c));
+        placeGroupAtY(unplacedGpChildren, startX, parentY);
+      });
+    }
+
+    // === Step 3.3: 叔伯姑舅姨的子女（堂/表兄弟姊妹 + 配偶，放在 CY）===
+    uncleAuntList.forEach(ua => {
+      const uaChildren = getChildren(ua).filter(c => !placed.has(c.id));
+      if (uaChildren.length === 0) return;
+      const uaNode = result.find(r => r.member.id === ua.id);
+      if (!uaNode) return;
+      let uaCX = uaNode.x + NODE / 2;
+      if (ua.spouseId) {
+        const spNode = result.find(r => r.member.id === ua.spouseId);
+        if (spNode) uaCX = (uaNode.x + spNode.x + NODE) / 2;
+      }
+      const totalW = groupWidth(uaChildren);
+      const startX = safeStartX(uaCX - totalW / 2, totalW, CY, selfCenterX);
+      placeGroupAtY(uaChildren, startX, CY);
     });
 
     // === Step 4: 放兄弟姊妹（同一代，本人左邊）===
-    // 兄弟姊妹 = 與本人有相同父母但不是本人（也不是本人的配偶）
+    const parentIdArr = Array.from(parentIdSet);
     const siblings = members.filter(m =>
       !placed.has(m.id) &&
       m.id !== main.id &&
       m.id !== main.spouseId &&
-      m.parentIds?.some(pid => main.parentIds?.includes(pid))
+      (m.parentIds?.some(pid => parentIdArr.includes(pid)) ||
+       parentMembers.some(p => (p.childrenIds || []).includes(m.id)))
     );
-    // 從本人左邊排列，每個兄弟姊妹+配偶佔一組
-    let sibOffset = 0;
+    // sibRightEdge = 下一個兄弟姊妹的右邊界（從本人左邊緣往左推）
+    const mainNodes = result.filter(r => r.member.id === main.id || r.member.id === main.spouseId);
+    const mainLeftX = Math.min(...mainNodes.map(r => r.x));
+    let sibRightEdge = mainLeftX - GAP_X;
     siblings.forEach(sib => {
-      sibOffset += 1;
-      const sx = CX - sibOffset * (NODE + GAP_X);
-      // 判斷兄弟姊妹是否有配偶
       if (sib.spouseId && !placed.has(sib.spouseId)) {
         const sibSpouse = members.find(m => m.id === sib.spouseId);
         if (sibSpouse) {
-          // 男左女右
           const left = sib.gender === 'male' ? sib : sibSpouse;
           const right = sib.gender === 'male' ? sibSpouse : sib;
-          const leftX = sx - COUPLE_GAP / 2;
-          const rightX = sx + NODE + COUPLE_GAP / 2;
-          result.push({ member: left, x: leftX, y: CY }); placed.add(left.id);
-          result.push({ member: right, x: rightX, y: CY }); placed.add(right.id);
-          sibOffset += 1; // 佔多一格
+          const rightX = sibRightEdge - NODE;
+          const leftX = rightX - COUPLE_GAP - NODE;
+          if (!placed.has(right.id)) { result.push({ member: right, x: rightX, y: CY }); placed.add(right.id); }
+          if (!placed.has(left.id)) { result.push({ member: left, x: leftX, y: CY }); placed.add(left.id); }
+          sibRightEdge = leftX - GAP_X;
           return;
         }
       }
+      sibRightEdge -= NODE;
       if (!placed.has(sib.id)) {
-        result.push({ member: sib, x: sx, y: CY });
+        result.push({ member: sib, x: sibRightEdge, y: CY });
         placed.add(sib.id);
       }
+      sibRightEdge -= GAP_X;
     });
 
-    // === Step 5: 放子女（下方）===
-    // 收集本人+配偶的所有子女
-    const childrenAll = getChildren(main);
-    const unplacedChildren = childrenAll.filter(c => !placed.has(c.id));
-    const childY = CY + NODE + GAP_Y;
-
-    if (unplacedChildren.length > 0) {
-      const totalWidth = unplacedChildren.length * NODE + (unplacedChildren.length - 1) * GAP_X;
-      const startX = selfCenterX - totalWidth / 2 + NODE / 2;
-
-      unplacedChildren.forEach((child, i) => {
-        const cx = startX + i * (NODE + GAP_X);
-        if (!placed.has(child.id)) {
-          result.push({ member: child, x: cx, y: childY });
-          placed.add(child.id);
-        }
-        // 子女的配偶
-        if (child.spouseId && !placed.has(child.spouseId)) {
-          const cSpouse = members.find(m => m.id === child.spouseId);
-          if (cSpouse) {
-            const spX = child.gender === 'male'
-              ? cx + NODE + COUPLE_GAP
-              : cx - NODE - COUPLE_GAP;
-            result.push({ member: cSpouse, x: spX, y: childY });
-            placed.add(cSpouse.id);
+    // === Step 4.5: 配偶的兄弟姊妹（同一代，配偶父母下方往右）===
+    const spouseSiblingsList: FamilyMember[] = [];
+    if (spouse) {
+      const spouseParentArr = Array.from(spouseParentIdSet);
+      const spouseParentMembers = members.filter(m => spouseParentIdSet.has(m.id));
+      const spouseSiblings = members.filter(m =>
+        !placed.has(m.id) &&
+        m.id !== spouse.id &&
+        m.id !== main.id &&
+        (m.parentIds?.some(pid => spouseParentArr.includes(pid)) ||
+         spouseParentMembers.some(p => (p.childrenIds || []).includes(m.id)))
+      );
+      // 從配偶右邊緣往右排列
+      const spouseNode = result.find(r => r.member.id === spouse.id);
+      let spouseSibLeftEdge = (spouseNode ? spouseNode.x + NODE : CX + NODE) + GAP_X;
+      spouseSiblings.forEach(sib => {
+        spouseSiblingsList.push(sib);
+        if (sib.spouseId && !placed.has(sib.spouseId)) {
+          const sibSpouse = members.find(m => m.id === sib.spouseId);
+          if (sibSpouse) {
+            const left = sib.gender === 'male' ? sib : sibSpouse;
+            const right = sib.gender === 'male' ? sibSpouse : sib;
+            if (!placed.has(left.id)) { result.push({ member: left, x: spouseSibLeftEdge, y: CY }); placed.add(left.id); }
+            if (!placed.has(right.id)) { result.push({ member: right, x: spouseSibLeftEdge + NODE + COUPLE_GAP, y: CY }); placed.add(right.id); }
+            spouseSibLeftEdge += NODE * 2 + COUPLE_GAP + GAP_X;
+            return;
           }
+        }
+        if (!placed.has(sib.id)) {
+          result.push({ member: sib, x: spouseSibLeftEdge, y: CY });
+          placed.add(sib.id);
+          spouseSibLeftEdge += NODE + GAP_X;
         }
       });
     }
 
-    // === Step 6: 放孫子女（再下方）===
+    // === Step 4.7: 兄弟姊妹的子女（姪子姪女 + 配偶，放在各自父母下方）===
+    const childY = CY + NODE + GAP_Y;
+    const allSibGroups = [...siblings, ...spouseSiblingsList];
+    allSibGroups.forEach(sib => {
+      const sibChildren = getChildren(sib).filter(c => !placed.has(c.id));
+      if (sibChildren.length === 0) return;
+      const sibNode = result.find(r => r.member.id === sib.id);
+      if (!sibNode) return;
+      let sibChildCX = sibNode.x + NODE / 2;
+      if (sib.spouseId) {
+        const sibSpNode = result.find(r => r.member.id === sib.spouseId);
+        if (sibSpNode) sibChildCX = (sibNode.x + sibSpNode.x + NODE) / 2;
+      }
+      const totalW = groupWidth(sibChildren);
+      const startX = safeStartX(sibChildCX - totalW / 2, totalW, childY, selfCenterX);
+      placeGroupAtY(sibChildren, startX, childY);
+    });
+
+    // === Step 5: 放子女（下方）===
+    const childrenAll = getChildren(main);
+    const unplacedChildren = childrenAll.filter(c => !placed.has(c.id));
+
+    if (unplacedChildren.length > 0) {
+      const childWidths = unplacedChildren.map(child => {
+        const hasSpouse = child.spouseId && !placed.has(child.spouseId) &&
+          members.some(m => m.id === child.spouseId);
+        return hasSpouse ? NODE * 2 + COUPLE_GAP : NODE;
+      });
+      const totalWidth = childWidths.reduce((a, b) => a + b, 0) + (unplacedChildren.length - 1) * GAP_X;
+      let cursorX = safeStartX(selfCenterX - totalWidth / 2, totalWidth, childY, selfCenterX);
+
+      unplacedChildren.forEach((child) => {
+        const hasSpouse = child.spouseId && !placed.has(child.spouseId);
+        const cSpouse = hasSpouse ? members.find(m => m.id === child.spouseId) : null;
+
+        if (cSpouse) {
+          const left = child.gender === 'male' ? child : cSpouse;
+          const right = child.gender === 'male' ? cSpouse : child;
+          if (!placed.has(left.id)) { result.push({ member: left, x: cursorX, y: childY }); placed.add(left.id); }
+          if (!placed.has(right.id)) { result.push({ member: right, x: cursorX + NODE + COUPLE_GAP, y: childY }); placed.add(right.id); }
+          cursorX += NODE * 2 + COUPLE_GAP + GAP_X;
+        } else {
+          if (!placed.has(child.id)) {
+            result.push({ member: child, x: cursorX, y: childY });
+            placed.add(child.id);
+          }
+          cursorX += NODE + GAP_X;
+        }
+      });
+    }
+
+    // === Step 6: 放孫子女（再下方，含配偶）===
     const gcY = childY + NODE + GAP_Y;
     childrenAll.forEach(child => {
       const grandChildren = getChildren(child).filter(gc => !placed.has(gc.id));
       if (grandChildren.length === 0) return;
       const childNode = result.find(r => r.member.id === child.id);
-      // 子女夫妻的中心
       let gcCX = childNode ? childNode.x + NODE / 2 : selfCenterX;
       if (child.spouseId) {
         const spNode = result.find(r => r.member.id === child.spouseId);
         if (childNode && spNode) gcCX = (childNode.x + spNode.x + NODE) / 2;
       }
 
-      const gcTotalW = grandChildren.length * NODE + (grandChildren.length - 1) * GAP_X;
-      const gcStartX = gcCX - gcTotalW / 2;
-      grandChildren.forEach((gc, i) => {
-        result.push({ member: gc, x: gcStartX + i * (NODE + GAP_X), y: gcY });
-        placed.add(gc.id);
-      });
+      const totalW = groupWidth(grandChildren);
+      const startX = safeStartX(gcCX - totalW / 2, totalW, gcY, selfCenterX);
+      placeGroupAtY(grandChildren, startX, gcY);
     });
 
-    // === Step 7: 未放置的 ===
-    let extraX = 0;
+    // === Step 7: 未放置的（根據 relationship 放到正確 Y 層，碰撞安全）===
+    const relationYMap: Record<string, number> = {
+      grandfather: gpY, grandmother: gpY,
+      father: parentY, mother: parentY,
+      father_in_law: parentY, mother_in_law: parentY,
+      uncle: parentY, aunt: parentY,
+      self: CY, spouse: CY,
+      brother: CY, sister: CY,
+      cousin: CY, other: CY,
+      son: childY, daughter: childY,
+      son_in_law: childY, daughter_in_law: childY,
+      nephew: childY, niece: childY,
+      grandson: gcY, granddaughter: gcY,
+    };
     members.filter(m => !placed.has(m.id)).forEach(m => {
-      result.push({ member: m, x: CX + 300 + extraX, y: CY });
-      extraX += NODE + GAP_X;
+      const yLevel = relationYMap[m.relationship] ?? CY;
+      // 在該 Y 層找到最右邊的節點，放在其右邊（避免重疊）
+      const yNodes = result.filter(r => r.y === yLevel);
+      const x = yNodes.length > 0
+        ? Math.max(...yNodes.map(n => n.x + NODE)) + GAP_X
+        : CX + 300;
+      result.push({ member: m, x, y: yLevel });
     });
 
     return result;
@@ -491,7 +828,7 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
       position: { x, y },
       data: {
         member,
-        policyCount: member.policyIds?.length || 0,
+        policyCount: policies.filter(p => p.familyMemberId === member.id).length,
         isSelected: member.isSelectedForPlanning || false,
         onEdit: handleEditMember,
         onSelect: handleNodeClick,
@@ -523,12 +860,15 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
       (m.childrenIds || []).forEach(cid => {
         const child = members.find(c => c.id === cid);
         if (!child) return;
-        // 看子女有幾個家長在 tree 裡
-        const childParents = members.filter(p => child.parentIds?.includes(p.id));
-        // 如果有兩個家長，只從其中一個畫（取 sort 後第一個）
-        if (childParents.length === 2) {
+        // 雙向查找所有家長（parentIds 或 childrenIds 包含此子女）
+        const childParents = members.filter(p =>
+          (child.parentIds || []).includes(p.id) ||
+          (p.childrenIds || []).includes(cid)
+        );
+        // 如果有兩個以上家長，只從其中一個畫（取 sort 後第一個）
+        if (childParents.length >= 2) {
           const first = childParents.map(p => p.id).sort()[0];
-          if (m.id !== first) return; // 跳過第二個家長
+          if (m.id !== first) return; // 跳過非首位家長
         }
         const key = `pc-${m.id}-${cid}`;
         if (!added.has(key)) {
@@ -548,7 +888,7 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
 
     setNodes(flowNodes);
     setEdges(flowEdges);
-  }, [activeTree, handleEditMember, handleNodeClick, handleQuickAdd, handleDeleteMember]);
+  }, [activeTree, policies, handleEditMember, handleNodeClick, handleQuickAdd, handleDeleteMember]);
 
   // ─── 建立家庭圖 ───
   const handleCreateTree = async () => {
@@ -648,7 +988,7 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
           nodeTypes={nodeTypes} edgeTypes={edgeTypes}
           nodesDraggable={false}
           nodesConnectable={false}
-          elementsSelectable={false}
+          selectNodesOnDrag={false}
           fitView fitViewOptions={{ padding: 0.4 }}
           proOptions={{ hideAttribution: true }}
           minZoom={0.3} maxZoom={2}
@@ -852,7 +1192,7 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
                             onChange={async (e) => {
                               const newMemberId = e.target.checked ? editingMemberId : null;
                               // 更新保單的 familyMemberId
-                              await updatePolicy(p.id, { familyMemberId: newMemberId || undefined });
+                              await updatePolicy(p.id, { familyMemberId: newMemberId });
                               // 更新成員的 policyIds
                               const member = activeTree?.members.find(m => m.id === editingMemberId);
                               if (member) {
@@ -894,6 +1234,14 @@ export default function FamilyTreeBuilder({ userId, clientId, onNext, familyTree
               </div>
             )}
           </div>
+
+          {formErrors.length > 0 && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+              {formErrors.map((err, i) => (
+                <p key={i} className="text-xs text-red-600">{err}</p>
+              ))}
+            </div>
+          )}
 
           <div className="flex gap-3 mt-6">
             {editingMemberId && editingMemberId !== activeTree?.mainInsuredId && (

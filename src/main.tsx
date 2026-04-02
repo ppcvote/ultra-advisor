@@ -1,8 +1,32 @@
-import { StrictMode } from 'react'
+import { StrictMode, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import BlogPage from './pages/BlogPage'
+const BlogPage = lazy(() => import('./pages/BlogPage'))
+
+// ============================================
+// Core Web Vitals 監測（Google 排名信號）
+// ============================================
+import { onCLS, onINP, onLCP, onFCP, onTTFB } from 'web-vitals'
+
+const reportWebVitals = () => {
+  const sendToAnalytics = (metric: { name: string; value: number; id: string; delta: number }) => {
+    // 如果有 GA4 gtag，送到 Google Analytics
+    if (typeof (window as any).gtag === 'function') {
+      (window as any).gtag('event', metric.name, {
+        value: Math.round(metric.name === 'CLS' ? metric.delta * 1000 : metric.delta),
+        event_label: metric.id,
+        non_interaction: true,
+      })
+    }
+  }
+  onCLS(sendToAnalytics)
+  onINP(sendToAnalytics)
+  onLCP(sendToAnalytics)
+  onFCP(sendToAnalytics)
+  onTTFB(sendToAnalytics)
+}
+reportWebVitals()
 
 // ============================================
 // Service Worker 註冊
@@ -56,16 +80,18 @@ console.log('[MAIN.TSX v3] pathname:', window.location.pathname, '| isBlogRoute:
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {isBlogRoute ? (
-      <BlogPage
-        onBack={() => {
-          window.history.pushState({}, '', '/');
-          window.location.reload();
-        }}
-        onLogin={() => {
-          window.history.pushState({}, '', '/register');
-          window.location.reload();
-        }}
-      />
+      <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+        <BlogPage
+          onBack={() => {
+            window.history.pushState({}, '', '/');
+            window.location.reload();
+          }}
+          onLogin={() => {
+            window.history.pushState({}, '', '/register');
+            window.location.reload();
+          }}
+        />
+      </Suspense>
     ) : (
       <App />
     )}

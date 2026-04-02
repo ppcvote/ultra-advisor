@@ -16,7 +16,7 @@ import { auth, db } from '../../firebase';
 // 4. 混合模式：試用每次顯示，付費24小時一次
 // ==========================================
 
-const LOGO_URL = "https://lh3.googleusercontent.com/d/1CEFGRByRM66l-4sMMM78LUBUvAMiAIaJ";
+const LOGO_URL = "/logo.png";
 
 // ==========================================
 // 📢 公告內容系統
@@ -161,7 +161,7 @@ const LoginForm = ({ onSuccess }: { onSuccess: () => void }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   // 🆕 讀取記住的帳號（僅記住 email，不儲存密碼）
   // 安全修復：移除密碼儲存功能，Base64 不是加密，容易被竊取
@@ -224,7 +224,7 @@ const LoginForm = ({ onSuccess }: { onSuccess: () => void }) => {
           onChange={(e) => setEmail(e.target.value)}
           className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl
                    text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none
-                   transition-all"
+                   focus:ring-2 focus:ring-blue-500/30 transition-all"
           placeholder="your@email.com"
           required
         />
@@ -240,7 +240,7 @@ const LoginForm = ({ onSuccess }: { onSuccess: () => void }) => {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl
                      text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none
-                     transition-all pr-12"
+                     focus:ring-2 focus:ring-blue-500/30 transition-all pr-12"
             placeholder="••••••••"
             required
           />
@@ -284,9 +284,9 @@ const LoginForm = ({ onSuccess }: { onSuccess: () => void }) => {
 
       {/* Error Message */}
       {error && (
-        <div className="flex items-center gap-2 bg-red-900/20 border border-red-500/30 
-                       rounded-xl px-4 py-3 text-red-300 text-sm">
-          <AlertCircle size={16} />
+        <div className="flex items-center gap-2 bg-red-900/20 border border-red-500/30
+                       rounded-xl px-4 py-3 text-red-300 text-sm animate-fade-in">
+          <AlertCircle size={16} className="flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}

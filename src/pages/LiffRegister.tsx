@@ -347,7 +347,7 @@ export default function LiffRegister({ onSuccess }: LiffRegisterProps) {
           <path d="M40 40 L50 30 L60 40" stroke="#A855F7" strokeWidth="4" fill="none" />
         </svg>
         <h1 className="text-xl font-bold text-white">Ultra Advisor</h1>
-        <p className="text-slate-400 text-sm mt-1">財務顧問的秘密武器</p>
+        <p className="text-slate-400 text-sm mt-1">AI 智能理財分析平台</p>
       </div>
 
       {/* 表單 */}

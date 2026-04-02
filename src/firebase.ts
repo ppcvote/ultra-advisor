@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";       // 1. 引入驗證功能
-import { getFirestore } from "firebase/firestore"; // 2. 引入資料庫功能
+import { initializeFirestore } from "firebase/firestore"; // 2. 引入資料庫功能
 import { getStorage } from "firebase/storage"; // 3. 引入儲存功能（大頭貼上傳用）
 import { getFunctions } from "firebase/functions"; // 4. Cloud Functions
 import { getMessaging, getToken, onMessage, isSupported } from "firebase/messaging"; // 5. 推播通知
@@ -29,7 +29,7 @@ const app = initializeApp(firebaseConfig);
 
 // 匯出核心服務
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
 export const storage = getStorage(app);
 export const functions = getFunctions(app, 'us-central1'); // Cloud Functions
 export { app }; // 匯出 app 供其他模組使用

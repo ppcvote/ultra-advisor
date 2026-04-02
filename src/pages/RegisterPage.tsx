@@ -6,7 +6,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, CheckCircle, AlertCircle, Eye, EyeOff, Gift, User, Mail, Lock, ArrowLeft } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, Eye, EyeOff, Gift, User, Mail, Lock, ArrowLeft, Sparkles } from 'lucide-react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
 
 interface RegisterPageProps {
   onSuccess?: () => void;
@@ -109,6 +111,10 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
   // 表單錯誤
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // 自動登入狀態
+  const [autoLoginDone, setAutoLoginDone] = useState(false);
+  const [autoLoginError, setAutoLoginError] = useState('');
+
   // 註冊成功資料
   const [successData, setSuccessData] = useState<{
     displayName: string;
@@ -121,7 +127,7 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
   // SEO: 更新頁面標題和 Meta
   useEffect(() => {
     const seoConfig = {
-      title: '免費註冊 | Ultra Advisor - 財務顧問的秘密武器',
+      title: '免費註冊 | Ultra Advisor - AI 智能理財分析平台',
       description: '免費試用 Ultra Advisor 7 天！18 種專業理財工具：房貸計算機、退休規劃、稅務傳承、資產配置。無需信用卡，立即開始。',
       url: 'https://ultra-advisor.tw/register'
     };
@@ -236,6 +242,22 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
       if (result.success) {
         setSuccessData(result.data);
         setStep('success');
+
+        // 自動登入：用剛註冊的帳密直接登入
+        try {
+          await signInWithEmailAndPassword(
+            auth,
+            formData.email.trim().toLowerCase(),
+            formData.password
+          );
+          // 記住帳號（預設開啟）
+          localStorage.setItem('ua_saved_email', formData.email.trim().toLowerCase());
+          localStorage.setItem('ua_remember_me', 'true');
+          setAutoLoginDone(true);
+        } catch (loginErr) {
+          console.error('自動登入失敗:', loginErr);
+          setAutoLoginError('自動登入失敗，請手動登入');
+        }
       } else {
         // 處理特定錯誤
         if (result.error?.includes('已經註冊') || result.error?.includes('已註冊')) {
@@ -359,19 +381,44 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
           </div>
         </div>
 
-        {/* 提醒 */}
-        <div className="w-full max-w-sm mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-          <p className="text-amber-400 text-sm text-center">
-            💡 首次登入時請修改密碼以確保安全
-          </p>
-        </div>
+        {/* 自動登入狀態提示 */}
+        {autoLoginDone ? (
+          <div className="w-full max-w-sm mt-6 p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+            <p className="text-green-400 text-sm text-center">
+              已自動登入，點擊下方按鈕直接進入系統
+            </p>
+          </div>
+        ) : autoLoginError ? (
+          <div className="w-full max-w-sm mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+            <p className="text-amber-400 text-sm text-center">
+              {autoLoginError}
+            </p>
+          </div>
+        ) : (
+          <div className="w-full max-w-sm mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+            <p className="text-blue-400 text-sm">自動登入中...</p>
+          </div>
+        )}
 
         {/* CTA 按鈕 */}
         <button
-          onClick={goToLogin}
-          className="w-full max-w-sm mt-6 py-4 bg-gradient-to-r from-[#4DA3FF] to-[#2E6BFF] text-white font-bold text-lg rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all active:scale-[0.98]"
+          onClick={autoLoginDone ? goToHome : goToLogin}
+          className="w-full max-w-sm mt-6 py-4 bg-gradient-to-r from-[#4DA3FF] to-[#2E6BFF] text-white font-bold text-lg rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
         >
-          立即登入系統
+          {autoLoginDone ? (
+            <>
+              <Sparkles className="w-5 h-5" />
+              進入戰情室
+            </>
+          ) : autoLoginError ? (
+            '前往登入頁面'
+          ) : (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              登入中...
+            </>
+          )}
         </button>
 
         {/* 分享提示 */}
@@ -405,7 +452,7 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
             <span style={{ color: '#FF3A3A' }}>Ultra</span>
             <span className="text-blue-400">Advisor</span>
           </h1>
-          <p className="text-slate-400 text-sm mt-1">財務顧問的秘密武器</p>
+          <p className="text-slate-400 text-sm mt-1">AI 智能理財分析平台</p>
 
           {/* 已有帳號？登入連結 - 放在最醒目的位置 */}
           <div className="mt-4 py-3 px-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
