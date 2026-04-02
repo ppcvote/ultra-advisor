@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['理專', '高資產客戶', '退休規劃', '財富管理', '銀行理專', '客戶開發'],
   readTime: 8,
   publishDate: '2026-01-16',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: false,
   metaTitle: '理專開發高資產客戶秘訣：用退休規劃建立信任【實戰指南】',
   metaDescription: '高資產客戶最在意什麼？不是報酬率，是「安心」。學會用專業退休規劃工具切入，讓大戶主動找你談資產配置。',

@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['房屋稅', '地價稅', '自用住宅', '2026', '囤房稅', '房屋稅2.0', '節稅'],
   readTime: 10,
   publishDate: '2026-01-19',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: false,
   metaTitle: '2026 房屋稅地價稅自用住宅攻略｜囤房稅 2.0、稅率、申請期限完整說明',
   metaDescription: '2026 年房屋稅 2.0 全國單一自住稅率降至 1%，地價稅自用住宅 2‰ 優惠稅率。完整說明申請條件、期限、公告地價調整影響。',

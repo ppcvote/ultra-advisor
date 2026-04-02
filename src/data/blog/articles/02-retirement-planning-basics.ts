@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['退休規劃', '勞保', '勞退', '退休金', '所得替代率', '勞保年金'],
   readTime: 10,
   publishDate: '2026-01-10',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '退休規劃完整指南：勞保勞退能領多少？退休金缺口怎麼算【2026】',
   metaDescription: '台灣勞保、勞退年金詳細解說。計算您的退休金缺口，規劃充足的退休生活。附所得替代率計算公式與實際案例。',

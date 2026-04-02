@@ -1,8 +1,14 @@
 ﻿node_modules/
 dist/
 .env
+.env.local
+.env.*.local
 .DS_Store
 .tmp.driveupload/
 .tmp.drivedownload/
 admin/src/scripts/serviceAccountKey.json
 .vercel
+.claude/
+nul
+shioaji.log
+*.log

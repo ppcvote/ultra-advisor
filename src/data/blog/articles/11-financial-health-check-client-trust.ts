@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['客戶經營', '財務健檢', '顧問服務', '客戶關係', '回購率', '轉介紹'],
   readTime: 7,
   publishDate: '2026-01-12',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: false,
   metaTitle: '財務健檢建立客戶信任：讓一次成交變終身客戶的秘訣',
   metaDescription: '頂尖財務顧問的客戶經營秘訣：用定期財務健檢服務，創造持續價值，讓客戶主動找你、主動轉介紹。',

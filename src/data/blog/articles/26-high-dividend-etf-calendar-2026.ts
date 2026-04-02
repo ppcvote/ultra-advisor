@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['ETF', '高股息', '0056', '00878', '00919', '配息', '存股', '2026'],
   readTime: 12,
   publishDate: '2026-01-19',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '2026 台股高股息 ETF 配息月曆｜0056、00878、00919 殖利率、配息比較',
   metaDescription: '2026 年高股息 ETF 完整比較！0056、00878、00919 配息時間、殖利率、選股邏輯分析，教你組合搭配月月領息。',

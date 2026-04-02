@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['心態', '財務顧問', '職涯發展', '成長思維', '逆境', '2026'],
   readTime: 8,
   publishDate: '2026-01-21',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '心態決定你能走多遠｜財務顧問必讀的成長思維',
   metaDescription: '技巧可以學，話術可以練，但心態不對，一切都是白搭。這篇告訴你頂尖財務顧問的心態秘密。',

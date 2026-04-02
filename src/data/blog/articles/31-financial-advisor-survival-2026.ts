@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['財務顧問', '職涯發展', '持續學習', '數位工具', 'AI', '2026', '競爭力'],
   readTime: 10,
   publishDate: '2026-01-21',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '2026 財務顧問生存指南｜持續學習 + 善用工具不被淘汰',
   metaDescription: '2026 年財務顧問如何保持競爭力？從持續學習到善用數位工具，完整分析不被市場淘汰的關鍵策略。',

@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['基金', '配息基金', '配息來自本金', '安聯收益成長', '投資理財', '數據分析', '2026'],
   readTime: 6,
   publishDate: '2026-02-26',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '看懂基金靠真實數據，不是 Excel｜配息來自本金的真相',
   metaDescription: '「配息來源可能來自本金」是法規風險揭露，不是基金在吃老本。教你用真實數據判斷一支配息基金的好壞，別被 Excel 試算表的結論帶著走。',
@@ -232,9 +232,9 @@ export const article: BlogArticle = {
       <div class="bg-slate-800/50 border border-slate-700 rounded-2xl p-6 my-8">
         <h4 class="text-white font-bold mb-4">📚 延伸閱讀</h4>
         <ul class="text-slate-300 mb-0 space-y-2">
+          <li>→ <a href="/blog/investment-linked-policy-trust-rebuild-2026" class="text-blue-400 hover:underline">投資型保單讓你賠過錢？問題可能不在保單</a></li>
+          <li>→ <a href="/blog/offshore-insurance-risk-taiwan-2026" class="text-blue-400 hover:underline">境外保單利率高又免稅？三個你沒被告知的致命風險</a></li>
           <li>→ <a href="/blog/allianz-global-income-growth-suspended-2026" class="text-blue-400 hover:underline">安聯收益成長被買爆！暫停申購要緊嗎？</a></li>
-          <li>→ <a href="/blog/high-dividend-etf-calendar-2026" class="text-blue-400 hover:underline">2026 高股息 ETF 配息日曆</a></li>
-          <li>→ <a href="/blog/dca-vs-lump-sum-investment-2026" class="text-blue-400 hover:underline">定期定額 vs 單筆投入，哪個好？</a></li>
         </ul>
       </div>
     </article>

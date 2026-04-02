@@ -9,10 +9,10 @@ export const article: BlogArticle = {
   tags: ['房貸利率', '銀行比較', '房貸成數', '寬限期', '首購優惠', '2026房貸'],
   readTime: 6,
   publishDate: '2026-01-19',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
-  metaTitle: '2026年台灣各銀行房貸利率比較表｜15家銀行完整整理',
-  metaDescription: '最新 2026 年房貸利率比較！整理 15 家主要銀行的利率、成數、寬限期。首購族、換屋族必看的房貸完整攻略。',
+  metaTitle: '2026 台灣房貸利率比較表｜15 家銀行利率、成數、寬限期整理',
+  metaDescription: '2026 台灣房貸利率最新比較：公股銀行 2.06% 起、民營銀行最低 1.93%。15 家銀行利率、貸款成數、寬限期完整整理，首購族換屋族都適用。',
   content: `
       <article class="prose prose-invert max-w-none">
         <p class="lead text-xl text-slate-300 mb-8">

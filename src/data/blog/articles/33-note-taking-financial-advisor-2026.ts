@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['筆記', '學習方法', '財務顧問', '自我成長', '知識管理', '2026'],
   readTime: 7,
   publishDate: '2026-01-21',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '為什麼頂尖顧問都在做筆記？學習的關鍵不是聽，是記',
   metaDescription: '聽課不等於學會。筆記是把空中的資訊寫進硬碟的過程，也是證明你認真的最好方式。',

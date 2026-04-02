@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['財務顧問', '收入', '成功習慣', '業績', '職涯發展', '顧問收入'],
   readTime: 8,
   publishDate: '2026-01-15',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '財務顧問收入調查 2026｜頂尖顧問年收千萬的秘密',
   metaDescription: '財務顧問收入差距可達 10 倍！我們調查了 200 位顧問，發現頂尖 10% 都有這 3 個共同習慣。',

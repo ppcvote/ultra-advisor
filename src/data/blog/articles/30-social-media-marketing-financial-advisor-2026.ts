@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['社群媒體', '數位行銷', 'Facebook', 'Instagram', 'LINE', '個人品牌', '財務顧問', '2026'],
   readTime: 12,
   publishDate: '2026-01-21',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '財務顧問社群媒體經營指南｜2026 數位行銷必學策略',
   metaDescription: '財務顧問為什麼要經營社群媒體？2026 年 FB、IG、LINE 經營策略完整分析，教你打造個人品牌、持續獲得客戶信任。',

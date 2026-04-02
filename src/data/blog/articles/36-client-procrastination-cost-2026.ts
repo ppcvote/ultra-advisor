@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['拖延', '銷售技巧', '財務決策', '客戶心理', '成交', '2026'],
   readTime: 10,
   publishDate: '2026-01-23',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '客戶說「再想想」？拖延正在吃掉他的錢｜財務顧問必讀',
   metaDescription: '客戶遲遲不做決定，不是沒需求，是害怕做錯。這篇教你如何讓客戶看見拖延的真實代價，推動他跨出那一步。',

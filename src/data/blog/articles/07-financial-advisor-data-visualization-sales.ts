@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['財務顧問', '成交技巧', '數據視覺化', '提案工具', '銷售技巧', '顧問行銷'],
   readTime: 7,
   publishDate: '2026-01-18',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '財務顧問成交秘訣：數據視覺化讓客戶秒懂【實戰技巧】',
   metaDescription: '頂尖財務顧問的成交秘訣：用數據視覺化取代口頭說明。實戰案例教學，讓複雜理財概念變成一看就懂的圖表，提升成交率 40%。',

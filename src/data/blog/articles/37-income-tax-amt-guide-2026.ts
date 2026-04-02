@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['綜合所得稅', '最低稅負制', 'AMT', '報稅', '節稅', '2026'],
   readTime: 8,
   publishDate: '2026-01-23',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '2026 綜合所得稅＋最低稅負制完整攻略｜5 分鐘搞懂報稅',
   metaDescription: '2026 年報稅必讀！用最白話的方式解釋綜所稅級距、免稅額、扣除額，以及最低稅負制（AMT）是什麼、誰要繳。',

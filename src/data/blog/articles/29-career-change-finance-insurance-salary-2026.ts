@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['轉職', '金融業', '保險業', '薪資', '職涯規劃', '2026', '年後轉職'],
   readTime: 10,
   publishDate: '2026-01-21',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '2026 年後轉職潮｜金融保險業薪資最高？行業挑選完整攻略',
   metaDescription: '年後想轉職？2026 最新數據：金融保險業平均薪資 8.2 萬最高！一篇分析各行業優缺點，幫你找到最適合的職涯方向。',

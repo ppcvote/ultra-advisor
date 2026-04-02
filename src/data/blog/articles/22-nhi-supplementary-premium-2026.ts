@@ -9,10 +9,10 @@ export const article: BlogArticle = {
   tags: ['健保', '補充保費', '股利', '利息', '租金', '2026', '節稅', '二代健保'],
   readTime: 10,
   publishDate: '2026-01-19',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
-  metaTitle: '2026 健保補充保費攻略｜費率 2.11%、六大課徵項目、節省方法完整說明',
-  metaDescription: '健保補充保費費率 2.11%，單筆超過 2 萬就要扣。完整說明股利、利息、租金等六大課徵項目，以及合法節省補充保費的實用方法。',
+  metaTitle: '2026 二代健保補充保費攻略｜費率 2.11%、門檻 2 萬、六大項目與節省方法',
+  metaDescription: '二代健保補充保費 2026 最新整理：費率 2.11%，股利、利息、租金等單筆超過 2 萬就要扣。六大課徵項目 + 合法節省方法一次看懂。',
   content: `
     <article class="prose prose-invert max-w-none">
       <p class="lead text-xl text-slate-300 mb-8">

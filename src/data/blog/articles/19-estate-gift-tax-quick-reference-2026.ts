@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['遺產稅', '贈與稅', '免稅額', '2026', '稅務規劃', '資產傳承', '節稅'],
   readTime: 8,
   publishDate: '2026-01-19',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '2026 遺產稅贈與稅免稅額速查表｜課稅級距、扣除額完整整理',
   metaDescription: '2026 年遺產稅免稅額 1,333 萬、贈與稅免稅額 244 萬，課稅級距金額上調。完整整理免稅額、扣除額、稅率表，附計算範例。',

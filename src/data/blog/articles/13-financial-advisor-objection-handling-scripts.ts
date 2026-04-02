@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['話術', '異議處理', '銷售技巧', '財務顧問', '成交率', '客戶經營'],
   readTime: 10,
   publishDate: '2026-01-18',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '財務顧問話術大全：10個異議處理範本｜提升成交率必備',
   metaDescription: '客戶說「我再想想」「太貴了」怎麼回？資深財務顧問分享 10 個實戰話術範本，附情境模擬和回應技巧。',

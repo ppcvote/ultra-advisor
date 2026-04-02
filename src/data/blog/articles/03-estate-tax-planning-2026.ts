@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['遺產稅', '節稅', '稅務傳承', '免稅額', '遺產規劃', '繼承'],
   readTime: 12,
   publishDate: '2026-01-05',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: false,
   metaTitle: '2026 遺產稅完整指南：免稅額、扣除額、稅率與節稅策略',
   metaDescription: '2026年最新遺產稅免稅額1,333萬元。完整說明遺產稅計算方式、扣除額項目、累進稅率，以及合法節稅策略。',

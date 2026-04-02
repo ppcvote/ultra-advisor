@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['勞保', '勞退', '退休金', '2026', '基本工資', '退休規劃', '社會保險'],
   readTime: 12,
   publishDate: '2026-01-19',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '2026 勞保勞退新制攻略｜退休年齡 65 歲、基本工資 29,500 元完整說明',
   metaDescription: '2026 年勞保法定退休年齡正式調至 65 歲，基本工資調漲至 29,500 元。完整解析勞保勞退級距、費率計算、退休金試算。',

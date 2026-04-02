@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['財務顧問', '數位轉型', 'AI', '顧問工具', 'FinTech', '2026趨勢'],
   readTime: 6,
   publishDate: '2026-01-14',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: false,
   metaTitle: '2026財務顧問必備數位工具：數位轉型完整指南',
   metaDescription: 'AI時代財務顧問如何不被淘汰？盤點2026年顧問必備的5大數位工具，從客戶管理到提案簡報，全面提升競爭力。',

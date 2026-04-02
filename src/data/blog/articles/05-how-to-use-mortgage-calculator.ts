@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['房貸計算機', '工具教學', 'Ultra Advisor', '傲創計算機', '房貸試算'],
   readTime: 5,
   publishDate: '2025-12-20',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: false,
   metaTitle: '傲創計算機教學：免費房貸試算工具使用指南【圖文教學】',
   metaDescription: '3分鐘學會使用傲創計算機。免費試算本金均攤、本息均攤、額外還款、通膨貼現等進階功能。',

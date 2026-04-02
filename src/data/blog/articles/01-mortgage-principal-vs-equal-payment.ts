@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['房貸', '本金均攤', '本息均攤', '還款方式', '房貸利率', '房貸計算'],
   readTime: 8,
   publishDate: '2026-01-15',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '本金均攤 vs 本息均攤完整比較 | 房貸還款方式怎麼選？【2026】',
   metaDescription: '詳細比較本金均攤與本息均攤的利息差異、月付金變化、適合對象。附實際案例計算，幫助您選擇最省息的房貸還款方式。',

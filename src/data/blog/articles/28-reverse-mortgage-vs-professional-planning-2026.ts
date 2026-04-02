@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['以房養老', '逆向房貸', '退休規劃', '壽險', '財務顧問', '2026', '長壽風險'],
   readTime: 12,
   publishDate: '2026-01-20',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '以房養老該去銀行辦嗎？專業規劃 vs 銀行方案完整比較｜2026',
   metaDescription: '以房養老直接去銀行辦？小心長壽風險讓你老後沒保障！一篇搞懂為什麼找專業財務顧問規劃，搭配足額壽險才是正解。',

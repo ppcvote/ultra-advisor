@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['數位存款', '保單價值', '投資帳戶', '資產配置', '2026', '理財', '現金管理'],
   readTime: 10,
   publishDate: '2026-01-20',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '數位存款是什麼？銀行現金、保單價值、投資帳戶差在哪？2026 完整比較',
   metaDescription: '同樣 100 萬，放銀行、放保單、放投資帳戶結果差很多！一篇搞懂數位存款概念，用對地方讓錢幫你賺錢。',

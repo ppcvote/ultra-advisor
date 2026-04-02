@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['所得稅', '綜所稅', '免稅額', '扣除額', '2026', '報稅', '稅率級距'],
   readTime: 10,
   publishDate: '2026-01-19',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '2026 所得稅級距與扣除額速查表｜免稅額、標準扣除額、報稅門檻完整整理',
   metaDescription: '2026 年報稅（115 年度所得）免稅額 10.1 萬、標準扣除額 13.6 萬、薪資扣除額 22.7 萬。完整整理五級稅率、各項扣除額，告訴你免繳稅門檻。',

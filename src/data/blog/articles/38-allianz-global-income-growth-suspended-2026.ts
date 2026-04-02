@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['安聯', '基金', '境外基金', '暫停申購', '配息', '2026'],
   readTime: 5,
   publishDate: '2026-01-23',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '安聯收益成長基金暫停申購！被買爆的真相',
   metaDescription: '安聯全球收益成長基金暫停新申購，不是出問題，是太熱門！已持有的人權益完全不受影響。',

@@ -9,10 +9,10 @@ export const article: BlogArticle = {
   tags: ['儲蓄險', '定存', 'IRR', 'IFRS17', '2026', '理財', '保險'],
   readTime: 12,
   publishDate: '2026-01-19',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
-  metaTitle: '2026 儲蓄險 vs 定存比較｜IRR 怎麼算？IFRS17 影響？完整分析',
-  metaDescription: '儲蓄險和定存哪個好？用白話文解釋 IRR 內部報酬率、IFRS 17 對儲蓄險的影響、優缺點比較，幫你判斷什麼情況下儲蓄險比定存划算。',
+  metaTitle: '儲蓄險 vs 定存哪個划算？2026 IRR 實算比較｜白話文完整分析',
+  metaDescription: '儲蓄險 IRR 約 2%～2.5%、定存利率 1.5%～1.8%，看似儲蓄險贏？但提前解約虧本金！2026 最新比較：什麼情況選儲蓄險、什麼情況放定存。',
   content: `
     <article class="prose prose-invert max-w-none">
       <p class="lead text-xl text-slate-300 mb-8">

@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['信用卡', '分期零利率', '繳保費', '刷卡優惠', '2026', '銀行比較', '金融工具'],
   readTime: 10,
   publishDate: '2026-01-19',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '2026 信用卡分期零利率比較表｜繳保費、消費分期各銀行優惠整理',
   metaDescription: '2026 年最新 14 家銀行信用卡分期零利率優惠比較，含繳保費分期、特約商店分期、回饋比較。一表看懂哪家銀行最划算。',

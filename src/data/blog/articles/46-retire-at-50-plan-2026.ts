@@ -11,8 +11,8 @@ export const article: BlogArticle = {
   publishDate: '2026-01-25',
   author: 'Ultra Advisor',
   featured: false,
-  metaTitle: '50 歲提早退休要準備多少錢？完整規劃指南｜2026',
-  metaDescription: '50 歲提早退休完整規劃：需要多少退休金、勞保勞退怎麼領、健保怎麼辦、風險評估與準備策略。',
+  metaTitle: '50歲退休規劃｜提早退休要準備多少錢？完整檢查清單 2026',
+  metaDescription: '50歲退休規劃完整指南：退休金至少準備 1,500 萬起跳、勞保勞退提前領少很多、健保自付每月近萬元。一張檢查清單幫你盤點所有費用。',
   content: `
 <p class="text-xl text-slate-300 mb-8">
 「50 歲退休」聽起來很夢幻。<br>

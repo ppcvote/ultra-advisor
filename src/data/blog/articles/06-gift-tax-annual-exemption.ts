@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['贈與稅', '免稅額', '節稅', '資產傳承', '稅務規劃', '財富傳承'],
   readTime: 7,
   publishDate: '2025-12-15',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: false,
   metaTitle: '2026贈與稅免稅額244萬完整運用指南：合法節稅策略',
   metaDescription: '2026年贈與稅免稅額244萬元。教您善用夫妻合計488萬免稅額度，合法移轉資產給子女，節省大量稅金。',

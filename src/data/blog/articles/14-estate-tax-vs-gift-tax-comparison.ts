@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['遺產稅', '贈與稅', '稅務規劃', '節稅', '傳承', '免稅額'],
   readTime: 8,
   publishDate: '2026-01-17',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: false,
   metaTitle: '遺產稅 vs 贈與稅完整比較表【2026】｜3個節稅案例分析',
   metaDescription: '遺產稅免稅額 1,333 萬、贈與稅每年 244 萬，哪個划算？完整比較表 + 3 個實際案例，幫你選對節稅方式。',

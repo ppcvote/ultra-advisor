@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['複利', '投資', '理財', '退休', '定期定額', '時間價值'],
   readTime: 6,
   publishDate: '2025-12-28',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: false,
   metaTitle: '複利的力量：用數字證明早投資 10 年的驚人差距',
   metaDescription: '愛因斯坦說複利是世界第八大奇蹟。實際計算：25歲 vs 35歲開始投資，退休時差距超過1000萬！',

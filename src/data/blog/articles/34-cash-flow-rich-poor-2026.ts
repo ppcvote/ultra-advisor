@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['現金流', '理財觀念', '富爸爸', '資產', '負債', '財務自由', '2026'],
   readTime: 6,
   publishDate: '2026-01-21',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: true,
   metaTitle: '窮人、中產、富人的現金流差在哪？一張圖看懂財富差距',
   metaDescription: '同樣在工作，為什麼財富差距越來越大？關鍵在現金流的方向。這篇用最簡單的方式，讓你看懂窮人、中產、富人的錢都流去哪了。',

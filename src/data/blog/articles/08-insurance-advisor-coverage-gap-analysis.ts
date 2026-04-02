@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['壽險顧問', '保障缺口', '保險規劃', '需求分析', '保險銷售', 'IFA'],
   readTime: 9,
   publishDate: '2026-01-17',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: false,
   metaTitle: '壽險顧問保障缺口分析完整教學：5 步驟讓客戶看到真正需求',
   metaDescription: '專業壽險顧問的需求分析技巧。5 步驟完成保障缺口分析，用數據取代話術，讓「我保險夠了」變成「原來我還需要這個」。',

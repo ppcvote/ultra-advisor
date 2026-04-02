@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['房貸', '轉貸', '轉增貸', '利率', '2026', '房貸利率', '轉貸成本'],
   readTime: 10,
   publishDate: '2026-01-19',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: false,
   metaTitle: '2026 房貸轉貸成本試算｜利差多少划算？費用、流程完整分析',
   metaDescription: '房貸轉貸成本約 2.5～3 萬元，利差要多少才划算？完整分析轉貸費用明細、回本時間試算、轉貸前必問的 5 個問題。',

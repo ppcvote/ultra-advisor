@@ -9,7 +9,7 @@ export const article: BlogArticle = {
   tags: ['報稅', '節稅', '所得稅', '財務顧問', '2026報稅', '扣除額'],
   readTime: 7,
   publishDate: '2026-01-16',
-  author: 'Ultra Advisor 理財團隊',
+  author: 'Ultra Advisor',
   featured: false,
   metaTitle: '2026報稅季節稅攻略｜財務顧問必備 5 個技巧',
   metaDescription: '2026 年報稅季即將來臨！財務顧問如何幫客戶節稅？5 個實用技巧 + 扣除額完整整理，展現你的專業價值。',
