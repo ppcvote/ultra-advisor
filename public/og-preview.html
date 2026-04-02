@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>OG Image Preview - Ultra Advisor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 1200px; height: 630px; overflow: hidden; }
+
+    .og-card {
+      width: 1200px;
+      height: 630px;
+      background: linear-gradient(135deg, #0c0f1a 0%, #151929 50%, #0c0f1a 100%);
+      position: relative;
+      overflow: hidden;
+      font-family: 'Segoe UI', 'SF Pro Display', -apple-system, sans-serif;
+    }
+
+    /* 網格背景 */
+    .og-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* 左上藍色光暈 */
+    .glow-tl {
+      position: absolute;
+      top: -150px; left: -150px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(59,130,246,0.10) 0%, transparent 65%);
+    }
+    /* 右下紫色光暈 */
+    .glow-br {
+      position: absolute;
+      bottom: -150px; right: -150px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(168,85,247,0.08) 0%, transparent 65%);
+    }
+
+    /* 四角括號 */
+    .corner { position: absolute; width: 44px; height: 44px; }
+    .corner-tl { top: 48px; left: 48px; border-top: 1.5px solid rgba(255,255,255,0.2); border-left: 1.5px solid rgba(255,255,255,0.2); }
+    .corner-tr { top: 48px; right: 48px; border-top: 1.5px solid rgba(255,255,255,0.2); border-right: 1.5px solid rgba(255,255,255,0.2); }
+    .corner-bl { bottom: 48px; left: 48px; border-bottom: 1.5px solid rgba(255,255,255,0.2); border-left: 1.5px solid rgba(255,255,255,0.2); }
+    .corner-br { bottom: 48px; right: 48px; border-bottom: 1.5px solid rgba(255,255,255,0.2); border-right: 1.5px solid rgba(255,255,255,0.2); }
+
+    /* 主內容 */
+    .content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+    }
+
+    /* Logo — 只顯示圖標部分，裁掉底下文字 */
+    .logo-wrap {
+      width: 140px;
+      height: 155px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .logo-wrap img {
+      width: 140px;
+      height: auto;
+      display: block;
+      filter: drop-shadow(0 0 30px rgba(59,130,246,0.25)) drop-shadow(0 0 30px rgba(239,68,68,0.15));
+    }
+
+    .brand {
+      font-size: 62px;
+      font-weight: 800;
+      letter-spacing: 14px;
+      color: white;
+      text-align: center;
+    }
+
+    .tagline {
+      font-size: 22px;
+      font-weight: 300;
+      letter-spacing: 8px;
+      color: #94a3b8;
+      margin-top: 16px;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 17px;
+      font-weight: 400;
+      letter-spacing: 4px;
+      color: #64748b;
+      margin-top: 36px;
+      text-align: center;
+      font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="og-card">
+    <div class="glow-tl"></div>
+    <div class="glow-br"></div>
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+
+    <div class="content">
+      <div class="logo-wrap">
+        <img src="logo.png" alt="Ultra Advisor Logo" />
+      </div>
+      <div class="brand">ULTRA ADVISOR</div>
+      <div class="tagline">Visualize. Plan. Achieve.</div>
+      <div class="subtitle">專業財務視覺化 × 持照顧問打造 × 數據替你說話</div>
+    </div>
+  </div>
+</body>
+</html>

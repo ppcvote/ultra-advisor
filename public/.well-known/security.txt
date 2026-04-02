@@ -1,0 +1,8 @@
+# Ultra Advisor Security Policy
+# https://securitytxt.org/
+
+Contact: https://line.me/R/ti/p/@ultraadvisor
+Expires: 2027-02-28T00:00:00.000Z
+Preferred-Languages: zh-TW, en
+Canonical: https://ultra-advisor.tw/.well-known/security.txt
+Policy: https://ultra-advisor.tw/privacy

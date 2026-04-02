@@ -56,7 +56,7 @@ admin/
 
 ```powershell
 # 進入 admin 專案目錄
-cd C:\Users\User\financial-planner\admin
+cd C:\Users\User\UltraAdvisor\admin
 
 # 建立新資料夾
 mkdir src\pages\membership

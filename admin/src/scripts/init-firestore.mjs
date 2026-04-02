@@ -2,7 +2,7 @@
  * Ultra Advisor - Firestore 初始化腳本
  * 
  * 使用方式：
- * cd C:\Users\User\financial-planner\admin
+ * cd C:\Users\User\UltraAdvisor\admin
  * node scripts/init-firestore.mjs
  */
 

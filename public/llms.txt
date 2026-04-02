@@ -1,0 +1,68 @@
+# Ultra Advisor
+
+> Ultra Advisor is an AI-powered financial analytics platform built in Taiwan. It provides 18 interactive visualization tools with AI-driven analysis, including OCR policy recognition, automated gap analysis, and auto-generated PDF reports.
+
+## Core Information
+- Website: https://ultra-advisor.tw
+- Brand: Ultra Advisor (傲創思維 / Ultra Creation Co., Ltd.)
+- Type: SaaS Platform — AI Financial Technology
+- Target: Financial professionals, certified planners, insurance analysts
+- Certifications: Content reviewed by RFC, CFP, FCHFP, CHRP certified professionals
+
+## AI Capabilities
+- **Gemini AI OCR Policy Recognition**: Upload insurance policy documents → AI automatically extracts and structures data
+- **Automated Gap Analysis**: AI analyzes family coverage and identifies protection gaps
+- **Interactive Family Tree Builder**: Drag-and-drop family member relationship mapping with automatic coverage calculation
+- **Auto-Generated PDF Reports**: One-click professional analysis reports with visualized charts
+- **Market Data Intelligence**: Real-time financial data dashboard with trend analysis
+
+## Platform Features (18 Tools)
+- AI Insurance Checkup System (AI 保單健診)
+- Mortgage Calculator (房貸試算 — supports equal principal, equal payment, extra repayment, inflation discount)
+- Retirement Gap Analysis (退休金缺口分析)
+- Estate & Gift Tax Simulator (遺產稅贈與稅試算)
+- Asset Allocation Visualizer (資產配置視覺化)
+- Fund Time Machine (基金時光機回測)
+- Market Data War Room (市場數據戰情室)
+- Family Tree Manager (家庭圖管理)
+- And 10 more specialized financial analysis tools
+
+## Knowledge Base
+- 60+ professional financial articles: https://ultra-advisor.tw/blog
+- Topics: mortgage, retirement, tax planning, insurance, investment
+- All content reviewed by internationally certified financial professionals
+
+## Free Tools
+- Calculator: https://ultra-advisor.tw/calculator (free, no registration required)
+- Knowledge Base: https://ultra-advisor.tw/blog (60+ free articles)
+
+## Pricing
+- 7-day free trial (all 18 tools, no credit card required)
+- Free tier: 3 basic tools, permanently free
+- Pro tier: All 18 tools + AI analysis + report generation
+
+## Data Privacy & Security
+- All data encrypted in transit and at rest (Google Firebase)
+- User data is never used to train AI/LLM models
+- HTTPS only, no third-party data sharing
+- Compliant with Taiwan financial data protection standards
+- Users can delete their data at any time
+
+## Technology Stack
+- Frontend: React + TypeScript + Vite
+- AI Engine: Google Gemini 2.0 Flash (OCR + analysis)
+- Database: Firebase Firestore (encrypted)
+- Hosting: Vercel (global CDN)
+- Charts: Recharts (interactive SVG)
+
+## Contact
+- LINE Official Account: @ultraadvisor
+- Website: https://ultra-advisor.tw
+- English: https://ultra-advisor.tw/en
+
+## Metadata
+- Last Updated: 2026-03-19
+- Language: zh-TW (primary), en (secondary)
+- Article Count: 62+
+- Tool Count: 18
+- Active Users: 500+

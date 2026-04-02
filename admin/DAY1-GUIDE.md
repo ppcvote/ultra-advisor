@@ -45,7 +45,7 @@ npm --version
 
 ```powershell
 # 回到專案根目錄
-cd C:\Users\User\financial-planner
+cd C:\Users\User\UltraAdvisor
 
 # 創建 admin 資料夾
 mkdir admin
@@ -61,7 +61,7 @@ cd admin
 **將下載的所有文件按照以下結構放置**：
 
 ```
-C:\Users\User\financial-planner\admin\
+C:\Users\User\UltraAdvisor\admin\
 ├── index.html
 ├── package.json
 ├── vite.config.js
@@ -82,7 +82,7 @@ C:\Users\User\financial-planner\admin\
 ### 2.2 安裝依賴
 
 ```powershell
-cd C:\Users\User\financial-planner\admin
+cd C:\Users\User\UltraAdvisor\admin
 npm install
 ```
 
@@ -142,7 +142,7 @@ const firebaseConfig = {
 ## 🚀 Step 5: 啟動開發伺服器
 
 ```powershell
-cd C:\Users\User\financial-planner\admin
+cd C:\Users\User\UltraAdvisor\admin
 npm run dev
 ```
 

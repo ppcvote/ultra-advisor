@@ -73,7 +73,7 @@ export default defineConfig([
 ```
 
 ```
-financial-planner
+UltraAdvisor
 ├─ .firebaserc
 ├─ admin
 │  ├─ DAY1-GUIDE.md
