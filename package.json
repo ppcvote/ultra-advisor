@@ -35,7 +35,8 @@
     "react-router-dom": "^6.20.0",
     "reactflow": "^11.11.4",
     "recharts": "^2.10.0",
-    "remotion": "^4.0.409"
+    "remotion": "^4.0.409",
+    "web-vitals": "^4.2.4"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

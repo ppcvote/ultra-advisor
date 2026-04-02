@@ -1,55 +1,84 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- 背景漸層 -->
   <defs>
-    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0f172a"/>
-      <stop offset="50%" style="stop-color:#1e293b"/>
-      <stop offset="100%" style="stop-color:#0f172a"/>
+    <!-- 背景漸層 -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0c0f1a"/>
+      <stop offset="50%" stop-color="#151929"/>
+      <stop offset="100%" stop-color="#0c0f1a"/>
     </linearGradient>
-    <linearGradient id="accent-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#3b82f6"/>
-      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    <!-- Logo 左筆畫（藍） -->
+    <linearGradient id="stroke-blue" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
     </linearGradient>
+    <!-- Logo 右筆畫（紅/紫） -->
+    <linearGradient id="stroke-red" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#f87171"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <!-- 橫槓漸層 -->
+    <linearGradient id="bar-grad" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="50%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+    <!-- 網格線 pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ffffff" stroke-width="0.3" opacity="0.08"/>
+    </pattern>
+    <!-- 角落光暈 -->
+    <radialGradient id="glow-tl" cx="0" cy="0" r="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow-br" cx="1200" cy="630" r="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+    </radialGradient>
   </defs>
 
   <!-- 背景 -->
-  <rect width="1200" height="630" fill="url(#bg-gradient)"/>
+  <rect width="1200" height="630" fill="url(#bg)"/>
 
-  <!-- 裝飾圓圈 -->
-  <circle cx="100" cy="100" r="200" fill="#3b82f6" opacity="0.1"/>
-  <circle cx="1100" cy="530" r="250" fill="#8b5cf6" opacity="0.1"/>
+  <!-- 網格 -->
+  <rect width="1200" height="630" fill="url(#grid)"/>
 
-  <!-- 主標題區 -->
-  <text x="600" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="white">
-    Ultra Advisor
+  <!-- 角落光暈 -->
+  <rect width="1200" height="630" fill="url(#glow-tl)"/>
+  <rect width="1200" height="630" fill="url(#glow-br)"/>
+
+  <!-- ===== 四角裝飾括號 ===== -->
+  <!-- 左上 -->
+  <path d="M 60 100 L 60 60 L 100 60" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.25"/>
+  <!-- 右上 -->
+  <path d="M 1140 100 L 1140 60 L 1100 60" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.25"/>
+  <!-- 左下 -->
+  <path d="M 60 530 L 60 570 L 100 570" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.25"/>
+  <!-- 右下 -->
+  <path d="M 1140 530 L 1140 570 L 1100 570" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.25"/>
+
+  <!-- ===== Logo（居中上方）===== -->
+  <g transform="translate(600, 195) scale(0.7)">
+    <!-- 左筆畫（藍）— 從左下到右上彎曲 -->
+    <path d="M -45 80 C -30 -10, 10 -90, 25 -120" fill="none" stroke="url(#stroke-blue)" stroke-width="10" stroke-linecap="round"/>
+    <!-- 右筆畫（紅）— 從右下到左上彎曲 -->
+    <path d="M 45 80 C 30 -10, -10 -90, -25 -120" fill="none" stroke="url(#stroke-red)" stroke-width="10" stroke-linecap="round"/>
+    <!-- 橫槓 -->
+    <rect x="-40" y="42" width="80" height="4" rx="2" fill="url(#bar-grad)" opacity="0.7"/>
+  </g>
+
+  <!-- ===== 品牌名稱 ===== -->
+  <text x="600" y="340" text-anchor="middle" font-family="'Segoe UI', 'SF Pro Display', Arial, sans-serif" font-size="64" font-weight="800" letter-spacing="12" fill="white">
+    ULTRA ADVISOR
   </text>
 
-  <!-- 副標題 -->
-  <text x="600" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="36" fill="#94a3b8">
-    台灣最強財務顧問提案工具
+  <!-- ===== 英文標語 ===== -->
+  <text x="600" y="395" text-anchor="middle" font-family="'Segoe UI', 'SF Pro Display', Arial, sans-serif" font-size="24" font-weight="300" letter-spacing="6" fill="#94a3b8">
+    Visualize. Plan. Achieve.
   </text>
 
-  <!-- 分隔線 -->
-  <rect x="400" y="320" width="400" height="4" rx="2" fill="url(#accent-gradient)"/>
-
-  <!-- 特色標籤 -->
-  <g transform="translate(200, 400)">
-    <rect width="200" height="50" rx="25" fill="#3b82f6" opacity="0.2"/>
-    <text x="100" y="32" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#60a5fa">18 種專業工具</text>
-  </g>
-
-  <g transform="translate(500, 400)">
-    <rect width="200" height="50" rx="25" fill="#8b5cf6" opacity="0.2"/>
-    <text x="100" y="32" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#a78bfa">數據視覺化</text>
-  </g>
-
-  <g transform="translate(800, 400)">
-    <rect width="200" height="50" rx="25" fill="#10b981" opacity="0.2"/>
-    <text x="100" y="32" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#34d399">免費試用 7 天</text>
-  </g>
-
-  <!-- 底部 CTA -->
-  <text x="600" y="540" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#64748b">
-    ultra-advisor.tw
+  <!-- ===== 中文副標 ===== -->
+  <text x="600" y="455" text-anchor="middle" font-family="'Noto Sans TC', 'Microsoft JhengHei', sans-serif" font-size="18" font-weight="400" letter-spacing="3" fill="#64748b">
+    專業財務視覺化 × 持照顧問打造 × 數據替你說話
   </text>
 </svg>

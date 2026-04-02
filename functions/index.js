@@ -4743,256 +4743,467 @@ exports.searchProductCache = functions.https.onCall(async (data, context) => {
 });
 
 // ==========================================
-// Threads Token 換取
+// [已移除] Threads 功能已遷移至 MindThread.tw
+// exchangeThreadsToken + threadsScheduledPublish 已於 2026-03-13 移除
 // ==========================================
 
-/**
- * exchangeThreadsToken
- * 前端取得授權碼後，透過 Cloud Function 安全地換取 Token
- * 流程：授權碼 → 短期 Token → 長期 Token → 取得用戶資訊
- */
-exports.exchangeThreadsToken = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', '請先登入');
-  }
+// [Threads 功能已於 2026-03-13 移除，遷移至 MindThread.tw]
+// 原 exchangeThreadsToken + threadsScheduledPublish 已刪除
 
-  const { appId, appSecret, code, redirectUri } = data;
 
-  if (!appId || !appSecret || !code || !redirectUri) {
-    throw new functions.https.HttpsError('invalid-argument', '缺少必要參數');
-  }
+// ==========================================
+// 🤖 AI Financial Insight Engine — 通用 AI 分析引擎
+// 支援：房貸分析、保障建議（未來擴充更多工具）
+// 公開可用（不需登入），以 IP 限流
+// ==========================================
 
-  try {
-    // Step 1: 授權碼 → 短期 Token
-    const shortTokenResponse = await axios.post(
-      'https://graph.threads.net/oauth/access_token',
-      new URLSearchParams({
-        client_id: appId,
-        client_secret: appSecret,
-        grant_type: 'authorization_code',
-        redirect_uri: redirectUri,
-        code: code,
-      }).toString(),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-    );
-
-    const shortToken = shortTokenResponse.data.access_token;
-    if (!shortToken) {
-      throw new functions.https.HttpsError('internal', '換取短期 Token 失敗');
+exports.generateFinancialInsight = functions
+  .runWith({ timeoutSeconds: 30, memory: '256MB' })
+  .https.onCall(async (data, context) => {
+    const { type, payload } = data;
+    if (!type || !payload) {
+      throw new functions.https.HttpsError('invalid-argument', '缺少分析類型或資料');
     }
 
-    // Step 2: 短期 Token → 長期 Token
-    const longTokenResponse = await axios.get(
-      'https://graph.threads.net/access_token', {
-        params: {
-          grant_type: 'th_exchange_token',
-          client_secret: appSecret,
-          access_token: shortToken,
-        },
-      }
-    );
+    // --- Rate limiting ---
+    const uid = context.auth?.uid;
+    const ip = context.rawRequest?.ip || context.rawRequest?.headers?.['x-forwarded-for'] || 'unknown';
+    const rateLimitKey = uid || ip.replace(/[^a-zA-Z0-9]/g, '_');
+    const today = new Date().toISOString().split('T')[0];
+    const rateLimitRef = db.collection('rateLimits').doc(`insight_${rateLimitKey}_${today}`);
 
-    const longToken = longTokenResponse.data.access_token;
-    const expiresIn = longTokenResponse.data.expires_in; // 約 60 天（秒數）
-    if (!longToken) {
-      throw new functions.https.HttpsError('internal', '換取長期 Token 失敗');
+    try {
+      const rlDoc = await rateLimitRef.get();
+      const currentCount = rlDoc.exists ? (rlDoc.data().count || 0) : 0;
+      const dailyLimit = uid ? 30 : 10; // 登入用戶 30 次，匿名 10 次
+
+      if (currentCount >= dailyLimit) {
+        throw new functions.https.HttpsError('resource-exhausted', '今日 AI 分析次數已達上限，請明天再試');
+      }
+
+      await rateLimitRef.set({
+        count: currentCount + 1,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    } catch (err) {
+      if (err.code === 'resource-exhausted') throw err;
+      console.warn('⚠️ Rate limit check failed, proceeding:', err.message);
     }
 
-    // Step 3: 取得用戶資訊
-    const userResponse = await axios.get(
-      'https://graph.threads.net/v1.0/me', {
-        params: {
-          fields: 'id,username',
-          access_token: longToken,
-        },
+    // --- Build prompt ---
+    let prompt = '';
+
+    if (type === 'mortgage') {
+      const { loanAmount, annualRate, loanTerm, method, monthlyPayment, totalInterest, totalPayment, interestRatio } = payload;
+      prompt = `你是台灣的房貸分析專家。根據以下房貸條件，提供精準的財務分析洞察。
+
+貸款條件：
+- 貸款金額：${loanAmount} 萬元（${loanAmount * 10000} 元）
+- 年利率：${annualRate}%
+- 貸款年限：${loanTerm} 年（${loanTerm * 12} 期）
+- 還款方式：${method === 'equal_payment' ? '本息均攤' : '本金均攤'}
+
+計算結果：
+- 每月還款：${Math.round(monthlyPayment).toLocaleString()} 元
+- 累計利息：${Math.round(totalInterest).toLocaleString()} 元
+- 總還款金額：${Math.round(totalPayment).toLocaleString()} 元
+- 利息佔比：${interestRatio.toFixed(1)}%
+
+請提供以下分析（用 markdown 格式）：
+
+### 📊 整體評估
+一句話點評這筆房貸。
+
+### 💰 利息成本解讀
+利息佔比是高是低？與台灣 2026 年市場平均水準比較。
+
+### ⚡ 省息方案
+如果每月多還 5,000 元，預估可省下多少利息、提前幾年還清？（用近似計算即可）
+
+### 🎯 具體建議
+給一個最實用的行動建議。
+
+要求：
+- 繁體中文，語氣像朋友給建議
+- 用數字說話，給具體金額
+- 總字數 200-300 字
+- 不要有推銷語氣`;
+    } else if (type === 'insurance') {
+      const { memberName, age, annualIncome, gaps, totalPolicies, totalPremium, premiumRatio, coverageScore } = payload;
+      prompt = `你是台灣的保險規劃分析專家。根據以下保障現況，提供個人化的保障分析報告。
+
+客戶基本資料：
+- 姓名：${memberName || '客戶'}
+- 年齡：${age || '未提供'} 歲
+- 年收入：${annualIncome ? annualIncome.toLocaleString() : '未提供'} 元
+
+保障現況：
+- 持有保單：${totalPolicies} 張
+- 年繳總保費：${totalPremium ? totalPremium.toLocaleString() : 0} 元
+- 保費佔收入比：${premiumRatio ? premiumRatio.toFixed(1) : 0}%
+- 保障分數：${coverageScore}/100
+
+保障缺口：
+${gaps && gaps.length > 0 ? gaps.map(g => `- [${g.severity === 'critical' ? '嚴重不足' : '略有不足'}] ${g.category}：${g.description}`).join('\n') : '- 無明顯缺口'}
+
+請提供以下分析（用 markdown 格式）：
+
+### 📊 保障總評
+一句話總結保障現況。
+
+### ⚠️ 優先處理
+最需要優先補強的 1-2 個項目，說明原因和建議保額。
+
+### 💡 保費優化
+保費是否合理？有無重複或可調整的空間？
+
+### 🎯 行動建議
+下一步最該做什麼？
+
+要求：
+- 繁體中文，語氣專業但親切
+- 具體到金額和險種方向
+- 總字數 200-300 字
+- 客觀中立，不推銷任何產品`;
+    } else {
+      throw new functions.https.HttpsError('invalid-argument', `不支援的分析類型: ${type}`);
+    }
+
+    // --- Call Gemini ---
+    try {
+      const geminiApiKey = functions.config().gemini?.api_key;
+      if (!geminiApiKey) {
+        throw new Error('Gemini API key 未設定');
       }
-    );
 
-    const userId = userResponse.data.id;
-    const username = userResponse.data.username;
+      const genAI = new GoogleGenerativeAI(geminiApiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const result = await model.generateContent(prompt);
+      const insight = result.response.text();
 
-    return {
-      success: true,
-      accessToken: longToken,
-      userId: userId,
-      username: username || '',
-      expiresIn: expiresIn || 5184000,
-    };
-  } catch (error) {
-    console.error('❌ exchangeThreadsToken 錯誤:', error.response?.data || error.message);
-    const errorMessage = error.response?.data?.error_message
-      || error.response?.data?.error?.message
-      || error.message
-      || 'Token 換取失敗';
-    throw new functions.https.HttpsError('internal', errorMessage);
-  }
-});
+      console.log(`✅ AI Insight (${type}): ${insight.length} chars`);
 
-// ==========================================
-// Threads 排程自動發文
-// ==========================================
-
-/**
- * threadsScheduledPublish
- * 每 30 分鐘執行一次，檢查所有啟用排程的用戶
- * 如果當前時間匹配用戶設定的發文時間，自動發佈下一篇文案
- */
-exports.threadsScheduledPublish = functions.pubsub
-  .schedule('*/30 * * * *')
-  .timeZone('Asia/Taipei')
-  .onRun(async () => {
-    const now = new Date();
-    // 台灣時間 HH:MM
-    const twHour = now.toLocaleString('en-US', { hour: '2-digit', hour12: false, timeZone: 'Asia/Taipei' }).padStart(2, '0');
-    const twMinute = now.toLocaleString('en-US', { minute: '2-digit', timeZone: 'Asia/Taipei' }).padStart(2, '0');
-    const currentTime = `${twHour}:${twMinute}`;
-
-    // 比對允許的時間窗口（±15 分鐘內算匹配，因為 cron 每 30 分鐘執行一次）
-    const isTimeMatch = (scheduleTimes) => {
-      if (!scheduleTimes || scheduleTimes.length === 0) return false;
-      for (const t of scheduleTimes) {
-        const [h, m] = t.split(':').map(Number);
-        const scheduleMinutes = h * 60 + m;
-        const currentMinutes = parseInt(twHour) * 60 + parseInt(twMinute);
-        const diff = Math.abs(currentMinutes - scheduleMinutes);
-        if (diff <= 15 || diff >= 1425) return true; // 1425 = 24*60 - 15，處理跨日
-      }
-      return false;
-    };
-
-    console.log(`🕐 Threads 排程檢查開始，台灣時間: ${currentTime}`);
-
-    // 查詢所有啟用排程的用戶（透過 collectionGroup 查詢 threadsConfig）
-    // 注意：threadsConfig 存在 users/{uid}/threadsConfig/settings
-    const usersSnapshot = await db.collection('users').get();
-    let publishedCount = 0;
-
-    for (const userDoc of usersSnapshot.docs) {
-      const userId = userDoc.id;
-
+      // 記錄分析使用量
       try {
-        const configRef = db.collection('users').doc(userId).collection('threadsConfig').doc('settings');
-        const configSnap = await configRef.get();
-        if (!configSnap.exists) continue;
-
-        const config = configSnap.data();
-        if (!config.libraryScheduleEnabled) continue;
-        if (!config.threadsAccessToken || !config.threadsUserId) continue;
-        if (!isTimeMatch(config.libraryScheduleTimes)) continue;
-
-        // 取得文案庫（按 order 排序）
-        const librarySnap = await db.collection('users').doc(userId)
-          .collection('threadsLibrary')
-          .orderBy('order', 'asc')
-          .get();
-
-        if (librarySnap.empty) continue;
-
-        const libraryItems = librarySnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const currentIndex = config.libraryCurrentIndex || 0;
-
-        // 已發完
-        if (currentIndex >= libraryItems.length) {
-          console.log(`📭 用戶 ${userId} 文案庫已發完，停用排程`);
-          await configRef.update({
-            libraryScheduleEnabled: false,
-            updatedAt: admin.firestore.Timestamp.now(),
-          });
-          continue;
-        }
-
-        const item = libraryItems[currentIndex];
-        const textToPublish = config.signatureLine
-          ? `${item.content}\n\n${config.signatureLine}`
-          : item.content;
-
-        // Step 1: 建立貼文容器
-        const createResponse = await axios.post(
-          `https://graph.threads.net/v1.0/${config.threadsUserId}/threads`,
-          new URLSearchParams({
-            media_type: 'TEXT',
-            text: textToPublish,
-            access_token: config.threadsAccessToken,
-          }).toString(),
-          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-        );
-
-        const creationId = createResponse.data.id;
-
-        // 等待 3 秒
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        // Step 2: 發佈
-        const publishResponse = await axios.post(
-          `https://graph.threads.net/v1.0/${config.threadsUserId}/threads_publish`,
-          new URLSearchParams({
-            creation_id: creationId,
-            access_token: config.threadsAccessToken,
-          }).toString(),
-          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-        );
-
-        const postId = publishResponse.data.id;
-
-        // 更新文案庫狀態
-        await db.collection('users').doc(userId).collection('threadsLibrary').doc(item.id).update({
-          status: 'published',
-          publishedAt: admin.firestore.Timestamp.now(),
-        });
-
-        // 寫入發文紀錄
-        await db.collection('users').doc(userId).collection('threadsPosts').add({
-          content: textToPublish,
-          source: 'library',
-          libraryItemId: item.id,
-          threadsPostId: postId,
-          status: 'published',
-          publishedAt: admin.firestore.Timestamp.now(),
+        await db.collection('aiInsightLogs').add({
+          type,
+          uid: uid || null,
+          charCount: insight.length,
           createdAt: admin.firestore.Timestamp.now(),
         });
+      } catch (logErr) {
+        // 紀錄失敗不影響主流程
+      }
 
-        // 更新 config: index + 1, lastPostAt
-        const nextIndex = currentIndex + 1;
-        await configRef.update({
-          libraryCurrentIndex: nextIndex,
-          lastPostAt: admin.firestore.Timestamp.now(),
-          updatedAt: admin.firestore.Timestamp.now(),
-          // 如果下一篇超出範圍，自動停用
-          ...(nextIndex >= libraryItems.length ? { libraryScheduleEnabled: false } : {}),
-        });
+      return { insight };
+    } catch (error) {
+      console.error(`❌ generateFinancialInsight (${type}):`, error.message);
+      throw new functions.https.HttpsError('internal', `AI 分析失敗: ${error.message}`);
+    }
+  });
 
-        publishedCount++;
-        console.log(`✅ 用戶 ${userId} 排程發文成功 (${currentIndex + 1}/${libraryItems.length})`);
+// ==========================================
+// 每日市場 AI 報告（排程 + 手動觸發）
+// 台股盤後 14:00 自動抓取市場數據 → Gemini 產出摘要 → 存 Firestore → FCM 推播
+// ==========================================
 
-      } catch (error) {
-        console.error(`❌ 用戶 ${userId} 排程發文失敗:`, error.response?.data || error.message);
-
-        // 寫入失敗紀錄
-        try {
-          const configSnap = await db.collection('users').doc(userId).collection('threadsConfig').doc('settings').get();
-          const config = configSnap.data();
-          const librarySnap = await db.collection('users').doc(userId).collection('threadsLibrary').orderBy('order', 'asc').get();
-          const items = librarySnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          const idx = config?.libraryCurrentIndex || 0;
-          if (idx < items.length) {
-            await db.collection('users').doc(userId).collection('threadsPosts').add({
-              content: items[idx].content,
-              source: 'library',
-              libraryItemId: items[idx].id,
-              status: 'failed',
-              errorMessage: error.response?.data?.error?.message || error.message || '排程發文失敗',
-              publishedAt: admin.firestore.Timestamp.now(),
-              createdAt: admin.firestore.Timestamp.now(),
-            });
-          }
-        } catch (logError) {
-          console.error(`❌ 寫入失敗紀錄也失敗:`, logError.message);
-        }
+// 手動觸發版本（用於測試 & 補跑）
+exports.generateDailyMarketReport = functions
+  .runWith({ timeoutSeconds: 60, memory: '256MB' })
+  .https.onCall(async (data, context) => {
+    // 僅限管理員觸發
+    if (context.auth) {
+      const adminDoc = await db.collection('admins').doc(context.auth.uid).get();
+      if (!adminDoc.exists) {
+        throw new functions.https.HttpsError('permission-denied', '僅限管理員');
       }
     }
 
-    console.log(`🕐 Threads 排程完成，本次發文 ${publishedCount} 篇`);
+    const targetDate = data?.date || new Date().toISOString().split('T')[0];
+    return await _generateMarketReport(targetDate);
+  });
+
+// 排程版本：盤後 — 每天台股收盤後 14:30 (UTC+8 = UTC 06:30)
+exports.scheduledMarketReport = functions.pubsub
+  .schedule('30 6 * * 1-5')  // 週一到週五 UTC 06:30 = 台灣 14:30
+  .timeZone('UTC')
+  .onRun(async () => {
+    const today = _getTaiwanDate();
+    console.log(`📊 盤後排程觸發: ${today}`);
+    await _generateMarketReport(today, 'post');
     return null;
   });
+
+// 取得台灣時區日期 YYYY-MM-DD
+function _getTaiwanDate() {
+  const now = new Date();
+  const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  return tw.toISOString().split('T')[0];
+}
+
+// 核心邏輯：抓數據 → Gemini 分析 → 存 Firestore → 推播
+// type: 'pre' = 盤前, 'post' = 盤後
+async function _generateMarketReport(date, type = 'post') {
+  const docId = type === 'pre' ? `${date}-pre` : date;
+  const label = type === 'pre' ? '盤前' : '盤後';
+  console.log(`📊 開始產出${label}市場報告: ${docId}`);
+
+  // 1. 檢查是否已產出過（避免重複）
+  const reportRef = db.collection('dailyMarketReports').doc(docId);
+  const existing = await reportRef.get();
+  if (existing.exists) {
+    console.log(`⏭️ ${docId} 報告已存在，跳過`);
+    return { status: 'already_exists', date: docId };
+  }
+
+  // 2. 抓取市場數據（Yahoo Finance）
+  let marketData;
+  try {
+    const symbols = ['^TWII', 'TWD=X', '^GSPC', '^TNX', '^DJI', '^IXIC', '0050.TW'];
+    const responses = await Promise.allSettled(
+      symbols.map(symbol =>
+        axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`, {
+          params: { interval: '1d', range: '2d' },
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          timeout: 10000,
+        })
+      )
+    );
+
+    marketData = {};
+    const nameMap = {
+      '^TWII': { key: 'twii', name: '台股加權指數' },
+      'TWD=X': { key: 'usdtwd', name: '美元/台幣' },
+      '^GSPC': { key: 'sp500', name: 'S&P 500' },
+      '^TNX': { key: 'us10y', name: '美國 10 年期公債殖利率' },
+      '^DJI': { key: 'dji', name: '道瓊工業指數' },
+      '^IXIC': { key: 'nasdaq', name: 'NASDAQ' },
+      '0050.TW': { key: 'etf0050', name: '元大台灣 50 ETF' },
+    };
+
+    symbols.forEach((symbol, i) => {
+      const res = responses[i];
+      if (res.status === 'fulfilled' && res.value?.data?.chart?.result?.[0]) {
+        const result = res.value.data.chart.result[0];
+        const meta = result.meta;
+        const prev = meta.chartPreviousClose || meta.previousClose;
+        const curr = meta.regularMarketPrice;
+        const change = curr - prev;
+        const changePercent = prev ? ((change / prev) * 100) : 0;
+
+        const info = nameMap[symbol];
+        marketData[info.key] = {
+          name: info.name,
+          symbol,
+          price: parseFloat(curr?.toFixed(2)),
+          change: parseFloat(change?.toFixed(2)),
+          changePercent: parseFloat(changePercent?.toFixed(2)),
+          previousClose: parseFloat(prev?.toFixed(2)),
+        };
+      } else {
+        const info = nameMap[symbol];
+        console.warn(`⚠️ ${info.name} 數據抓取失敗`);
+      }
+    });
+
+    console.log(`✅ 市場數據抓取完成: ${Object.keys(marketData).length} 個指標`);
+  } catch (err) {
+    console.error('❌ 市場數據抓取失敗:', err.message);
+    throw new functions.https.HttpsError('internal', '市場數據抓取失敗');
+  }
+
+  // 3. Gemini AI 分析（盤前/盤後用不同 prompt）
+  let aiSummary;
+  try {
+    const geminiApiKey = functions.config().gemini?.api_key;
+    if (!geminiApiKey) throw new Error('Gemini API key 未設定');
+
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+    const dataStr = Object.values(marketData).map(d =>
+      `${d.name}(${d.symbol}): ${d.price} (${d.change >= 0 ? '+' : ''}${d.change}, ${d.change >= 0 ? '+' : ''}${d.changePercent}%)`
+    ).join('\n');
+
+    const prompt = type === 'pre'
+      ? `你是專業的台灣市場分析師。根據最新數據，產出一份簡潔的盤前市場快訊，幫助投資人在開盤前掌握國際動態。
+
+最新市場數據（含昨日美股收盤 + 台股前一交易日）：
+${dataStr}
+
+請產出以下格式的 JSON（不要 markdown code block，直接回傳 JSON）：
+
+{
+  "headline": "10-15字的一句話標題，例如：美股全面收紅 台股開盤看多",
+  "summary": "50-80字摘要，聚焦昨夜美股表現、匯率變化，以及對今日台股開盤的影響",
+  "keyPoints": [
+    "重點1：20-30字",
+    "重點2：20-30字",
+    "重點3：20-30字"
+  ],
+  "outlook": "20-30字的今日台股開盤展望",
+  "sentiment": "bullish 或 bearish 或 neutral"
+}
+
+要求：繁體中文、客觀中立、不做投資建議、語氣專業簡潔、數據要準確引用`
+      : `你是專業的台灣市場分析師。根據今日（${date}）收盤數據，產出一份簡潔的盤後市場快訊。
+
+今日收盤數據：
+${dataStr}
+
+請產出以下格式的 JSON（不要 markdown code block，直接回傳 JSON）：
+
+{
+  "headline": "10-15字的一句話標題，例如：台股量縮反彈 站穩月線",
+  "summary": "50-80字的市場重點摘要，提及主要指數表現和關鍵趨勢",
+  "keyPoints": [
+    "重點1：20-30字",
+    "重點2：20-30字",
+    "重點3：20-30字"
+  ],
+  "outlook": "20-30字的明日展望或注意事項",
+  "sentiment": "bullish 或 bearish 或 neutral"
+}
+
+要求：繁體中文、客觀中立、不做投資建議、語氣專業簡潔、數據要準確引用`;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text().trim();
+
+    // 清理可能的 markdown code block
+    const cleanJson = responseText
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
+
+    aiSummary = JSON.parse(cleanJson);
+    console.log(`✅ AI 摘要產出: ${aiSummary.headline}`);
+  } catch (err) {
+    console.error('❌ AI 摘要產出失敗:', err.message);
+    // AI 失敗時用基本摘要（根據實際漲跌幅判斷 sentiment）
+    const twii = marketData.twii;
+    const sp = marketData.sp500;
+
+    // 根據主要指數漲跌幅自動判斷 sentiment
+    const autoSentiment = (refData) => {
+      if (!refData) return 'neutral';
+      const pct = refData.changePercent;
+      if (pct >= 0.5) return 'bullish';
+      if (pct <= -0.5) return 'bearish';
+      return 'neutral';
+    };
+
+    // 根據數據生成有意義的 outlook
+    const autoOutlook = (type, twiiData, spData) => {
+      if (type === 'pre') {
+        if (!spData) return '關注國際動態對台股開盤影響。';
+        const pct = spData.changePercent;
+        if (pct >= 1) return `美股強勢收漲，台股今日開盤偏多看待。`;
+        if (pct <= -1) return `美股重挫，台股今日開盤恐有壓力。`;
+        if (pct >= 0.3) return `美股小幅走高，台股今日開盤有撐。`;
+        if (pct <= -0.3) return `美股偏弱，台股今日開盤留意賣壓。`;
+        return `美股平盤整理，台股今日開盤觀望氣氛濃。`;
+      } else {
+        if (!twiiData) return '關注明日市場動態。';
+        const pct = twiiData.changePercent;
+        const pts = Math.abs(twiiData.change).toFixed(0);
+        if (pct >= 1) return `台股大漲${pts}點，短線留意追高風險。`;
+        if (pct <= -1) return `台股重挫${pts}點，留意是否出現止穩訊號。`;
+        if (pct >= 0.3) return `台股溫和上漲，關注成交量能否配合。`;
+        if (pct <= -0.3) return `台股小幅修正，觀察支撐是否有效。`;
+        return `台股窄幅整理，靜待方向選擇。`;
+      }
+    };
+
+    const primaryRef = type === 'pre' ? sp : twii;
+
+    if (type === 'pre') {
+      aiSummary = {
+        headline: sp ? `美股${sp.change >= 0 ? '收漲' : '收跌'} 台股開盤關注` : '盤前市場數據',
+        summary: '昨夜美股及國際市場數據已更新，請查看各指數表現。',
+        keyPoints: Object.values(marketData).filter(d => ['sp500', 'dji', 'nasdaq', 'usdtwd'].includes(Object.keys(marketData).find(k => marketData[k] === d))).slice(0, 3).map(d =>
+          `${d.name} ${d.price} (${d.change >= 0 ? '+' : ''}${d.changePercent}%)`
+        ),
+        outlook: autoOutlook('pre', twii, sp),
+        sentiment: autoSentiment(primaryRef),
+      };
+    } else {
+      aiSummary = {
+        headline: twii ? `台股 ${twii.change >= 0 ? '收漲' : '收跌'} ${Math.abs(twii.change).toFixed(0)} 點` : '今日市場數據',
+        summary: '今日市場數據已更新，請查看各指數表現。',
+        keyPoints: Object.values(marketData).slice(0, 3).map(d =>
+          `${d.name} ${d.price} (${d.change >= 0 ? '+' : ''}${d.changePercent}%)`
+        ),
+        outlook: autoOutlook('post', twii, sp),
+        sentiment: autoSentiment(primaryRef),
+      };
+    }
+  }
+
+  // 4. 存入 Firestore
+  const reportData = {
+    date,
+    type, // 'pre' or 'post'
+    marketData,
+    aiSummary,
+    createdAt: admin.firestore.Timestamp.now(),
+    source: 'yahoo-finance + gemini-2.0-flash',
+  };
+
+  await reportRef.set(reportData);
+  console.log(`✅ ${label}報告已存入 Firestore: dailyMarketReports/${docId}`);
+
+  // 5. FCM 推播給所有有開啟通知的會員
+  try {
+    const tokensSnapshot = await db.collection('fcmTokens')
+      .where('enabled', '==', true)
+      .get();
+
+    if (!tokensSnapshot.empty) {
+      const messaging = admin.messaging();
+      const tokens = [];
+      tokensSnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.token) tokens.push({ uid: doc.id, token: data.token });
+      });
+
+      const twii = marketData.twii;
+      const notifTitle = type === 'pre'
+        ? `🌅 盤前快訊｜${aiSummary.headline}`
+        : `📊 盤後快訊｜${aiSummary.headline}`;
+      const notifBody = twii
+        ? `加權 ${twii.price.toLocaleString()} (${twii.change >= 0 ? '+' : ''}${twii.changePercent}%) | ${aiSummary.keyPoints?.[0] || ''}`
+        : aiSummary.summary;
+
+      let successCount = 0;
+      const sendPromises = tokens.map(async ({ uid, token }) => {
+        try {
+          await messaging.send({
+            token,
+            notification: { title: notifTitle, body: notifBody },
+            webpush: {
+              fcmOptions: { link: 'https://ultra-advisor.tw' },
+              notification: { icon: '/logo.png', badge: '/logo.png' },
+            },
+          });
+          successCount++;
+        } catch (err) {
+          if (err.code === 'messaging/registration-token-not-registered' ||
+              err.code === 'messaging/invalid-registration-token') {
+            await db.collection('fcmTokens').doc(uid).update({ enabled: false });
+          }
+        }
+      });
+
+      await Promise.allSettled(sendPromises);
+      console.log(`✅ FCM 推播完成: ${successCount}/${tokens.length} 成功`);
+    }
+  } catch (pushErr) {
+    console.error('⚠️ FCM 推播失敗（不影響報告）:', pushErr.message);
+  }
+
+  return { status: 'success', date: docId, headline: aiSummary.headline };
+}
 
 console.log('Ultra Advisor Cloud Functions loaded');

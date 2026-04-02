@@ -3,9 +3,9 @@
  * 提供離線支援、快取策略、推播通知基礎
  */
 
-const CACHE_NAME = 'ultra-advisor-v1';
-const STATIC_CACHE = 'ultra-advisor-static-v1';
-const DYNAMIC_CACHE = 'ultra-advisor-dynamic-v1';
+const CACHE_NAME = 'ultra-advisor-v2';
+const STATIC_CACHE = 'ultra-advisor-static-v2';
+const DYNAMIC_CACHE = 'ultra-advisor-dynamic-v2';
 
 // 靜態資源（App Shell）- 優先快取
 const STATIC_ASSETS = [
@@ -87,8 +87,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // 跳過不快取的請求
-  if (shouldSkipCache(url)) {
+  // 跳過不快取的請求（Cache API 僅支援 GET）
+  if (request.method !== 'GET' || shouldSkipCache(url)) {
     return;
   }
 

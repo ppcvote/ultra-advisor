@@ -1,13 +1,15 @@
 # Ultra Advisor - robots.txt
 # https://ultra-advisor.tw
 
+# === 一般搜尋引擎 ===
 User-agent: *
 Allow: /
 Allow: /calculator
 Allow: /register
 Allow: /blog
-
-# 禁止索引私密頁面
+Allow: /blog/
+Allow: /booking
+Allow: /alliance
 Disallow: /admin/
 Disallow: /signup-secret
 Disallow: /liff/
@@ -15,12 +17,75 @@ Disallow: /api/
 Disallow: /dashboard
 Disallow: /app
 
-# 禁止索引資源檔案
-Disallow: /*.json$
-Disallow: /*.js.map$
+# === Google ===
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /og-*.png
+Allow: /logo.png
+Allow: /screenshots/
+
+# === Bing ===
+User-agent: Bingbot
+Allow: /
+
+# === AI 搜尋引擎（AEO — 允許索引以獲得 AI 搜尋曝光）===
+User-agent: GPTBot
+Allow: /
+Allow: /blog/
+Allow: /calculator
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+# === 社群平台爬蟲 ===
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: Slackbot
+Allow: /
+
+# === 禁止惡意爬蟲 ===
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
 
 # Sitemap 位置
 Sitemap: https://ultra-advisor.tw/sitemap.xml
 
-# 爬蟲延遲（避免過度負載）
-Crawl-delay: 1
+# LLMs.txt（AI 搜尋引擎專用摘要）
+# https://llmstxt.org/
+# See: https://ultra-advisor.tw/llms.txt
