@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   BookOpen, ExternalLink, RefreshCw, Share2, TrendingUp,
-  Crown, Users, Wrench, ArrowRight, Newspaper, Plus, Zap
+  Crown, Users, Wrench, ArrowRight, Newspaper, Plus, Zap, Mic
 } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -285,6 +285,27 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
           <span className="text-xs text-slate-500 group-hover:text-purple-300 font-medium transition-colors">隨機一篇</span>
         </button>
       </div>
+
+      {/* ====== Repeater 會議重播器 ====== */}
+      <a href="https://repeater-app.vercel.app" target="_blank" rel="noopener noreferrer"
+        className="w-full rounded-2xl overflow-hidden relative group text-left
+                   bg-gradient-to-br from-amber-950/40 to-slate-900 border border-amber-800/30
+                   hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/10 transition-all p-5 block">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
+            <Mic size={22} className="text-amber-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-sm font-bold text-white">Repeater</span>
+              <span className="text-[9px] bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-full font-bold">NEW</span>
+            </div>
+            <p className="text-[11px] text-slate-400">會議錄音 → 逐字稿 → AI 摘要 → 簡報，一鍵交差</p>
+          </div>
+          <ArrowRight size={16} className="text-slate-600 group-hover:text-amber-400 transition-colors shrink-0" />
+        </div>
+      </a>
     </div>
   );
 };
