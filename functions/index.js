@@ -5043,10 +5043,10 @@ ${dataStr}
     "重點3：20-30字"
   ],
   "outlook": "20-30字的今日台股開盤展望",
-  "sentiment": "bullish 或 bearish 或 neutral"
+  "sentiment": "bullish 或 bearish 或 neutral（判斷規則：主要指數漲幅 ≥0.3% 為 bullish，跌幅 ≥0.3% 為 bearish，介於 -0.3%~+0.3% 才是 neutral）"
 }
 
-要求：繁體中文、客觀中立、不做投資建議、語氣專業簡潔、數據要準確引用`
+要求：繁體中文、不做投資建議、語氣專業簡潔、數據要準確引用。sentiment 必須根據實際漲跌幅判斷，不要因為追求中立而忽略明顯的市場方向。`
       : `你是專業的台灣市場分析師。根據今日（${date}）收盤數據，產出一份簡潔的盤後市場快訊。
 
 今日收盤數據：
@@ -5063,10 +5063,10 @@ ${dataStr}
     "重點3：20-30字"
   ],
   "outlook": "20-30字的明日展望或注意事項",
-  "sentiment": "bullish 或 bearish 或 neutral"
+  "sentiment": "bullish 或 bearish 或 neutral（判斷規則：台股漲幅 ≥0.3% 為 bullish，跌幅 ≥0.3% 為 bearish，介於 -0.3%~+0.3% 才是 neutral）"
 }
 
-要求：繁體中文、客觀中立、不做投資建議、語氣專業簡潔、數據要準確引用`;
+要求：繁體中文、不做投資建議、語氣專業簡潔、數據要準確引用。sentiment 必須根據實際漲跌幅判斷，不要因為追求中立而忽略明顯的市場方向。`;
 
     const result = await model.generateContent(prompt);
     const responseText = result.response.text().trim();
@@ -5078,7 +5078,25 @@ ${dataStr}
       .trim();
 
     aiSummary = JSON.parse(cleanJson);
-    console.log(`✅ AI 摘要產出: ${aiSummary.headline}`);
+
+    // Post-validation: 如果 Gemini 給的 sentiment 跟實際數據明顯矛盾，直接覆蓋
+    const primaryData = type === 'pre' ? marketData.sp500 : marketData.twii;
+    if (primaryData) {
+      const pct = primaryData.changePercent;
+      if (pct >= 1.0 && aiSummary.sentiment !== 'bullish') {
+        console.log(`⚠️ Gemini 說 ${aiSummary.sentiment} 但主要指數漲 ${pct}%，覆蓋為 bullish`);
+        aiSummary.sentiment = 'bullish';
+      } else if (pct <= -1.0 && aiSummary.sentiment !== 'bearish') {
+        console.log(`⚠️ Gemini 說 ${aiSummary.sentiment} 但主要指數跌 ${pct}%，覆蓋為 bearish`);
+        aiSummary.sentiment = 'bearish';
+      } else if (pct >= 0.3 && aiSummary.sentiment === 'neutral') {
+        aiSummary.sentiment = 'bullish';
+      } else if (pct <= -0.3 && aiSummary.sentiment === 'neutral') {
+        aiSummary.sentiment = 'bearish';
+      }
+    }
+
+    console.log(`✅ AI 摘要產出: ${aiSummary.headline} | sentiment: ${aiSummary.sentiment}`);
   } catch (err) {
     console.error('❌ AI 摘要產出失敗:', err.message);
     // AI 失敗時用基本摘要（根據實際漲跌幅判斷 sentiment）
@@ -5089,8 +5107,8 @@ ${dataStr}
     const autoSentiment = (refData) => {
       if (!refData) return 'neutral';
       const pct = refData.changePercent;
-      if (pct >= 0.5) return 'bullish';
-      if (pct <= -0.5) return 'bearish';
+      if (pct >= 0.3) return 'bullish';
+      if (pct <= -0.3) return 'bearish';
       return 'neutral';
     };
 
