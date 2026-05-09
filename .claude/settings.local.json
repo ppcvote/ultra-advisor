@@ -10,7 +10,7 @@
       "Bash(node initPointsRules.js:*)",
       "Read(//c/Users/User/**)",
       "Read(//c/Users/User/Downloads/**)",
-      "Bash(GOOGLE_APPLICATION_CREDENTIALS=\"/c/Users/User/financial-planner/admin/src/scripts/serviceAccountKey.json\" node:*)",
+      "Bash(GOOGLE_APPLICATION_CREDENTIALS=\"/c/Users/User/UltraAdvisor/admin/src/scripts/serviceAccountKey.json\" node:*)",
       "Bash(firebase functions:log:*)",
       "Bash(npm run dev:*)",
       "Bash(npx tsc:*)",
@@ -21,10 +21,18 @@
       "Bash(grep:*)",
       "Bash(cmd.exe /c \"dir /s C:\\\\Users\\\\User\\\\AppData\\\\Local\\\\Temp 2>nul\")",
       "Bash(cmd.exe /c \"dir /s C:\\\\Users\\\\User\\\\.nuget 2>nul\")",
-      "Bash(git -C c:/Users/User/financial-planner commit -m \"$\\(cat <<''EOF''\nfeat: 新增文章 32 - 心態，決定你在這行能走多遠\n\n4THINK 風格：精煉、金句、好掃讀\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C c:/Users/User/UltraAdvisor commit -m \"$\\(cat <<''EOF''\nfeat: 新增文章 32 - 心態，決定你在這行能走多遠\n\n4THINK 風格：精煉、金句、好掃讀\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(timeout 45 npx vercel:*)",
       "Bash(timeout 60 npx vercel:*)",
-      "Bash(wmic logicaldisk where \"DeviceID=''C:''\" get Size,FreeSpace /format:value)"
+      "Bash(wmic logicaldisk where \"DeviceID=''C:''\" get Size,FreeSpace /format:value)",
+      "Bash(powershell -Command:*)",
+      "WebFetch(domain:ultralab.tw)",
+      "Bash(taskkill /PID 158308 /F)",
+      "Bash(taskkill //PID 158308 //F)",
+      "Bash(tail -30 /c/Users/User/UltraTrader/data/logs/*.log)",
+      "Bash(ls -t /c/Users/User/UltraTrader/data/logs/*.log)",
+      "Bash(python scripts/start.py --mode live --risk crisis --no-browser)",
+      "Bash(python scripts/start.py --mode live --no-browser)"
     ]
   }
 }
