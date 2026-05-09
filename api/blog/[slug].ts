@@ -66,6 +66,8 @@ const articleMetadata: Record<string, ArticleMeta> = {
   'education-worker-retirement-risk-2026': { title: '教授、老師注意：三個正在侵蝕你退休金的隱形風險', category: 'retirement', description: '少子化、AI 浪潮、年金改革三重衝擊，教育工作者的退休金正面臨前所未有的壓力。公立 vs 私立差距高達 800 萬，你準備好了嗎？', publishDate: '2026-02-27' },
   'ai-agent-finance-disruption-2026': { title: 'AI Agent 來了：金融業正在發生的五件事，你準備好了嗎？', category: 'investment', description: 'Morgan Stanley 營收創新高卻裁 2,500 人、保險理賠 AI 處理只要 7.5 天、財務顧問公司股價一天暴跌 8%。AI Agent 對金融業的衝擊全面解析。', publishDate: '2026-03-08' },
   'market-crash-buying-opportunity-2026': { title: '你錯過了 2020、2022、2025 的低點？這次回檔，別再只是看著', category: 'investment', description: '每次股市崩盤都是財富重新分配的起點。從新冠低點到關稅暴跌，回顧三次危機入市的報酬，教你建立一套不再錯過的系統。', publishDate: '2026-03-28' },
+  'tw-stock-42k-retirement-savings-target-2026': { title: '台股 4 萬點，45 歲想 55 歲退休到底該存多少？把通膨、勞保、紙上富貴一起算進去', category: 'retirement', description: '台股 5 月單月漲 22.7%、創史上最大單日漲點。Google 搜尋「退休」瞬間爆量。但真正算清楚才知道：你看到的數字漲，跟你能不能 55 歲退休，中間還隔著三道很實際的門檻。', publishDate: '2026-05-09' },
+  'three-pension-systems-2026-may-update': { title: '勞保 +6.46%、國保保底 5,000、勞退專戶——65 歲那天三筆退休金到底月領多少？', category: 'retirement', description: '5 月勞保年金調升 6.46%、國民年金保底 5,000、勞退新制請領年齡升至 65 歲。三套制度同步動，但合在一起算，每個人領的數字差很多。本文把三筆放到同一張試算表，一個情境一個情境算給你看。', publishDate: '2026-05-09' },
 };
 
 // 分類對應的 OG 圖片
