@@ -116,6 +116,10 @@ import { article as article61 } from './articles/61-education-worker-retirement-
 import { article as article62 } from './articles/62-ai-agent-finance-disruption-2026';
 // 文章 63：錯過崩盤低點？下次回檔這樣佈局
 import { article as article63 } from './articles/63-market-crash-buying-opportunity-2026';
+// 文章 64：台股 4 萬點，45 歲想 55 歲退休該存多少（2026 熱搜切勢稿）
+import { article as article64 } from './articles/64-tw-stock-42k-retirement-savings-target-2026';
+// 文章 65：勞保 +6.46% / 國保保底 5,000 / 勞退新制 — 三筆退休金一次試算
+import { article as article65 } from './articles/65-three-pension-systems-2026-may-update';
 
 // ============ 匯出文章陣列 ============
 export const blogArticles: BlogArticle[] = [
@@ -182,6 +186,8 @@ export const blogArticles: BlogArticle[] = [
   article61,
   article62,
   article63,
+  article64,
+  article65,
 ];
 
 // ============ 匯出輔助函數 ============
