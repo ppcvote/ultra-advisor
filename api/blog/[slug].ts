@@ -68,6 +68,7 @@ const articleMetadata: Record<string, ArticleMeta> = {
   'market-crash-buying-opportunity-2026': { title: '你錯過了 2020、2022、2025 的低點？這次回檔，別再只是看著', category: 'investment', description: '每次股市崩盤都是財富重新分配的起點。從新冠低點到關稅暴跌，回顧三次危機入市的報酬，教你建立一套不再錯過的系統。', publishDate: '2026-03-28' },
   'tw-stock-42k-retirement-savings-target-2026': { title: '台股 4 萬點，45 歲想 55 歲退休到底該存多少？把通膨、勞保、紙上富貴一起算進去', category: 'retirement', description: '台股 5 月單月漲 22.7%、創史上最大單日漲點。Google 搜尋「退休」瞬間爆量。但真正算清楚才知道：你看到的數字漲，跟你能不能 55 歲退休，中間還隔著三道很實際的門檻。', publishDate: '2026-05-09' },
   'three-pension-systems-2026-may-update': { title: '勞保 +6.46%、國保保底 5,000、勞退專戶——65 歲那天三筆退休金到底月領多少？', category: 'retirement', description: '5 月勞保年金調升 6.46%、國民年金保底 5,000、勞退新制請領年齡升至 65 歲。三套制度同步動，但合在一起算，每個人領的數字差很多。本文把三筆放到同一張試算表，一個情境一個情境算給你看。', publishDate: '2026-05-09' },
+  '2027-child-subsidy-three-choices': { title: '2027 起政府給孩子 158 萬：花掉、存定存、規劃，十八年後差距 200 萬【顧問實算】', category: 'investment', description: '0-18 歲成長津貼最快 2027 上路。理財顧問用線圖算給您看：158 萬政府津貼，花掉/存定存/做投資型保單規劃，十八年後差距高達 200 萬，並同時完整保障孩子健康。', publishDate: '2026-06-05' },
 };
 
 // 分類對應的 OG 圖片

@@ -120,6 +120,8 @@ import { article as article63 } from './articles/63-market-crash-buying-opportun
 import { article as article64 } from './articles/64-tw-stock-42k-retirement-savings-target-2026';
 // 文章 65：勞保 +6.46% / 國保保底 5,000 / 勞退新制 — 三筆退休金一次試算
 import { article as article65 } from './articles/65-three-pension-systems-2026-may-update';
+// 文章 66：2027 成長津貼 158 萬，三種選擇 18 年差距 200 萬（顧問實算）
+import { article as article66 } from './articles/66-2027-child-subsidy-three-choices';
 
 // ============ 匯出文章陣列 ============
 export const blogArticles: BlogArticle[] = [
@@ -188,6 +190,7 @@ export const blogArticles: BlogArticle[] = [
   article63,
   article64,
   article65,
+  article66,
 ];
 
 // ============ 匯出輔助函數 ============
