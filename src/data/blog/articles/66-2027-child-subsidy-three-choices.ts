@@ -3,7 +3,7 @@ import { BlogArticle } from '../types';
 export const article: BlogArticle = {
   id: '66',
   slug: '2027-child-subsidy-three-choices',
-  title: '2027 起政府給孩子 158 萬：花掉、存定存、規劃，18 年後差 200 萬',
+  title: '2027 起政府給孩子 158 萬：花掉、存定存、規劃，18 年後差近 200 萬',
   excerpt: '0-18 歲成長津貼 2027 上路，單一胎家庭從政府手上會拿到 158 萬。三種用法的差距，比多數人想像中大。',
   category: 'investment',
   tags: ['懶人包', '育兒津貼', '成長津貼', '生育津貼', '兒童保單', '投資型保單', '教育金規劃', '2027 新政'],
@@ -11,8 +11,8 @@ export const article: BlogArticle = {
   publishDate: '2026-06-05',
   author: 'Ultra Advisor 理財團隊',
   featured: true,
-  metaTitle: '2027 成長津貼 158 萬怎麼用？18 年差 200 萬｜Ultra Advisor',
-  metaDescription: '0-18 歲成長津貼 2027 上路。理財顧問用一張圖比給您看：158 萬政府津貼，三種用法 18 年後差距高達 200 萬。',
+  metaTitle: '2027 成長津貼 158 萬怎麼用？18 年差近 200 萬｜Ultra Advisor',
+  metaDescription: '0-18 歲成長津貼 2027 上路。理財顧問用一張圖比給您看：158 萬政府津貼，三種用法 18 年後差距高達近 200 萬。',
   content: `
     <article class="prose prose-invert max-w-none">
 
@@ -38,15 +38,24 @@ export const article: BlogArticle = {
             <span class="text-yellow-300 font-bold text-lg">14 萬</span>
           </div>
           <div class="flex items-baseline justify-between border-b border-slate-800 pb-2">
-            <span class="text-slate-300 text-sm">0-6 歲 · 育兒津貼 + 成長津貼 每月 1 萬</span>
+            <span class="text-slate-300 text-sm">0-6 歲每月 1 萬 · <span class="text-slate-500 text-xs">育兒津貼 5K(現行)+ 成長津貼 5K(新)</span></span>
             <span class="text-yellow-300 font-bold text-lg">72 萬</span>
           </div>
           <div class="flex items-baseline justify-between">
-            <span class="text-slate-300 text-sm">6-18 歲 · 成長津貼 每月 5 千</span>
+            <span class="text-slate-300 text-sm">6-18 歲每月 5K · <span class="text-slate-500 text-xs">2.5K 現金 + 2.5K 強制存 TISA</span></span>
             <span class="text-yellow-300 font-bold text-lg">72 萬</span>
           </div>
         </div>
         <p class="text-xs text-slate-500 mt-4 mb-0">📌 以第 1 胎、設籍台北市試算。不同縣市地方加碼差最大 8 萬。</p>
+      </div>
+
+      <!-- Glossary callout -->
+      <div class="bg-slate-900/30 border border-slate-700/40 rounded-xl p-4 my-6 text-xs text-slate-400 space-y-2">
+        <div class="text-slate-300 font-bold tracking-widest text-xs mb-1">💡 名詞快速解釋(讀下去前先看)</div>
+        <div><strong class="text-slate-300">育兒津貼</strong> · 現行衛福部補助,5,000/月,父母親自照顧可領</div>
+        <div><strong class="text-slate-300">成長津貼</strong> · 2027 新政策,5,000/月,不排富、普發。0-6 歲全額現金,6-18 歲拆半(現金 + TISA)</div>
+        <div><strong class="text-slate-300">TISA 兒少帳戶</strong> · 政府代管的投資專戶,保底 2 年期定存利率(目前約 2%),18 歲解鎖,限教育/就業/創業用</div>
+        <div><strong class="text-slate-300">投資型主約 + 附約</strong> · 月繳保單,主約做投資累積、附約做健康保障(兒童附約多需附加於主約)</div>
       </div>
 
       <!-- Caution callout -->
@@ -233,6 +242,22 @@ export const article: BlogArticle = {
           <div class="text-sm text-slate-300 leading-relaxed">教育金充足<br/><strong class="text-yellow-200">+ 18 年完整全險</strong><br/>孩子不背學貸、您不動退休金</div>
         </div>
       </div>
+
+      <!-- Assumptions collapsible (verification anchor) -->
+      <details class="my-6 group">
+        <summary class="cursor-pointer text-xs text-slate-400 hover:text-slate-300 transition list-none px-2">
+          💡 試算用了哪些假設?(點開驗證)
+          <span class="float-right group-open:rotate-180 transition inline-block">▾</span>
+        </summary>
+        <div class="bg-slate-900/30 border border-slate-700 rounded-xl p-4 mt-2 text-xs text-slate-400 space-y-2">
+          <div><strong class="text-slate-300">銀行定存 1.5%</strong> · 2026 年 5 月主要銀行 1 年期定存平均</div>
+          <div><strong class="text-slate-300">投資型保單淨報酬 5%</strong> · 已扣除約 15% 附約成本與保單管理費,假設標的為長期股債平衡(全球股 60% / 全球債 40%)</div>
+          <div><strong class="text-slate-300">TISA 保底 2%</strong> · 政府草案的「2 年期定存利率」基準</div>
+          <div><strong class="text-slate-300">通膨 2%</strong> · 主計總處長期目標。B 方案 187 萬 ÷ (1.02)^18 ≈ 131 萬實質購買力</div>
+          <div><strong class="text-slate-300">試算對象</strong> · 第 1 胎、設籍台北市(地方加碼 4 萬)。其他縣市與胎次請參考來源中的「各縣市生育津貼」</div>
+          <div class="text-slate-500 pt-2 border-t border-slate-800">數字反推:C = 投資型主約 194 萬(5% 複利)+ 強制 TISA 40 萬(2% 複利)= 234 萬 / B = 銀行 147 萬 + TISA 40 萬 = 187 萬 / A = 0 + TISA 40 萬 = 40 萬</div>
+        </div>
+      </details>
 
       <!-- SCREEN 4: IMPACT TABLE -->
       <h2 id="screen-impact">壓力會掉到誰身上、什麼時候</h2>
