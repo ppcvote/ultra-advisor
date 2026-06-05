@@ -144,75 +144,122 @@ export const article: BlogArticle = {
         <li><strong>選擇 C · 投資型主約 + 附約全險規劃</strong>：用月繳投資型保單承接這筆現金流，假設淨報酬 5%（已扣除附約成本與保單費用）</li>
       </ul>
 
-      <!-- Chart 2: Three scenarios -->
+      <!-- Chart 2: Three scenarios — area chart with reference line -->
       <div class="bg-slate-900/50 border border-slate-700 rounded-2xl p-4 my-8">
-        <svg viewBox="0 0 800 440" xmlns="http://www.w3.org/2000/svg" class="w-full h-auto">
-          <text x="400" y="28" text-anchor="middle" fill="#e2e8f0" font-size="16" font-weight="bold">圖二　三種選擇 18 年後的累積資產（萬元）</text>
+        <svg viewBox="0 0 800 510" xmlns="http://www.w3.org/2000/svg" class="w-full h-auto">
+          <defs>
+            <linearGradient id="ch2GradA" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#94a3b8" stop-opacity="0.5"/>
+              <stop offset="100%" stop-color="#94a3b8" stop-opacity="0.04"/>
+            </linearGradient>
+            <linearGradient id="ch2GradB" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.5"/>
+              <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.04"/>
+            </linearGradient>
+            <linearGradient id="ch2GradC" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.55"/>
+              <stop offset="100%" stop-color="#fbbf24" stop-opacity="0.05"/>
+            </linearGradient>
+          </defs>
 
-          <!-- Grid lines (every 50 萬 = 40px) -->
-          <line x1="80" y1="40" x2="760" y2="40" stroke="#1e293b" stroke-width="1"/>
-          <line x1="80" y1="80" x2="760" y2="80" stroke="#1e293b" stroke-width="1"/>
-          <line x1="80" y1="120" x2="760" y2="120" stroke="#1e293b" stroke-width="1"/>
-          <line x1="80" y1="160" x2="760" y2="160" stroke="#1e293b" stroke-width="1"/>
-          <line x1="80" y1="200" x2="760" y2="200" stroke="#1e293b" stroke-width="1"/>
-          <line x1="80" y1="240" x2="760" y2="240" stroke="#1e293b" stroke-width="1"/>
-          <line x1="80" y1="280" x2="760" y2="280" stroke="#1e293b" stroke-width="1"/>
-          <line x1="80" y1="320" x2="760" y2="320" stroke="#1e293b" stroke-width="1"/>
-          <line x1="80" y1="360" x2="760" y2="360" stroke="#475569" stroke-width="1.5"/>
+          <text x="400" y="32" text-anchor="middle" fill="#f1f5f9" font-size="19" font-weight="bold">圖二　三種選擇,18 年後資產差距</text>
+          <text x="400" y="54" text-anchor="middle" fill="#94a3b8" font-size="13">縱軸:累積資產(萬元)　橫軸:孩子年齡(0-18 歲)</text>
 
-          <!-- Y axis labels (0 to 250 萬, step 50 萬) -->
-          <text x="70" y="364" text-anchor="end" fill="#94a3b8" font-size="11">0</text>
-          <text x="70" y="324" text-anchor="end" fill="#94a3b8" font-size="11">25</text>
-          <text x="70" y="284" text-anchor="end" fill="#94a3b8" font-size="11">50</text>
-          <text x="70" y="244" text-anchor="end" fill="#94a3b8" font-size="11">75</text>
-          <text x="70" y="204" text-anchor="end" fill="#94a3b8" font-size="11">100</text>
-          <text x="70" y="164" text-anchor="end" fill="#94a3b8" font-size="11">125</text>
-          <text x="70" y="124" text-anchor="end" fill="#94a3b8" font-size="11">150</text>
-          <text x="70" y="84" text-anchor="end" fill="#94a3b8" font-size="11">200</text>
-          <text x="70" y="44" text-anchor="end" fill="#94a3b8" font-size="11">250</text>
+          <!-- Grid -->
+          <line x1="80" y1="80" x2="700" y2="80" stroke="#1e293b" stroke-width="1"/>
+          <line x1="80" y1="144" x2="700" y2="144" stroke="#1e293b" stroke-width="1"/>
+          <line x1="80" y1="208" x2="700" y2="208" stroke="#1e293b" stroke-width="1"/>
+          <line x1="80" y1="272" x2="700" y2="272" stroke="#1e293b" stroke-width="1"/>
+          <line x1="80" y1="336" x2="700" y2="336" stroke="#1e293b" stroke-width="1"/>
+          <line x1="80" y1="400" x2="700" y2="400" stroke="#475569" stroke-width="2"/>
+
+          <!-- Y axis labels -->
+          <text x="68" y="404" text-anchor="end" fill="#cbd5e1" font-size="13" font-weight="500">0</text>
+          <text x="68" y="340" text-anchor="end" fill="#cbd5e1" font-size="13" font-weight="500">50</text>
+          <text x="68" y="276" text-anchor="end" fill="#cbd5e1" font-size="13" font-weight="500">100</text>
+          <text x="68" y="212" text-anchor="end" fill="#cbd5e1" font-size="13" font-weight="500">150</text>
+          <text x="68" y="148" text-anchor="end" fill="#cbd5e1" font-size="13" font-weight="500">200</text>
+          <text x="68" y="84" text-anchor="end" fill="#cbd5e1" font-size="13" font-weight="500">250</text>
 
           <!-- X axis labels -->
-          <text x="80" y="380" text-anchor="middle" fill="#94a3b8" font-size="11">0</text>
-          <text x="193" y="380" text-anchor="middle" fill="#94a3b8" font-size="11">3</text>
-          <text x="307" y="380" text-anchor="middle" fill="#94a3b8" font-size="11">6</text>
-          <text x="420" y="380" text-anchor="middle" fill="#94a3b8" font-size="11">9</text>
-          <text x="533" y="380" text-anchor="middle" fill="#94a3b8" font-size="11">12</text>
-          <text x="647" y="380" text-anchor="middle" fill="#94a3b8" font-size="11">15</text>
-          <text x="760" y="380" text-anchor="middle" fill="#94a3b8" font-size="11">18 歲</text>
+          <text x="80" y="425" text-anchor="middle" fill="#cbd5e1" font-size="13" font-weight="500">0</text>
+          <text x="183" y="425" text-anchor="middle" fill="#cbd5e1" font-size="13" font-weight="500">3</text>
+          <text x="287" y="425" text-anchor="middle" fill="#cbd5e1" font-size="13" font-weight="500">6</text>
+          <text x="390" y="425" text-anchor="middle" fill="#cbd5e1" font-size="13" font-weight="500">9</text>
+          <text x="493" y="425" text-anchor="middle" fill="#cbd5e1" font-size="13" font-weight="500">12</text>
+          <text x="597" y="425" text-anchor="middle" fill="#cbd5e1" font-size="13" font-weight="500">15</text>
+          <text x="700" y="425" text-anchor="middle" fill="#cbd5e1" font-size="13" font-weight="500">18 歲</text>
 
-          <!-- Scenario A: 花掉 (only TISA) - grey/red dashed -->
-          <polyline points="80,360 118,360 156,360 193,360 231,360 269,360 307,355 344,350 382,345 420,341 458,336 496,331 533,327 571,322 609,316 647,312 684,307 722,303 760,294"
-            fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="6,4"/>
+          <!-- Area C (gold, drawn first/back) -->
+          <path d="M 80,400 L 80,372 L 114,357 L 149,342 L 183,326 L 218,309 L 252,292 L 287,279 L 321,266 L 356,253 L 390,239 L 425,224 L 459,209 L 493,193 L 528,176 L 562,159 L 597,141 L 631,122 L 666,102 L 700,89 L 700,400 Z" fill="url(#ch2GradC)"/>
 
-          <!-- Scenario B: 定存 (1.5%) - blue -->
-          <polyline points="80,318 118,299 156,279 193,260 231,239 269,217 307,205 344,194 382,180 420,165 458,151 496,135 533,120 571,103 609,87 647,71 684,55 722,41 760,33"
-            fill="none" stroke="#60a5fa" stroke-width="2.5"/>
+          <!-- Area B -->
+          <path d="M 80,400 L 80,367 L 114,351 L 149,335 L 183,318 L 218,302 L 252,285 L 287,276 L 321,266 L 356,256 L 390,247 L 425,237 L 459,226 L 493,216 L 528,205 L 562,194 L 597,184 L 631,172 L 666,161 L 700,157 L 700,400 Z" fill="url(#ch2GradB)"/>
 
-          <!-- Scenario C: 規劃 (5% net) + TISA - gold -->
-          <polyline points="80,325 118,306 156,288 193,268 231,247 269,225 307,210 344,193 382,176 420,158 458,140 496,121 533,102 571,82 609,61 647,42 684,28 722,9 760,-12"
-            fill="none" stroke="#fbbf24" stroke-width="3.5"/>
+          <!-- Area A -->
+          <path d="M 80,400 L 80,400 L 114,400 L 149,400 L 183,400 L 218,400 L 252,400 L 287,396 L 321,392 L 356,388 L 390,384 L 425,380 L 459,376 L 493,371 L 528,367 L 562,363 L 597,358 L 631,353 L 666,349 L 700,348 L 700,400 Z" fill="url(#ch2GradA)"/>
 
-          <!-- Cap the gold line at top -->
-          <line x1="730" y1="0" x2="760" y2="0" stroke="#0f172a" stroke-width="8"/>
+          <!-- Reference line: 私立大學 4 年費用 = 120 萬 (y = 400 - 1.28*120 = 246) -->
+          <line x1="80" y1="246" x2="700" y2="246" stroke="#ef4444" stroke-dasharray="6,4" stroke-width="2" opacity="0.75"/>
+          <rect x="430" y="226" width="270" height="20" fill="#0f172a" opacity="0.9" rx="3"/>
+          <text x="695" y="240" text-anchor="end" fill="#fca5a5" font-size="12" font-weight="600">⊢ 私立大學 4 年費用 ≈ 120 萬</text>
 
-          <!-- End point markers -->
-          <circle cx="760" cy="294" r="5" fill="#94a3b8"/>
-          <circle cx="760" cy="33" r="5" fill="#60a5fa"/>
-          <circle cx="760" cy="9" r="6" fill="#fbbf24"/>
+          <!-- Lines on top -->
+          <polyline points="80,400 114,400 149,400 183,400 218,400 252,400 287,396 321,392 356,388 390,384 425,380 459,376 493,371 528,367 562,363 597,358 631,353 666,349 700,348" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="6,4"/>
+          <polyline points="80,367 114,351 149,335 183,318 218,302 252,285 287,276 321,266 356,256 390,247 425,237 459,226 493,216 528,205 562,194 597,184 631,172 666,161 700,157" fill="none" stroke="#60a5fa" stroke-width="3"/>
+          <polyline points="80,372 114,357 149,342 183,326 218,309 252,292 287,279 321,266 356,253 390,239 425,224 459,209 493,193 528,176 562,159 597,141 631,122 666,102 700,89" fill="none" stroke="#fbbf24" stroke-width="4"/>
 
-          <!-- End labels (right of chart) -->
-          <text x="785" y="298" text-anchor="end" fill="#94a3b8" font-size="13" font-weight="bold">A · 41 萬</text>
-          <text x="785" y="37" text-anchor="end" fill="#60a5fa" font-size="13" font-weight="bold">B · 190 萬</text>
-          <text x="785" y="13" text-anchor="end" fill="#fbbf24" font-size="13" font-weight="bold">C · 243 萬</text>
+          <!-- End-point bubbles + labels -->
+          <circle cx="700" cy="348" r="22" fill="#94a3b8" opacity="0.25"/>
+          <circle cx="700" cy="348" r="7" fill="#94a3b8"/>
+          <text x="728" y="343" fill="#e2e8f0" font-size="15" font-weight="bold">A · 41 萬</text>
+          <text x="728" y="361" fill="#94a3b8" font-size="11">教育金缺口 → 學貸 / 動退休金</text>
 
-          <!-- Legend -->
-          <rect x="100" y="405" width="20" height="3" fill="#94a3b8"/>
-          <text x="128" y="411" fill="#cbd5e1" font-size="12">A 花掉（剩 TISA）</text>
-          <rect x="300" y="405" width="20" height="3" fill="#60a5fa"/>
-          <text x="328" y="411" fill="#cbd5e1" font-size="12">B 銀行定存 1.5%</text>
-          <rect x="500" y="405" width="20" height="3.5" fill="#fbbf24"/>
-          <text x="528" y="411" fill="#cbd5e1" font-size="12">C 投資型 + 全險（淨 5%）</text>
+          <circle cx="700" cy="157" r="22" fill="#60a5fa" opacity="0.25"/>
+          <circle cx="700" cy="157" r="7" fill="#60a5fa"/>
+          <text x="728" y="152" fill="#dbeafe" font-size="15" font-weight="bold">B · 190 萬</text>
+          <text x="728" y="170" fill="#94a3b8" font-size="11">通膨後實質購買力 ≈ 133 萬</text>
+
+          <circle cx="700" cy="89" r="24" fill="#fbbf24" opacity="0.3"/>
+          <circle cx="700" cy="89" r="8" fill="#fbbf24"/>
+          <text x="728" y="84" fill="#fef3c7" font-size="15" font-weight="bold">C · 243 萬</text>
+          <text x="728" y="102" fill="#fde68a" font-size="11">+ 18 年完整全險保障</text>
+
+          <!-- Bottom legend -->
+          <rect x="100" y="465" width="28" height="3.5" fill="#94a3b8"/>
+          <text x="136" y="472" fill="#cbd5e1" font-size="13">A 花掉</text>
+          <rect x="220" y="465" width="28" height="3.5" fill="#60a5fa"/>
+          <text x="256" y="472" fill="#cbd5e1" font-size="13">B 銀行定存 1.5%</text>
+          <rect x="410" y="465" width="28" height="4" fill="#fbbf24"/>
+          <text x="446" y="472" fill="#cbd5e1" font-size="13">C 投資型 + 全險(淨 5%)</text>
+          <line x1="610" y1="468" x2="638" y2="468" stroke="#ef4444" stroke-dasharray="4,3" stroke-width="2"/>
+          <text x="646" y="472" fill="#fca5a5" font-size="13">教育金基準線</text>
+
+          <!-- Bottom impact line -->
+          <text x="400" y="498" text-anchor="middle" fill="#fde68a" font-size="14" font-weight="bold">C 與 A 差距 = 202 萬 + 18 年保障　|　C 比 B 多 53 萬 + 18 年保障</text>
         </svg>
+      </div>
+
+      <!-- 3-card comparison panel (big bold visual contrast) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
+        <div class="bg-slate-900/60 border-2 border-slate-700 rounded-2xl p-5 text-center">
+          <div class="text-slate-400 text-xs font-bold tracking-widest mb-2">選擇 A · 花掉</div>
+          <div class="text-4xl font-black text-slate-300 mb-1">41 <span class="text-lg text-slate-500">萬</span></div>
+          <div class="text-3xl mb-2">❌</div>
+          <div class="text-sm text-slate-400 leading-relaxed">教育金不足<br/>孩子背學貸 / 動您退休金<br/>過程中無保障</div>
+        </div>
+        <div class="bg-blue-950/40 border-2 border-blue-700/50 rounded-2xl p-5 text-center">
+          <div class="text-blue-400 text-xs font-bold tracking-widest mb-2">選擇 B · 銀行定存</div>
+          <div class="text-4xl font-black text-blue-300 mb-1">190 <span class="text-lg text-blue-500">萬</span></div>
+          <div class="text-3xl mb-2">🟡</div>
+          <div class="text-sm text-slate-400 leading-relaxed">通膨吃掉購買力<br/>實質約 133 萬<br/>過程中無保障</div>
+        </div>
+        <div class="bg-yellow-950/40 border-2 border-yellow-600/60 rounded-2xl p-5 text-center shadow-xl shadow-yellow-900/20">
+          <div class="text-yellow-400 text-xs font-bold tracking-widest mb-2">選擇 C · 規劃</div>
+          <div class="text-4xl font-black text-yellow-300 mb-1">243 <span class="text-lg text-yellow-500">萬</span></div>
+          <div class="text-3xl mb-2">✅</div>
+          <div class="text-sm text-slate-300 leading-relaxed">教育金充足<br/><strong class="text-yellow-200">+ 18 年完整全險</strong><br/>孩子不背學貸、您不動退休金</div>
+        </div>
       </div>
 
       <div class="bg-green-900/30 border border-green-500/30 rounded-2xl p-6 my-8">
