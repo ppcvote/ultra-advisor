@@ -3,342 +3,317 @@ import { BlogArticle } from '../types';
 export const article: BlogArticle = {
   id: '65',
   slug: 'three-pension-systems-2026-may-update',
-  title: '勞保 +6.46%、國保保底 5,000、勞退專戶——65 歲那天三筆退休金到底月領多少？',
-  excerpt: '5 月勞保年金調升 6.46%、國民年金保底 5,000、勞退新制請領年齡升至 65 歲。三套制度同步動，但合在一起算，每個人領的數字差很多。本文把三筆放到同一張試算表，一個情境一個情境算給你看。',
+  title: '55 歲想退休？政府幫你過 0 年。勞保＋勞退＋國保三筆 65 歲月領 21K【2026 新制】',
+  excerpt: '2026 年 5 月勞保 +6.46%、國保保底 5K、勞退請領升至 65 歲。中產家庭三筆合計月領 21K,但 55-65 那 10 年政府給 0,要全靠自備。',
   category: 'retirement',
-  tags: ['勞保', '勞退', '國民年金', '退休金', '2026 新制', '退休試算', '所得替代率'],
-  readTime: 14,
+  tags: ['懶人包', '勞保', '勞退', '國民年金', '退休金', '2026 新制', '退休試算', '所得替代率'],
+  readTime: 5,
   publishDate: '2026-05-09',
-  author: 'Ultra Advisor',
-  featured: false,
-  metaTitle: '勞保 +6.46% / 國保保底 5,000 / 勞退專戶：三筆退休金月領多少【2026】',
-  metaDescription: '2026 年 5 月勞保調漲、國保修法、勞退請領年齡新制三軌齊發。把勞保＋勞退＋國保放到同一張試算表，3 種薪資級距 × 3 種年資情境逐一計算，含工具與雷區提醒。',
+  author: 'Ultra Advisor 理財團隊',
+  featured: true,
+  metaTitle: '三筆退休金月領 21K? 勞保 +6.46% / 國保 5K / 勞退 65 歲【2026】｜Ultra Advisor',
+  metaDescription: '2026 年 5 月三軌新制同步動。把勞保 + 勞退 + 國保放到同一張試算表,中產家庭 65 歲後月領 21K,中間 55-65 那 10 年政府給 0。',
   content: `
     <article class="prose prose-invert max-w-none">
-      <p class="lead text-xl text-slate-300 mb-8">
-        2026 年 5 月有三件事同時動了：<br/>
-        勞保年金調漲 <strong class="text-emerald-400">6.46%</strong>，78 萬人受惠，月領約 <strong class="text-emerald-400">22,868 元</strong>。<br/>
-        國民年金「保底 5,000」修法上路，未繳保費或年資短的人也保證 5,000 元起跳。<br/>
-        勞退新制請領年齡 51 年次後出生者，<strong class="text-rose-400">升至 65 歲</strong>。<br/><br/>
-        三軌同步動，但合在一起算的人很少。本文把三筆放到同一張試算表，一個情境一個情境算給你看。
+
+      <!-- LEAD -->
+      <p class="lead text-base text-slate-300 mb-6 leading-relaxed">
+        2026 年 5 月,三件事同時動了——勞保 +6.46%、國保保底 5,000、勞退請領升至 65 歲。三軌新制單獨看每條都好,合在一起算,才會發現一個事實:<strong>55 歲想退休的人,政府幫你過的是 0 年</strong>。
       </p>
 
-      <h2 id="three-systems">三筆退休金的本質：「保險基底 + 強制儲蓄 + 兜底線」</h2>
-
-      <p>
-        台灣退休金不是一筆，是三筆，運作邏輯完全不同。先把三者區分清楚，才不會誤算：
-      </p>
-
-      <div class="bg-slate-800/50 border border-slate-700 rounded-2xl p-6 my-8">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-slate-600">
-              <th class="text-left py-3 text-white">層級</th>
-              <th class="text-left py-3 text-white">勞保年金</th>
-              <th class="text-left py-3 text-white">勞退新制</th>
-              <th class="text-left py-3 text-white">國民年金</th>
-            </tr>
-          </thead>
-          <tbody class="text-slate-300">
-            <tr class="border-b border-slate-700">
-              <td class="py-2 font-bold">本質</td>
-              <td class="py-2">社會保險（風險共攤）</td>
-              <td class="py-2">個人專戶（強制儲蓄）</td>
-              <td class="py-2">社會保險（兜底）</td>
-            </tr>
-            <tr class="border-b border-slate-700">
-              <td class="py-2 font-bold">投保對象</td>
-              <td class="py-2">受雇勞工 + 自雇</td>
-              <td class="py-2">受雇勞工</td>
-              <td class="py-2">25-65 歲未投保勞保者</td>
-            </tr>
-            <tr class="border-b border-slate-700">
-              <td class="py-2 font-bold">提撥方</td>
-              <td class="py-2">勞 20% + 雇 70% + 政 10%</td>
-              <td class="py-2">雇主 6% + 自願 0-6%</td>
-              <td class="py-2">本人 60% + 政府 40%</td>
-            </tr>
-            <tr class="border-b border-slate-700">
-              <td class="py-2 font-bold">領取邏輯</td>
-              <td class="py-2">公式 A 或 B 擇優</td>
-              <td class="py-2">本金累積 ÷ 年金化</td>
-              <td class="py-2">公式 A 或 B 擇優</td>
-            </tr>
-            <tr>
-              <td class="py-2 font-bold">2026 變動</td>
-              <td class="py-2 text-emerald-300">+6.46% 調漲</td>
-              <td class="py-2 text-amber-300">請領升至 65 歲</td>
-              <td class="py-2 text-blue-300">保底 5,000</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- SCREEN 1: HERO -->
+      <div class="text-center my-10 py-12 bg-gradient-to-b from-yellow-950/30 to-transparent border-y border-yellow-700/30 rounded-2xl">
+        <div class="text-yellow-400 text-xs font-bold tracking-widest mb-3">中產家庭 65 歲後 · 三筆合計</div>
+        <div class="text-6xl md:text-8xl font-black text-yellow-300 leading-none mb-3">21<span class="text-3xl md:text-4xl text-yellow-500 ml-2">K / 月</span></div>
+        <div class="text-slate-300 text-lg md:text-xl mb-6">勞保 + 勞退 + 國保 合計</div>
+        <div class="text-yellow-400 text-base md:text-lg font-bold tracking-wide">── 你以為政府給多少？──</div>
       </div>
 
-      <h2 id="labor-insurance">第一筆：勞保年金 5 月起調漲 6.46%（CPI 自動連動）</h2>
+      <!-- 21K breakdown -->
+      <div class="bg-slate-900/40 border border-slate-700/50 rounded-2xl p-6 my-8">
+        <div class="text-slate-400 text-xs font-bold tracking-widest mb-4">21K 從哪來(36K 級距 × 25 年範例)</div>
+        <div class="space-y-3">
+          <div class="flex items-baseline justify-between border-b border-slate-800 pb-2">
+            <span class="text-slate-300 text-sm">勞保年金 · <span class="text-slate-500 text-xs">公式 B + 5 月 +6.46%</span></span>
+            <span class="text-yellow-300 font-bold text-lg">~15K</span>
+          </div>
+          <div class="flex items-baseline justify-between border-b border-slate-800 pb-2">
+            <span class="text-slate-300 text-sm">勞退新制 · <span class="text-slate-500 text-xs">專戶累積 127 萬 ÷ 年金化</span></span>
+            <span class="text-yellow-300 font-bold text-lg">~6K</span>
+          </div>
+          <div class="flex items-baseline justify-between">
+            <span class="text-slate-300 text-sm">國民年金 · <span class="text-slate-500 text-xs">中產有勞保,通常不領</span></span>
+            <span class="text-yellow-300 font-bold text-lg">0</span>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500 mt-4 mb-0">📌 中位數族群(28K 級距 × 15 年)合計約 15K · 高薪族群(45.8K × 35 年)約 37K · 詳見下方圖表</p>
+      </div>
 
-      <h3>調漲機制：CPI 兩年累計超過 5% 觸發</h3>
+      <!-- Glossary callout -->
+      <div class="bg-slate-900/30 border border-slate-700/40 rounded-xl p-4 my-6 text-xs text-slate-400 space-y-2">
+        <div class="text-slate-300 font-bold tracking-widest text-xs mb-1">💡 名詞快速解釋</div>
+        <div><strong class="text-slate-300">勞保年金</strong> · 社會保險,風險共攤。勞 20% + 雇 70% + 政 10%,2026 起 CPI 連動 +6.46%</div>
+        <div><strong class="text-slate-300">勞退新制</strong> · 個人專戶,強制儲蓄。雇主 6% + 自願 0-6%,保證收益不低於 2 年定存</div>
+        <div><strong class="text-slate-300">國民年金</strong> · 兜底線。給 25-65 歲沒勞 / 公 / 軍保的人,2026 保底 5,000</div>
+        <div><strong class="text-slate-300">自提 6%</strong> · 勞退自願多繳,部分當年免稅(延稅),退休本金累積更厚</div>
+      </div>
 
-      <p>
-        2026 年勞保調漲不是政策恩給，是法定機制：勞保條例第 65-2 條規定，
-        年金給付指數採 CPI 兩年累計，超過 5% 時自動調整一次。
-        2024-2025 累計 CPI 漲幅約 6.46%，於是 2026 年 5 月起按比例調升年金。
-      </p>
-
-      <div class="bg-blue-900/20 border border-blue-500/30 rounded-2xl p-6 my-6">
-        <h4 class="text-blue-400 font-bold mb-3">📐 勞保年金原本兩個公式（擇優）</h4>
-        <p class="text-white font-mono text-sm mb-2">
-          公式 A：月領 = 平均月投保薪資 × 年資 × 0.775% + 3,000
+      <!-- BIG CAUTION: 55-65 gap -->
+      <div class="bg-red-900/20 border border-red-500/40 rounded-2xl p-5 my-8">
+        <div class="text-red-400 text-sm font-bold tracking-widest mb-2">🚨 最大盲點</div>
+        <p class="text-slate-200 text-base mb-2 leading-relaxed">
+          勞保最早 60 歲(展延 -20% 永久減損)、勞退新制 51 年次後 <strong class="text-red-300">65 歲</strong>才能領、國保 65 歲。
         </p>
-        <p class="text-white font-mono text-sm">
-          公式 B：月領 = 平均月投保薪資 × 年資 × 1.55%
-        </p>
-        <p class="text-slate-400 text-xs mt-3">
-          公式 A 適用「短年資 + 高薪資」族群（保底 3,000 拉抬效果大）。<br/>
-          公式 B 適用「長年資 + 高薪資」族群（年資乘數效果大）。
+        <p class="text-slate-300 text-sm mb-0">
+          也就是說——<strong class="text-red-300">55 歲想退休的人,55-65 那 10 年政府給 0</strong>。完全靠你自備的本金 + 投資撐過去。
         </p>
       </div>
 
-      <h3>三組典型範例（套用 5 月 +6.46% 後）</h3>
+      <!-- SCREEN 2: CHART 1 — 3 cases stacked bar -->
+      <h2 id="screen-cases">你是哪一族?月領多少?</h2>
 
-      <div class="bg-slate-800 rounded-xl p-6 my-6">
-        <h4 class="text-white font-bold mb-3">案例 1：A 君（保險業務 25 年）</h4>
-        <ul class="text-slate-300 space-y-1 text-sm">
-          <li>平均月投保薪資：<strong class="text-emerald-400">36,300</strong>（中等級距）</li>
-          <li>勞保年資：<strong class="text-emerald-400">25 年</strong></li>
-        </ul>
-        <div class="mt-4 pt-4 border-t border-slate-700 text-sm">
-          <p class="text-slate-400">公式 A：36,300 × 25 × 0.775% + 3,000 = <strong class="text-blue-300">10,032</strong></p>
-          <p class="text-slate-400">公式 B：36,300 × 25 × 1.55% = <strong class="text-emerald-300">14,066</strong>（擇優）</p>
-          <p class="text-white">5 月起 +6.46%：<strong class="text-emerald-400 text-lg">14,975</strong> 元/月</p>
+      <p class="text-slate-300 text-sm">三個典型情境的合計月領(已套用 5 月 +6.46% 後):</p>
+
+      <div class="bg-slate-900/50 border border-slate-700 rounded-2xl p-4 my-6">
+        <svg viewBox="0 0 800 380" xmlns="http://www.w3.org/2000/svg" class="w-full h-auto">
+          <text x="400" y="28" text-anchor="middle" fill="#f1f5f9" font-size="17" font-weight="bold">三筆退休金月領對比(元/月)</text>
+
+          <!-- X axis grid + labels -->
+          <line x1="80" y1="80" x2="80" y2="340" stroke="#475569" stroke-width="1.5"/>
+          <line x1="240" y1="80" x2="240" y2="340" stroke="#1e293b" stroke-width="1"/>
+          <line x1="400" y1="80" x2="400" y2="340" stroke="#1e293b" stroke-width="1"/>
+          <line x1="560" y1="80" x2="560" y2="340" stroke="#1e293b" stroke-width="1"/>
+          <line x1="720" y1="80" x2="720" y2="340" stroke="#1e293b" stroke-width="1"/>
+
+          <text x="80" y="358" text-anchor="middle" fill="#cbd5e1" font-size="12">0</text>
+          <text x="240" y="358" text-anchor="middle" fill="#cbd5e1" font-size="12">10K</text>
+          <text x="400" y="358" text-anchor="middle" fill="#cbd5e1" font-size="12">20K</text>
+          <text x="560" y="358" text-anchor="middle" fill="#cbd5e1" font-size="12">30K</text>
+          <text x="720" y="358" text-anchor="middle" fill="#cbd5e1" font-size="12">40K</text>
+
+          <!-- Bar 1: 中位數族群 (7K 勞保 + 3K 勞退 + 5K 國保 = 15K) -->
+          <text x="75" y="105" text-anchor="end" fill="#cbd5e1" font-size="13" font-weight="bold">中位數族群</text>
+          <text x="75" y="120" text-anchor="end" fill="#94a3b8" font-size="10">28K 級距 × 15 年</text>
+          <rect x="80" y="92" width="112" height="36" fill="#fbbf24" opacity="0.85"/>
+          <rect x="192" y="92" width="48" height="36" fill="#60a5fa" opacity="0.85"/>
+          <rect x="240" y="92" width="80" height="36" fill="#94a3b8" opacity="0.85"/>
+          <text x="335" y="115" fill="#fef3c7" font-size="15" font-weight="bold">15K</text>
+
+          <!-- Bar 2: 中產族群 (15K 勞保 + 6K 勞退 = 21K) -->
+          <text x="75" y="180" text-anchor="end" fill="#cbd5e1" font-size="13" font-weight="bold">中產族群</text>
+          <text x="75" y="195" text-anchor="end" fill="#94a3b8" font-size="10">36K 級距 × 25 年</text>
+          <rect x="80" y="167" width="240" height="36" fill="#fbbf24" opacity="0.9"/>
+          <rect x="320" y="167" width="96" height="36" fill="#60a5fa" opacity="0.9"/>
+          <text x="431" y="190" fill="#fef3c7" font-size="15" font-weight="bold">21K</text>
+
+          <!-- Bar 3: 高薪族群 (27K 勞保 + 10K 勞退 = 37K) -->
+          <text x="75" y="255" text-anchor="end" fill="#cbd5e1" font-size="13" font-weight="bold">高薪族群</text>
+          <text x="75" y="270" text-anchor="end" fill="#94a3b8" font-size="10">45.8K 級距 × 35 年</text>
+          <rect x="80" y="242" width="432" height="36" fill="#fbbf24"/>
+          <rect x="512" y="242" width="160" height="36" fill="#60a5fa"/>
+          <text x="687" y="265" fill="#fef3c7" font-size="15" font-weight="bold">37K</text>
+
+          <!-- Reference line: 23K = 台北單人月生活成本 -->
+          <line x1="448" y1="80" x2="448" y2="340" stroke="#ef4444" stroke-dasharray="6,4" stroke-width="2" opacity="0.7"/>
+          <text x="450" y="76" text-anchor="start" fill="#fca5a5" font-size="11" font-weight="600">↓ 23K(台北單人月生活線)</text>
+
+          <!-- Legend bottom -->
+          <rect x="100" y="305" width="20" height="10" fill="#fbbf24"/>
+          <text x="126" y="314" fill="#cbd5e1" font-size="12">勞保年金</text>
+          <rect x="220" y="305" width="20" height="10" fill="#60a5fa"/>
+          <text x="246" y="314" fill="#cbd5e1" font-size="12">勞退新制</text>
+          <rect x="340" y="305" width="20" height="10" fill="#94a3b8"/>
+          <text x="366" y="314" fill="#cbd5e1" font-size="12">國民年金</text>
+        </svg>
+      </div>
+
+      <p class="text-slate-300 text-sm">
+        <strong>關鍵觀察</strong>:中位數族群 15K 連台北單人生活線 23K 都不到。高薪族群即便 37K 看似不錯,也只是「全職 35 年 + 滿級距投保」的最佳結果——多數人這輩子都拿不到。
+      </p>
+
+      <!-- SCREEN 3: CHOICE — 提前/準時/延後 -->
+      <h2 id="screen-timing">提前領 vs 延後領,差多少?</h2>
+
+      <p class="text-slate-300 text-sm">勞保 + 國保 都可以提前(60 歲)或延後(70 歲)請領,每提前/延後 1 年 ±4%,最多 5 年。Swing range 是 <strong>40%</strong>:</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
+        <div class="bg-red-950/40 border-2 border-red-700/50 rounded-2xl p-5 text-center">
+          <div class="text-red-400 text-xs font-bold tracking-widest mb-2">提前領 · 60 歲</div>
+          <div class="text-4xl font-black text-red-300 mb-1">16.8 <span class="text-lg text-red-500">K</span></div>
+          <div class="text-3xl mb-2">⬇️ -20%</div>
+          <div class="text-sm text-slate-400 leading-relaxed">永久減損<br/>多領 5 年但少 20%<br/>活越久越虧</div>
+        </div>
+        <div class="bg-slate-900/60 border-2 border-slate-700 rounded-2xl p-5 text-center">
+          <div class="text-slate-400 text-xs font-bold tracking-widest mb-2">準時領 · 65 歲</div>
+          <div class="text-4xl font-black text-slate-300 mb-1">21 <span class="text-lg text-slate-500">K</span></div>
+          <div class="text-3xl mb-2">⏱ 100%</div>
+          <div class="text-sm text-slate-400 leading-relaxed">基準月領<br/>勞退新制 51 年次後<br/>最早就是 65 歲</div>
+        </div>
+        <div class="bg-yellow-950/40 border-2 border-yellow-600/60 rounded-2xl p-5 text-center shadow-xl shadow-yellow-900/20">
+          <div class="text-yellow-400 text-xs font-bold tracking-widest mb-2">延後領 · 70 歲</div>
+          <div class="text-4xl font-black text-yellow-300 mb-1">25.2 <span class="text-lg text-yellow-500">K</span></div>
+          <div class="text-3xl mb-2">⬆️ +20%</div>
+          <div class="text-sm text-slate-300 leading-relaxed">永久加成<br/>少領 5 年但多 20%<br/><strong class="text-yellow-200">活越久越賺</strong></div>
         </div>
       </div>
 
-      <div class="bg-slate-800 rounded-xl p-6 my-6">
-        <h4 class="text-white font-bold mb-3">案例 2：B 君（科技業 35 年最高級距）</h4>
-        <ul class="text-slate-300 space-y-1 text-sm">
-          <li>平均月投保薪資：<strong class="text-emerald-400">45,800</strong>（最高級距）</li>
-          <li>勞保年資：<strong class="text-emerald-400">35 年</strong></li>
-        </ul>
-        <div class="mt-4 pt-4 border-t border-slate-700 text-sm">
-          <p class="text-slate-400">公式 B（直接領先）：45,800 × 35 × 1.55% = <strong class="text-emerald-300">24,847</strong></p>
-          <p class="text-white">5 月起 +6.46%：<strong class="text-emerald-400 text-lg">26,452</strong> 元/月</p>
-          <p class="text-slate-400 text-xs mt-2">這是勞保年金的「天花板區」。再多年資、再高薪資都很難突破 27K 太多。</p>
+      <!-- Assumptions collapsible -->
+      <details class="my-6 group">
+        <summary class="cursor-pointer text-xs text-slate-400 hover:text-slate-300 transition list-none px-2">
+          💡 試算用了哪些假設?(點開驗證)
+          <span class="float-right group-open:rotate-180 transition inline-block">▾</span>
+        </summary>
+        <div class="bg-slate-900/30 border border-slate-700 rounded-xl p-4 mt-2 text-xs text-slate-400 space-y-2">
+          <div><strong class="text-slate-300">勞保公式</strong> · 公式 A = 平均月投保薪資 × 年資 × 0.775% + 3,000;公式 B = 平均月投保薪資 × 年資 × 1.55%;擇優</div>
+          <div><strong class="text-slate-300">5 月 +6.46%</strong> · 2024-2025 CPI 累計 6.46%,觸發勞保條例第 65-2 條法定調漲</div>
+          <div><strong class="text-slate-300">勞退新制累積</strong> · 雇主 6% × 12 × 年資 × (1+r)^年,r = 3.5%(中央信託局保證收益,2024 年化)</div>
+          <div><strong class="text-slate-300">勞退年金化</strong> · 累積 127 萬 ÷ 年金因子(65-85 歲 × 3.5%)≈ 7,400/月</div>
+          <div><strong class="text-slate-300">國保</strong> · 2026 新制保底 5,000,適用未投勞保 / 公保 / 軍保者</div>
+          <div><strong class="text-slate-300">中產範例</strong> · 36,300 平均月投保薪資 × 25 年 × 1.55% × 1.0646 ≈ 14,975</div>
+          <div><strong class="text-slate-300">提前 / 延後</strong> · 每年 ±4%,最多 ±5 年 = ±20% 永久 swing</div>
+          <div class="text-slate-500 pt-2 border-t border-slate-800">所有試算可用勞保局官方試算驗證:bli.gov.tw → 個人專區 → 退休金試算(需自然人憑證)</div>
+        </div>
+      </details>
+
+      <!-- IMPACT TABLE: 三筆 vs 自備 -->
+      <h2 id="screen-impact">三筆能撐起退休嗎?</h2>
+
+      <p class="text-slate-300 text-sm">把三筆放到生活成本面前看:</p>
+
+      <div class="bg-slate-900/40 border border-slate-700 rounded-2xl overflow-hidden my-6">
+        <div class="grid grid-cols-3 bg-slate-800/60 text-center">
+          <div class="p-3 text-xs font-bold tracking-widest text-slate-400">情境</div>
+          <div class="p-3 text-xs font-bold tracking-widest text-slate-400">月需要</div>
+          <div class="p-3 text-xs font-bold tracking-widest text-yellow-400">三筆能補?</div>
+        </div>
+        <div class="grid grid-cols-3 border-t border-slate-800">
+          <div class="p-3 text-sm text-slate-300">台北單人基本生活</div>
+          <div class="p-3 text-sm text-slate-400 text-center">23K</div>
+          <div class="p-3 text-sm text-yellow-200 text-center font-bold">中產勉強(21K 缺 2K)</div>
+        </div>
+        <div class="grid grid-cols-3 border-t border-slate-800">
+          <div class="p-3 text-sm text-slate-300">夫妻 + 一房 + 健保自付</div>
+          <div class="p-3 text-sm text-slate-400 text-center">45K</div>
+          <div class="p-3 text-sm text-yellow-200 text-center font-bold">中產缺 24K(自備補)</div>
+        </div>
+        <div class="grid grid-cols-3 border-t border-slate-800">
+          <div class="p-3 text-sm text-slate-300">含旅遊 / 長照儲備</div>
+          <div class="p-3 text-sm text-slate-400 text-center">60K+</div>
+          <div class="p-3 text-sm text-yellow-200 text-center font-bold">高薪也缺 23K</div>
+        </div>
+        <div class="grid grid-cols-3 border-t border-slate-800">
+          <div class="p-3 text-sm text-slate-300">55-65 想退休</div>
+          <div class="p-3 text-sm text-slate-400 text-center">完全自付</div>
+          <div class="p-3 text-sm text-red-300 text-center font-bold">政府給 0,10 年要 360 萬+</div>
         </div>
       </div>
 
-      <div class="bg-slate-800 rounded-xl p-6 my-6">
-        <h4 class="text-white font-bold mb-3">案例 3：C 君（中小企業 15 年中斷再進）</h4>
-        <ul class="text-slate-300 space-y-1 text-sm">
-          <li>平均月投保薪資：<strong class="text-amber-400">28,800</strong>（中段級距）</li>
-          <li>勞保年資：<strong class="text-amber-400">15 年</strong>（中間有 5 年自雇沒投）</li>
-        </ul>
-        <div class="mt-4 pt-4 border-t border-slate-700 text-sm">
-          <p class="text-slate-400">公式 A：28,800 × 15 × 0.775% + 3,000 = <strong class="text-blue-300">6,348</strong>（擇優）</p>
-          <p class="text-slate-400">公式 B：28,800 × 15 × 1.55% = <strong class="text-amber-300">6,696</strong></p>
-          <p class="text-white">5 月起 +6.46%：<strong class="text-emerald-400 text-lg">7,128</strong> 元/月</p>
-          <p class="text-rose-300 text-xs mt-2">⚠️ 這個級距才是台灣勞保族群的中位數。低於 1 萬，遠不夠生活。</p>
+      <!-- Pitfalls callout -->
+      <div class="bg-purple-900/20 border border-purple-500/30 rounded-2xl p-5 my-6">
+        <p class="text-purple-300 text-xs font-bold tracking-widest mb-3">⚠️ 算錯的人很多,3 個常見雷區</p>
+        <div class="space-y-2 text-sm text-slate-300">
+          <div>① <strong class="text-slate-100">平均薪資</strong>是最高 60 個月,不是離職前的薪資。中年大幅加薪的人特別容易高估</div>
+          <div>② <strong class="text-slate-100">勞退年資</strong>從 2005 才有,在那之前的工作年資算舊制(一次給付)不是專戶</div>
+          <div>③ <strong class="text-slate-100">提前 / 延後</strong>swing range 是 ±20%,影響後半生超大,多數人忽略</div>
         </div>
       </div>
 
-      <h2 id="labor-pension">第二筆：勞退新制（個人專戶 = 雇主 6% + 自願自提）</h2>
+      <!-- SCREEN 5: ACTION -->
+      <h2 id="screen-action">下個月就能做的 5 件事</h2>
 
-      <h3>關鍵新制：51 年次後出生者請領年齡升至 65 歲</h3>
-
-      <p>
-        勞退新制過去可以 60 歲領，2026 年起出生年次 51 年（民國，西元 1962 年）以後的人，
-        <strong class="text-amber-400">需滿 65 歲才能請領</strong>。
-        這意味著：<strong>1962 年（民國 51 年）後出生的人，整套退休規劃都要往後 5 年計算</strong>。
-      </p>
-
-      <h3>勞退月領金額怎麼算</h3>
-
-      <div class="bg-emerald-900/20 border border-emerald-500/30 rounded-2xl p-6 my-6">
-        <p class="text-white font-mono text-sm mb-2">
-          勞退個人專戶累積金額 = 月薪 × 6%（雇主）× 12 × 年資 × (1 + 投資報酬率)^年
-        </p>
-        <p class="text-slate-400 text-xs mt-3">
-          自願自提部分（0-6%）也累積在同一專戶，享同樣保證收益（不低於 2 年定存利率，2024 年實際年化約 3.5%）。
-        </p>
+      <div class="bg-slate-900/40 border border-slate-700 rounded-2xl p-6 my-6">
+        <ol class="space-y-4 list-none p-0 m-0">
+          <li class="flex items-start gap-3 m-0">
+            <span class="flex-shrink-0 w-8 h-8 bg-yellow-500/20 border border-yellow-500/40 rounded-full text-yellow-300 font-bold text-base flex items-center justify-center">1</span>
+            <div class="flex-1 text-slate-300 text-sm leading-relaxed pt-1">
+              <strong class="text-slate-100">查勞保正式試算</strong>——自然人憑證或健保卡登入 bli.gov.tw,拿到三筆中最大那一筆的預估值
+            </div>
+          </li>
+          <li class="flex items-start gap-3 m-0">
+            <span class="flex-shrink-0 w-8 h-8 bg-yellow-500/20 border border-yellow-500/40 rounded-full text-yellow-300 font-bold text-base flex items-center justify-center">2</span>
+            <div class="flex-1 text-slate-300 text-sm leading-relaxed pt-1">
+              <strong class="text-slate-100">查勞退專戶累積</strong>——勞保局 app 登入即看。若自提率 0%,馬上改 6%(延稅效果立刻見)
+            </div>
+          </li>
+          <li class="flex items-start gap-3 m-0">
+            <span class="flex-shrink-0 w-8 h-8 bg-yellow-500/20 border border-yellow-500/40 rounded-full text-yellow-300 font-bold text-base flex items-center justify-center">3</span>
+            <div class="flex-1 text-slate-300 text-sm leading-relaxed pt-1">
+              <strong class="text-slate-100">確認提前 / 延後策略</strong>——預期活到 85 歲?延後領 70 歲總領取金額較高;預期短壽?提前 60 歲可優先拿到
+            </div>
+          </li>
+          <li class="flex items-start gap-3 m-0">
+            <span class="flex-shrink-0 w-8 h-8 bg-yellow-500/20 border border-yellow-500/40 rounded-full text-yellow-300 font-bold text-base flex items-center justify-center">4</span>
+            <div class="flex-1 text-slate-300 text-sm leading-relaxed pt-1">
+              <strong class="text-slate-100">算 55-65 自備缺口</strong>——若想 55 退休,這 10 年生活費 360 萬以上要自備。檢查目前儲蓄 + 投資是否到位
+            </div>
+          </li>
+          <li class="flex items-start gap-3 m-0">
+            <span class="flex-shrink-0 w-8 h-8 bg-yellow-500/20 border border-yellow-500/40 rounded-full text-yellow-300 font-bold text-base flex items-center justify-center">5</span>
+            <div class="flex-1 text-slate-300 text-sm leading-relaxed pt-1">
+              <strong class="text-slate-100">三筆 + 自備合併規劃</strong>——找顧問或用工具把三筆 + 通膨 + 自備款放到同一張畫面看
+            </div>
+          </li>
+        </ol>
       </div>
 
-      <div class="bg-slate-800 rounded-xl p-6 my-6">
-        <h4 class="text-white font-bold mb-3">案例 2 延續：B 君的勞退專戶</h4>
-        <ul class="text-slate-300 space-y-1 text-sm">
-          <li>月薪 45,800（最高級距），雇主提撥 6% × 12 = <strong class="text-emerald-400">32,976/年</strong></li>
-          <li>累積年資 25 年（勞退新制 2005 年才有，B 君 35 年裡只有後 25 年屬新制）</li>
-          <li>個人專戶過去 25 年實際年化收益 <strong class="text-emerald-400">3.5%</strong>（中央信託局保證收益）</li>
-        </ul>
-        <div class="mt-4 pt-4 border-t border-slate-700 text-sm">
-          <p class="text-slate-400">累積專戶金額（年金現值）：32,976 × ((1.035^25 - 1) / 0.035) = <strong class="text-emerald-300">~127 萬</strong></p>
-          <p class="text-slate-400">月領（年金化，假設 65 歲到 85 歲、3.5% 報酬）：</p>
-          <p class="text-white">127 萬 ÷ 年金化因子 = <strong class="text-emerald-400 text-lg">~7,400</strong> 元/月</p>
+      <!-- Tool CTA -->
+      <div class="bg-blue-900/30 border border-blue-500/30 rounded-2xl p-6 my-8 text-center">
+        <p class="text-blue-300 text-sm mb-4">用我們的退休缺口試算工具(三筆 + 自備 + 通膨同時算)</p>
+        <a href="/calculator/retirement" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-3 rounded-xl transition-colors no-underline">退休缺口試算 →</a>
+      </div>
+
+      <!-- SOURCES (collapsed) -->
+      <details class="my-8 group">
+        <summary class="cursor-pointer bg-slate-900/40 border border-slate-700 rounded-xl px-5 py-3 text-slate-300 text-sm font-bold hover:bg-slate-800/50 transition list-none">
+          📚 點開所有官方資料來源(政府公告 + 公式條文 + 媒體解析)
+          <span class="float-right group-open:rotate-180 transition inline-block">▾</span>
+        </summary>
+        <div class="bg-slate-900/30 border border-t-0 border-slate-700 rounded-b-xl px-5 py-4 -mt-1 text-sm space-y-4">
+
+          <div>
+            <div class="text-slate-400 text-xs font-bold tracking-widest mb-2">政策原文與試算系統</div>
+            <ul class="space-y-1 my-0">
+              <li class="m-0"><a href="https://www.bli.gov.tw" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300">勞動部勞工保險局</a> · 2026 年 5 月勞保年金調漲公告 + 個人退休金試算</li>
+              <li class="m-0"><a href="https://www.bli.gov.tw/0011454.html" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300">勞工保險條例第 65-2 條</a> · CPI 自動連動調整機制</li>
+              <li class="m-0"><a href="https://www.bli.gov.tw/0014155.html" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300">勞工退休金條例</a> · 個人專戶提撥與請領</li>
+              <li class="m-0"><a href="https://www.bli.gov.tw/0103850.html" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300">國民年金法</a> · 含 2026 保底 5,000 修法</li>
+            </ul>
+          </div>
+
+          <div>
+            <div class="text-slate-400 text-xs font-bold tracking-widest mb-2">統計與相關資料</div>
+            <ul class="space-y-1 my-0">
+              <li class="m-0"><a href="https://www.stat.gov.tw" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300">行政院主計總處</a> · CPI 統計 / 家庭收支調查 / 平均餘命</li>
+              <li class="m-0"><a href="https://www.blf.gov.tw" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300">勞動部勞動基金運用局</a> · 勞退基金實際收益年報</li>
+              <li class="m-0"><a href="https://www.mol.gov.tw" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300">勞動部</a> · 勞退新制請領年齡修法說明</li>
+            </ul>
+          </div>
+
+          <div>
+            <div class="text-slate-400 text-xs font-bold tracking-widest mb-2">媒體解析(二手)</div>
+            <ul class="space-y-1 my-0">
+              <li class="m-0">《天下雜誌》2026/5/6 · 勞保年金 5 月起調漲 6.46%、78 萬人受惠</li>
+              <li class="m-0">《關鍵評論網》2026/5/8 · 勞退新制請領年齡升至 65 歲影響分析</li>
+              <li class="m-0">《商業周刊》· 國保保底 5,000 修法歷程整理</li>
+            </ul>
+          </div>
+
+          <div class="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+            <div class="text-blue-300 text-xs font-bold mb-2">📞 諮詢專線</div>
+            <p class="text-slate-300 m-0 text-sm leading-relaxed">
+              勞保局免付費客服:<strong class="text-blue-300">0800-078-777</strong>(週一至週五 8:30-17:30)<br/>
+              現場諮詢:全國各勞保局辦事處,可預約面談
+            </p>
+          </div>
+
         </div>
-      </div>
+      </details>
 
-      <h3>自提 6% 划算嗎？</h3>
-
-      <p>
-        自提 6% 的兩個甜點：
+      <!-- Disclaimer -->
+      <p class="text-slate-500 text-xs mt-8 leading-relaxed">
+        最後更新:2026 年 6 月 5 日。本文為教育用途,所有試算為粗估,個人實際情境請以<a href="https://www.bli.gov.tw" target="_blank" rel="noopener" class="text-slate-400">勞保局正式試算</a> + 專業財務顧問為準。勞保條例、勞退條例、國民年金法持續修法中,所有數字以最新法令為準。本文不構成個人投資、退休或保險商品之招攬。
       </p>
 
-      <ol class="text-slate-300 space-y-2 my-4 text-sm">
-        <li>1. <strong class="text-emerald-400">薪資所得免稅</strong>：自提部分當年不計入綜合所得稅，等於延稅。
-        若年所得稅率 20%，等於變相政府幫你付 20% 入帳。</li>
-        <li>2. <strong class="text-emerald-400">保證收益不低於 2 年定存</strong>：本金不會虧，下檔有政府兜底。</li>
-      </ol>
-
-      <p>
-        但只有兩種人不適合：年所得稅率 5% 以下的低薪族（延稅效果差），
-        以及確定 60 歲前要出國/移民、不打算累積到台灣退休的人。
-      </p>
-
-      <h2 id="national-pension">第三筆：國民年金（保底 5,000 新制）</h2>
-
-      <h3>國保是「沒勞保的人」的 backup</h3>
-
-      <p>
-        國民年金 2008 年開辦，給 25-65 歲未投保勞保 / 公保 / 軍保的人，
-        例如家庭主婦、自由工作者中斷期間、待業期。
-        2026 年新制最大變動：<strong class="text-blue-400">月領保底 5,000 元</strong>（過去公式算下來如果不到 5,000，會被自動補到 5,000）。
-      </p>
-
-      <div class="bg-blue-900/20 border border-blue-500/30 rounded-2xl p-6 my-6">
-        <h4 class="text-blue-400 font-bold mb-3">📐 國保兩個公式（擇優）</h4>
-        <p class="text-white font-mono text-sm mb-2">
-          公式 A：月領 = 月投保金額（19,761）× 年資 × 0.65% + 3,772
-        </p>
-        <p class="text-white font-mono text-sm">
-          公式 B：月領 = 月投保金額 × 年資 × 1.3%
-        </p>
-        <p class="text-blue-300 text-xs mt-3">
-          2026 新制：上述兩式擇優後，若仍低於 5,000，自動補到 <strong>5,000 元月領保底</strong>。
-        </p>
-      </div>
-
-      <h3>誰會受益最多</h3>
-
-      <ul class="text-slate-300 space-y-2 my-4 text-sm">
-        <li>• <strong class="text-blue-300">家管中年回職場</strong>：勞保年資不長 + 國保補 backup，三筆合計可能撐到 1.5 萬</li>
-        <li>• <strong class="text-blue-300">中斷期長的自由工作者</strong>：勞保斷檔的那幾年，國保補上不會空白</li>
-        <li>• <strong class="text-blue-300">沒繳清國保保費的人</strong>：過去未繳 = 0 元，新制至少有 5,000 兜底</li>
-      </ul>
-
-      <h2 id="combined-table">三筆合併試算（55 → 65 → 85 歲現金流）</h2>
-
-      <p>
-        把三筆放到同一張表，才看得到全貌。以 B 君情境為例（最高級距 + 35 年勞保 + 25 年勞退新制）：
-      </p>
-
-      <div class="bg-slate-800/50 border border-slate-700 rounded-2xl p-6 my-8">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-slate-600">
-              <th class="text-left py-2 text-white">階段</th>
-              <th class="text-right py-2 text-white">勞保</th>
-              <th class="text-right py-2 text-white">勞退</th>
-              <th class="text-right py-2 text-white">國保</th>
-              <th class="text-right py-2 text-white">合計月領</th>
-            </tr>
-          </thead>
-          <tbody class="text-slate-300">
-            <tr class="border-b border-slate-700">
-              <td class="py-2">55-65 歲（10 年）</td>
-              <td class="py-2 text-right text-slate-500">0</td>
-              <td class="py-2 text-right text-slate-500">0</td>
-              <td class="py-2 text-right text-slate-500">0</td>
-              <td class="py-2 text-right text-rose-400 font-bold">0（純自備款撐）</td>
-            </tr>
-            <tr class="border-b border-slate-700 bg-emerald-900/10">
-              <td class="py-2">65 歲開始</td>
-              <td class="py-2 text-right text-emerald-300">26,452</td>
-              <td class="py-2 text-right text-emerald-300">7,400</td>
-              <td class="py-2 text-right text-slate-500">N/A</td>
-              <td class="py-2 text-right text-emerald-400 font-bold text-lg">33,852</td>
-            </tr>
-          </tbody>
-        </table>
-        <p class="text-slate-400 text-xs mt-4">
-          B 君是「最佳情境」（最高級距 + 滿年資）。多數人合計會落在 18,000-28,000 之間。
-        </p>
-      </div>
-
-      <p>
-        關鍵觀察：<strong class="text-amber-300">55 歲想退休 ≠ 政府年金能立刻支援</strong>。
-        從 55 到 65 這 10 年，三筆都領不到。這 10 年完全靠你自己準備的本金 + 投資。
-      </p>
-
-      <h2 id="action-plan">行動清單：你今天該做的 3 件事</h2>
-
-      <div class="bg-slate-800 rounded-xl p-6 my-6 space-y-4">
-        <div>
-          <strong class="text-emerald-400">1. 上勞保局申請「個人退休金試算」</strong>
-          <p class="text-sm text-slate-400 mt-1">
-            勞保局網站可申請正式試算（需自然人憑證或健保卡 + 讀卡機）。
-            這是你三筆中最大的那一筆，先把預估數字拿到手。
-            連結：<a href="https://www.bli.gov.tw/" class="text-blue-400 hover:text-blue-300" target="_blank" rel="noopener noreferrer">www.bli.gov.tw</a>
-          </p>
-        </div>
-        <div>
-          <strong class="text-emerald-400">2. 查自己的勞退專戶累積金額</strong>
-          <p class="text-sm text-slate-400 mt-1">
-            勞動部「勞工保險局」app 或網站，登入即可查專戶現有金額。
-            如果發現自提率是 0%，現在就開始 1-6% 自提，延稅效果立刻有感。
-          </p>
-        </div>
-        <div>
-          <strong class="text-emerald-400">3. 用 UltraAdvisor 三筆合併試算</strong>
-          <p class="text-sm text-slate-400 mt-1">
-            勞保局只算勞保、勞退專戶只查勞退、國保資訊在另一個系統。
-            UltraAdvisor 把三筆放到同一張畫面，加上通膨、缺口、半 FIRE 對比。
-            <a href="https://ultra-advisor.tw/calculator/retirement" class="text-purple-300 hover:text-purple-200" target="_blank" rel="noopener noreferrer">→ ultra-advisor.tw/calculator/retirement</a>
-          </p>
-        </div>
-      </div>
-
-      <h2 id="pitfalls">三個常見計算雷區</h2>
-
-      <ol class="text-slate-300 space-y-3 my-6">
-        <li>
-          <strong class="text-rose-400">雷區 1：以為「平均薪資」是退休前的薪資</strong>
-          <span class="block text-slate-400 text-sm mt-1">勞保算的是「最高 60 個月的平均」，不是離職前那年的薪資。
-          年輕時薪資較低會把平均拉下來。中年加薪幅度大的人特別要算清楚。</span>
-        </li>
-        <li>
-          <strong class="text-rose-400">雷區 2：勞退「年資」不等於「投保年資」</strong>
-          <span class="block text-slate-400 text-sm mt-1">勞退新制 2005 年才開辦。在那之前的工作年資，計入舊制（一次給付）而不是新制專戶。
-          很多人 35 年職涯只有後 25 年是新制累積。</span>
-        </li>
-        <li>
-          <strong class="text-rose-400">雷區 3：勞保展延請領的扣減算錯</strong>
-          <span class="block text-slate-400 text-sm mt-1">提早一年請領扣 4%，最多扣 5 年 = 20% 永久減損。
-          延後請領加 4%，最多加 5 年 = 20% 永久加成。
-          多數人忽略這個 swing range 是 40%，影響後半生月領數字非常大。</span>
-        </li>
-      </ol>
-
-      <h2 id="bottom-line">結論：5 月新制是 reset 的好時機</h2>
-
-      <p>
-        勞保 +6.46%、國保保底 5,000、勞退新制請領 65 歲——這三件事 5 月一起發生，
-        意味著你過去算過的退休缺口數字幾乎都要重算。
-      </p>
-
-      <p>
-        重算的目的不是焦慮，是<strong class="text-emerald-300">確定自己離目標還差多少，並把『多差的部分』在還能 work 的歲數內補齊</strong>。
-        看到台股創高、看到帳上數字突然胖起來，第一個念頭應該是：把多賺的，丟去補退休缺口最大的那一塊。
-      </p>
-
-      <p>
-        勞保 + 勞退 + 國保 三筆合計，台灣中產家庭的退休保底大約是 <strong class="text-emerald-400">每月 1.8-3.4 萬</strong>。
-        這個數字之上，全部都靠你自己。
-      </p>
-
-      <p class="text-slate-400 text-sm border-t border-slate-700 pt-6 mt-8">
-        資料來源：勞動部勞工保險局（2026 年 5 月勞保調漲公告）、《天下雜誌》5/6 報導、
-        《關鍵評論網》5/8 解析、財政部主計處 CPI 統計、勞退基金管理委員會年報 2024。<br/><br/>
-        本文不構成個人投資或退休建議。所有試算為粗估，個人實際情境請以勞保局正式試算 + 專業財務顧問為準。
-        勞保條例、勞退條例及國民年金法持續修法中，數字以最新法令為準。
-      </p>
     </article>
   `,
 };
