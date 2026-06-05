@@ -141,6 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Vary', 'User-Agent');
       res.status(200).send(indexHtml);
     } catch (error) {
       // 如果 fetch 失敗，返回簡單的重導向頁面
@@ -150,6 +151,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 <script>window.location.href = '/index.html';</script>
 </head><body>正在載入...</body></html>`;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Vary', 'User-Agent');
       res.status(200).send(fallbackHtml);
     }
     return;
@@ -288,5 +291,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader('Vary', 'User-Agent');
   res.status(200).send(crawlerHtml);
 }
