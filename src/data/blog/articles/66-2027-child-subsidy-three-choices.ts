@@ -58,7 +58,7 @@ export const article: BlogArticle = {
       <!-- SCREEN 2: CHART 1 -->
       <h2 id="screen-cumulative">每年領多少？</h2>
 
-      <p class="text-slate-300 text-sm">注意 <strong>6 歲那年的斜率轉折</strong>——0-6 歲每年 12 萬,6 歲後每年只剩 6 萬:</p>
+      <p class="text-slate-300 text-sm">出生領 14 萬一次性,接著每年累加。注意 <strong>6 歲那年斜率轉折</strong>——0-6 歲每年 12 萬,6 歲後每年只剩 6 萬:</p>
 
       <div class="bg-slate-900/50 border border-slate-700 rounded-2xl p-4 my-6">
         <svg viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg" class="w-full h-auto">
@@ -71,18 +71,17 @@ export const article: BlogArticle = {
 
           <text x="400" y="28" text-anchor="middle" fill="#f1f5f9" font-size="17" font-weight="bold">一個孩子 0-18 歲累積領取的政府津貼(萬元)</text>
 
-          <line x1="80" y1="60" x2="760" y2="60" stroke="#1e293b" stroke-width="1"/>
-          <line x1="80" y1="120" x2="760" y2="120" stroke="#1e293b" stroke-width="1"/>
-          <line x1="80" y1="180" x2="760" y2="180" stroke="#1e293b" stroke-width="1"/>
-          <line x1="80" y1="240" x2="760" y2="240" stroke="#1e293b" stroke-width="1"/>
-          <line x1="80" y1="300" x2="760" y2="300" stroke="#1e293b" stroke-width="1"/>
+          <line x1="80" y1="80" x2="760" y2="80" stroke="#1e293b" stroke-width="1"/>
+          <line x1="80" y1="147" x2="760" y2="147" stroke="#1e293b" stroke-width="1"/>
+          <line x1="80" y1="215" x2="760" y2="215" stroke="#1e293b" stroke-width="1"/>
+          <line x1="80" y1="282" x2="760" y2="282" stroke="#1e293b" stroke-width="1"/>
           <line x1="80" y1="350" x2="760" y2="350" stroke="#475569" stroke-width="2"/>
 
           <text x="68" y="354" text-anchor="end" fill="#cbd5e1" font-size="13">0</text>
-          <text x="68" y="304" text-anchor="end" fill="#cbd5e1" font-size="13">40</text>
-          <text x="68" y="244" text-anchor="end" fill="#cbd5e1" font-size="13">80</text>
-          <text x="68" y="184" text-anchor="end" fill="#cbd5e1" font-size="13">120</text>
-          <text x="68" y="124" text-anchor="end" fill="#cbd5e1" font-size="13">160</text>
+          <text x="68" y="286" text-anchor="end" fill="#cbd5e1" font-size="13">40</text>
+          <text x="68" y="219" text-anchor="end" fill="#cbd5e1" font-size="13">80</text>
+          <text x="68" y="151" text-anchor="end" fill="#cbd5e1" font-size="13">120</text>
+          <text x="68" y="84" text-anchor="end" fill="#cbd5e1" font-size="13">160</text>
 
           <text x="80" y="375" text-anchor="middle" fill="#cbd5e1" font-size="13">0</text>
           <text x="193" y="375" text-anchor="middle" fill="#cbd5e1" font-size="13">3</text>
@@ -90,24 +89,26 @@ export const article: BlogArticle = {
           <text x="420" y="375" text-anchor="middle" fill="#cbd5e1" font-size="13">9</text>
           <text x="533" y="375" text-anchor="middle" fill="#cbd5e1" font-size="13">12</text>
           <text x="647" y="375" text-anchor="middle" fill="#cbd5e1" font-size="13">15</text>
-          <text x="722" y="375" text-anchor="middle" fill="#cbd5e1" font-size="13">17 歲</text>
+          <text x="760" y="375" text-anchor="middle" fill="#cbd5e1" font-size="13">18 歲</text>
 
-          <!-- Area fill -->
-          <path d="M 80,350 L 80,293 L 118,275 L 156,257 L 193,239 L 231,221 L 269,203 L 307,194 L 344,185 L 382,176 L 420,167 L 458,158 L 496,149 L 533,140 L 571,131 L 609,122 L 647,113 L 684,104 L 722,95 L 722,350 Z" fill="url(#ch1Grad)"/>
+          <!-- Area fill, 19 points: (0,14) start → (18,158) end -->
+          <path d="M 80,350 L 80,326 L 118,306 L 156,286 L 193,266 L 231,245 L 269,225 L 307,205 L 345,195 L 382,185 L 420,174 L 458,164 L 496,154 L 533,144 L 571,134 L 609,124 L 647,114 L 685,104 L 722,93 L 760,83 L 760,350 Z" fill="url(#ch1Grad)"/>
 
           <!-- Line -->
-          <polyline points="80,293 118,275 156,257 193,239 231,221 269,203 307,194 344,185 382,176 420,167 458,158 496,149 533,140 571,131 609,122 647,113 684,104 722,95" fill="none" stroke="#fbbf24" stroke-width="3"/>
+          <polyline points="80,326 118,306 156,286 193,266 231,245 269,225 307,205 345,195 382,185 420,174 458,164 496,154 533,144 571,134 609,124 647,114 685,104 722,93 760,83" fill="none" stroke="#fbbf24" stroke-width="3"/>
 
           <!-- Inflection point at age 6 -->
-          <circle cx="307" cy="194" r="5" fill="#fbbf24"/>
-          <text x="307" y="220" text-anchor="middle" fill="#94a3b8" font-size="12">↑ 6 歲後斜率轉緩</text>
+          <circle cx="307" cy="205" r="5" fill="#fbbf24"/>
+          <text x="307" y="230" text-anchor="middle" fill="#94a3b8" font-size="12">↑ 6 歲後斜率轉緩</text>
 
-          <!-- Start/end labels -->
-          <circle cx="80" cy="293" r="4" fill="#fbbf24"/>
-          <text x="80" y="283" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="bold">26 萬</text>
+          <!-- Start label: at age 0, value 14 (lump only) -->
+          <circle cx="80" cy="326" r="5" fill="#fbbf24"/>
+          <text x="92" y="343" text-anchor="start" fill="#fbbf24" font-size="12" font-weight="bold">14 萬</text>
+          <text x="92" y="357" text-anchor="start" fill="#94a3b8" font-size="10">(出生一次性)</text>
 
-          <circle cx="722" cy="95" r="6" fill="#fbbf24"/>
-          <text x="722" y="80" text-anchor="middle" fill="#fef3c7" font-size="14" font-weight="bold">158 萬</text>
+          <!-- End label -->
+          <circle cx="760" cy="83" r="6" fill="#fbbf24"/>
+          <text x="760" y="68" text-anchor="middle" fill="#fef3c7" font-size="14" font-weight="bold">158 萬</text>
         </svg>
       </div>
 
@@ -165,32 +166,38 @@ export const article: BlogArticle = {
           <text x="597" y="425" text-anchor="middle" fill="#cbd5e1" font-size="13" font-weight="500">15</text>
           <text x="700" y="425" text-anchor="middle" fill="#cbd5e1" font-size="13" font-weight="500">18 歲</text>
 
-          <path d="M 80,400 L 80,372 L 114,357 L 149,342 L 183,326 L 218,309 L 252,292 L 287,279 L 321,266 L 356,253 L 390,239 L 425,224 L 459,209 L 493,193 L 528,176 L 562,159 L 597,141 L 631,122 L 666,102 L 700,89 L 700,400 Z" fill="url(#ch2GradC)"/>
-          <path d="M 80,400 L 80,367 L 114,351 L 149,335 L 183,318 L 218,302 L 252,285 L 287,276 L 321,266 L 356,256 L 390,247 L 425,237 L 459,226 L 493,216 L 528,205 L 562,194 L 597,184 L 631,172 L 666,161 L 700,157 L 700,400 Z" fill="url(#ch2GradB)"/>
-          <path d="M 80,400 L 80,400 L 114,400 L 149,400 L 183,400 L 218,400 L 252,400 L 287,396 L 321,392 L 356,388 L 390,384 L 425,380 L 459,376 L 493,371 L 528,367 L 562,363 L 597,358 L 631,353 L 666,349 L 700,348 L 700,400 Z" fill="url(#ch2GradA)"/>
+          <!-- Area C (gold) — 19 points from age 0 (=11.9 萬 lump invested) to age 18 (=234 萬) -->
+          <path d="M 80,400 L 80,385 L 114,371 L 149,357 L 183,341 L 218,325 L 252,308 L 287,291 L 321,278 L 356,265 L 390,252 L 425,237 L 459,223 L 493,207 L 528,191 L 562,174 L 597,157 L 631,139 L 666,120 L 700,100 L 700,400 Z" fill="url(#ch2GradC)"/>
+          <!-- Area B (blue) — start age 0 = 14 萬 (lump only), end age 18 = 187 萬 -->
+          <path d="M 80,400 L 80,382 L 114,366 L 149,351 L 183,335 L 218,318 L 252,302 L 287,285 L 321,275 L 356,266 L 390,256 L 425,246 L 459,236 L 493,226 L 528,215 L 562,205 L 597,194 L 631,183 L 666,172 L 700,161 L 700,400 Z" fill="url(#ch2GradB)"/>
+          <!-- Area A (grey) — TISA starts at age 7 (year 6 first deposit), ends age 18 = 40 萬 -->
+          <path d="M 80,400 L 80,400 L 114,400 L 149,400 L 183,400 L 218,400 L 252,400 L 287,400 L 321,396 L 356,392 L 390,388 L 425,384 L 459,380 L 493,376 L 528,371 L 562,367 L 597,363 L 631,358 L 666,353 L 700,348 L 700,400 Z" fill="url(#ch2GradA)"/>
 
+          <!-- Reference line: 私立大學 4 年費用 = 120 萬 (y = 400 - 1.28*120 = 246) -->
           <line x1="80" y1="246" x2="700" y2="246" stroke="#ef4444" stroke-dasharray="6,4" stroke-width="2" opacity="0.75"/>
           <rect x="430" y="226" width="270" height="20" fill="#0f172a" opacity="0.9" rx="3"/>
           <text x="695" y="240" text-anchor="end" fill="#fca5a5" font-size="12" font-weight="600">⊢ 私立大學 4 年費用 ≈ 120 萬</text>
 
-          <polyline points="80,400 114,400 149,400 183,400 218,400 252,400 287,396 321,392 356,388 390,384 425,380 459,376 493,371 528,367 562,363 597,358 631,353 666,349 700,348" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="6,4"/>
-          <polyline points="80,367 114,351 149,335 183,318 218,302 252,285 287,276 321,266 356,256 390,247 425,237 459,226 493,216 528,205 562,194 597,184 631,172 666,161 700,157" fill="none" stroke="#60a5fa" stroke-width="3"/>
-          <polyline points="80,372 114,357 149,342 183,326 218,309 252,292 287,279 321,266 356,253 390,239 425,224 459,209 493,193 528,176 562,159 597,141 631,122 666,102 700,89" fill="none" stroke="#fbbf24" stroke-width="4"/>
+          <!-- Lines (on top of areas) -->
+          <polyline points="80,400 114,400 149,400 183,400 218,400 252,400 287,400 321,396 356,392 390,388 425,384 459,380 493,376 528,371 562,367 597,363 631,358 666,353 700,348" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="6,4"/>
+          <polyline points="80,382 114,366 149,351 183,335 218,318 252,302 287,285 321,275 356,266 390,256 425,246 459,236 493,226 528,215 562,205 597,194 631,183 666,172 700,161" fill="none" stroke="#60a5fa" stroke-width="3"/>
+          <polyline points="80,385 114,371 149,357 183,341 218,325 252,308 287,291 321,278 356,265 390,252 425,237 459,223 493,207 528,191 562,174 597,157 631,139 666,120 700,100" fill="none" stroke="#fbbf24" stroke-width="4"/>
 
+          <!-- End-point bubbles -->
           <circle cx="700" cy="348" r="22" fill="#94a3b8" opacity="0.25"/>
           <circle cx="700" cy="348" r="7" fill="#94a3b8"/>
-          <text x="728" y="343" fill="#e2e8f0" font-size="15" font-weight="bold">A · 41 萬</text>
+          <text x="728" y="343" fill="#e2e8f0" font-size="15" font-weight="bold">A · 40 萬</text>
           <text x="728" y="361" fill="#94a3b8" font-size="11">教育金缺口 → 學貸 / 動退休金</text>
 
-          <circle cx="700" cy="157" r="22" fill="#60a5fa" opacity="0.25"/>
-          <circle cx="700" cy="157" r="7" fill="#60a5fa"/>
-          <text x="728" y="152" fill="#dbeafe" font-size="15" font-weight="bold">B · 190 萬</text>
-          <text x="728" y="170" fill="#94a3b8" font-size="11">通膨後實質購買力 ≈ 133 萬</text>
+          <circle cx="700" cy="161" r="22" fill="#60a5fa" opacity="0.25"/>
+          <circle cx="700" cy="161" r="7" fill="#60a5fa"/>
+          <text x="728" y="156" fill="#dbeafe" font-size="15" font-weight="bold">B · 187 萬</text>
+          <text x="728" y="174" fill="#94a3b8" font-size="11">通膨後實質購買力 ≈ 131 萬</text>
 
-          <circle cx="700" cy="89" r="24" fill="#fbbf24" opacity="0.3"/>
-          <circle cx="700" cy="89" r="8" fill="#fbbf24"/>
-          <text x="728" y="84" fill="#fef3c7" font-size="15" font-weight="bold">C · 243 萬</text>
-          <text x="728" y="102" fill="#fde68a" font-size="11">+ 18 年完整全險保障</text>
+          <circle cx="700" cy="100" r="24" fill="#fbbf24" opacity="0.3"/>
+          <circle cx="700" cy="100" r="8" fill="#fbbf24"/>
+          <text x="728" y="95" fill="#fef3c7" font-size="15" font-weight="bold">C · 234 萬</text>
+          <text x="728" y="113" fill="#fde68a" font-size="11">+ 18 年完整全險保障</text>
 
           <rect x="100" y="465" width="28" height="3.5" fill="#94a3b8"/>
           <text x="136" y="472" fill="#cbd5e1" font-size="13">A 花掉</text>
@@ -201,7 +208,7 @@ export const article: BlogArticle = {
           <line x1="610" y1="468" x2="638" y2="468" stroke="#ef4444" stroke-dasharray="4,3" stroke-width="2"/>
           <text x="646" y="472" fill="#fca5a5" font-size="13">教育金基準線</text>
 
-          <text x="400" y="498" text-anchor="middle" fill="#fde68a" font-size="14" font-weight="bold">C 與 A 差距 = 202 萬 + 18 年保障　|　C 比 B 多 53 萬 + 18 年保障</text>
+          <text x="400" y="498" text-anchor="middle" fill="#fde68a" font-size="14" font-weight="bold">C 與 A 差距 = 194 萬 + 18 年保障　|　C 比 B 多 47 萬 + 18 年保障</text>
         </svg>
       </div>
 
@@ -209,19 +216,19 @@ export const article: BlogArticle = {
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
         <div class="bg-slate-900/60 border-2 border-slate-700 rounded-2xl p-5 text-center">
           <div class="text-slate-400 text-xs font-bold tracking-widest mb-2">選擇 A · 花掉</div>
-          <div class="text-4xl font-black text-slate-300 mb-1">41 <span class="text-lg text-slate-500">萬</span></div>
+          <div class="text-4xl font-black text-slate-300 mb-1">40 <span class="text-lg text-slate-500">萬</span></div>
           <div class="text-3xl mb-2">❌</div>
           <div class="text-sm text-slate-400 leading-relaxed">教育金不足<br/>孩子背學貸 / 動您退休金<br/>過程中無保障</div>
         </div>
         <div class="bg-blue-950/40 border-2 border-blue-700/50 rounded-2xl p-5 text-center">
           <div class="text-blue-400 text-xs font-bold tracking-widest mb-2">選擇 B · 銀行定存</div>
-          <div class="text-4xl font-black text-blue-300 mb-1">190 <span class="text-lg text-blue-500">萬</span></div>
+          <div class="text-4xl font-black text-blue-300 mb-1">187 <span class="text-lg text-blue-500">萬</span></div>
           <div class="text-3xl mb-2">🟡</div>
-          <div class="text-sm text-slate-400 leading-relaxed">通膨吃掉購買力<br/>實質約 133 萬<br/>過程中無保障</div>
+          <div class="text-sm text-slate-400 leading-relaxed">通膨吃掉購買力<br/>實質約 131 萬<br/>過程中無保障</div>
         </div>
         <div class="bg-yellow-950/40 border-2 border-yellow-600/60 rounded-2xl p-5 text-center shadow-xl shadow-yellow-900/20">
           <div class="text-yellow-400 text-xs font-bold tracking-widest mb-2">選擇 C · 規劃</div>
-          <div class="text-4xl font-black text-yellow-300 mb-1">243 <span class="text-lg text-yellow-500">萬</span></div>
+          <div class="text-4xl font-black text-yellow-300 mb-1">234 <span class="text-lg text-yellow-500">萬</span></div>
           <div class="text-3xl mb-2">✅</div>
           <div class="text-sm text-slate-300 leading-relaxed">教育金充足<br/><strong class="text-yellow-200">+ 18 年完整全險</strong><br/>孩子不背學貸、您不動退休金</div>
         </div>
