@@ -45,6 +45,7 @@ export default function WhiteboardPage() {
   const initialLoadedRef = useRef(false) // 是否已載入初始 snapshot（presenter 只載入一次）
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isPresenterRef = useRef(false) // 給 listener 用的 ref（避免 stale closure）
+  const viewerUnsubRef = useRef<(() => void) | null>(null) // viewer mode 的 onSnapshot 取消函式
 
   // Detect route on mount
   useEffect(() => {
@@ -74,13 +75,12 @@ export default function WhiteboardPage() {
     setView('board')
   }
 
-  // ===== Validate presenter token + sync =====
+  // ===== Validate presenter token (一次性) =====
   useEffect(() => {
     if (view !== 'board' || !roomId) return
     let isCurrentRoom = true
     const ref = doc(db, COLLECTION, roomId)
 
-    // First load: verify token + 設定 URL
     getDoc(ref).then((snap) => {
       if (!isCurrentRoom) return
       if (!snap.exists()) {
@@ -98,67 +98,83 @@ export default function WhiteboardPage() {
       setPresenterUrl(`${base}?${PRESENTER_TOKEN_KEY}=${data.presenterToken}`)
     })
 
-    // Real-time listener
-    // - Presenter: 只在「第一次」載入初始 snapshot，之後完全不接收（避免自己的 echo 洗掉畫面）
-    // - Viewer: 每次都套用最新 snapshot
-    const unsub = onSnapshot(ref, (snap) => {
-      if (!snap.exists() || !editorRef.current) return
-      const data = snap.data()
-      const remoteSnap = data.snapshot as TLStoreSnapshot | null
-      if (!remoteSnap) return
-
-      // Presenter 只在初始載入一次就不再套用任何遠端資料
-      if (isPresenterRef.current) {
-        if (initialLoadedRef.current) return
-        initialLoadedRef.current = true
-        try {
-          loadSnapshot(editorRef.current.store, remoteSnap)
-        } catch (err) {
-          console.error('Initial load failed:', err)
-        }
-        return
-      }
-
-      // Viewer: 套用每一次更新（這是純唯讀，不會有衝突）
-      try {
-        loadSnapshot(editorRef.current.store, remoteSnap)
-      } catch (err) {
-        console.error('Failed to apply remote snapshot:', err)
-      }
-    })
-
     return () => {
       isCurrentRoom = false
-      unsub()
     }
   }, [view, roomId, presenterToken])
 
-  // ===== Push local changes to Firestore (debounced) =====
-  const handleMount = (editor: Editor) => {
+  // ===== Editor mounted — 根據角色分流 =====
+  // Presenter: 一次性讀取初始 snapshot + 用 store.listen 寫入 Firestore
+  // Viewer:    onSnapshot 訂閱遠端 → 套用到 editor（純唯讀）
+  // 重點：Presenter 完全不訂閱 Firestore，避免自己的 echo
+  const handleMount = async (editor: Editor) => {
     editorRef.current = editor
+    if (!roomId) return
 
-    // 用 ref 判斷（避免 closure stale）
+    // 等 isPresenter 解析完成（token 驗證可能還沒回來）
+    // 最多等 2 秒
+    const waitForPresenterResolved = async () => {
+      const start = Date.now()
+      while (Date.now() - start < 2000) {
+        const initialSnap = await getDoc(doc(db, COLLECTION, roomId))
+        if (initialSnap.exists()) return initialSnap
+        await new Promise(r => setTimeout(r, 100))
+      }
+      return null
+    }
+
+    const initialDoc = await waitForPresenterResolved()
+    const remoteSnap = initialDoc?.data()?.snapshot as TLStoreSnapshot | null
+
+    // 套用初始 snapshot（兩種角色都需要）
+    if (remoteSnap) {
+      try {
+        loadSnapshot(editor.store, remoteSnap)
+      } catch (err) {
+        console.error('Initial snapshot load failed:', err)
+      }
+    }
+    initialLoadedRef.current = true
+
+    // 設定 readOnly
     editor.updateInstanceState({ isReadonly: !isPresenterRef.current })
 
-    // Listen for changes from local user
-    editor.store.listen(() => {
-      if (!isPresenterRef.current) return
+    if (isPresenterRef.current) {
+      // === Presenter mode: 寫入 Firestore，不訂閱 ===
+      editor.store.listen(() => {
+        if (!isPresenterRef.current) return
 
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
-      debounceTimerRef.current = setTimeout(async () => {
-        if (!roomId || !editorRef.current) return
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = setTimeout(async () => {
+          if (!roomId || !editorRef.current) return
+          try {
+            const snap = getSnapshot(editorRef.current.store)
+            await setDoc(
+              doc(db, COLLECTION, roomId),
+              { snapshot: snap, updatedAt: serverTimestamp() },
+              { merge: true }
+            )
+          } catch (err) {
+            console.error('Failed to sync snapshot:', err)
+          }
+        }, SYNC_DEBOUNCE_MS)
+      }, { source: 'user', scope: 'document' })
+    } else {
+      // === Viewer mode: 訂閱 Firestore，套用所有更新（不寫入） ===
+      const unsub = onSnapshot(doc(db, COLLECTION, roomId), (snap) => {
+        if (!snap.exists() || !editorRef.current) return
+        const data = snap.data()
+        const newSnap = data.snapshot as TLStoreSnapshot | null
+        if (!newSnap) return
         try {
-          const snap = getSnapshot(editorRef.current.store)
-          await setDoc(
-            doc(db, COLLECTION, roomId),
-            { snapshot: snap, updatedAt: serverTimestamp() },
-            { merge: true }
-          )
+          loadSnapshot(editorRef.current.store, newSnap)
         } catch (err) {
-          console.error('Failed to sync snapshot:', err)
+          console.error('Failed to apply remote snapshot:', err)
         }
-      }, SYNC_DEBOUNCE_MS)
-    }, { source: 'user', scope: 'document' })
+      })
+      // 存到 ref 以便 cleanup
+      viewerUnsubRef.current = unsub
+    }
   }
 
   // 當 isPresenter resolved 後，更新 ref + readOnly
@@ -168,6 +184,14 @@ export default function WhiteboardPage() {
       editorRef.current.updateInstanceState({ isReadonly: !isPresenter })
     }
   }, [isPresenter])
+
+  // Cleanup viewer subscription on unmount
+  useEffect(() => {
+    return () => {
+      viewerUnsubRef.current?.()
+      viewerUnsubRef.current = null
+    }
+  }, [])
 
   // ===== Permanent save (snapshot to history) =====
   const handleSave = async () => {
