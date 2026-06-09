@@ -42,9 +42,9 @@ export default function WhiteboardPage() {
   const [historyList, setHistoryList] = useState<any[]>([])
   const [saved, setSaved] = useState(false)
   const editorRef = useRef<Editor | null>(null)
-  const remoteApplyingRef = useRef(false)
-  const lastLocalUpdateRef = useRef<number>(0)
+  const initialLoadedRef = useRef(false) // 是否已載入初始 snapshot（presenter 只載入一次）
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isPresenterRef = useRef(false) // 給 listener 用的 ref（避免 stale closure）
 
   // Detect route on mount
   useEffect(() => {
@@ -80,7 +80,7 @@ export default function WhiteboardPage() {
     let isCurrentRoom = true
     const ref = doc(db, COLLECTION, roomId)
 
-    // First load: verify token + apply existing snapshot
+    // First load: verify token + 設定 URL
     getDoc(ref).then((snap) => {
       if (!isCurrentRoom) return
       if (!snap.exists()) {
@@ -91,31 +91,39 @@ export default function WhiteboardPage() {
       const data = snap.data()
       const validPresenter = !!presenterToken && data.presenterToken === presenterToken
       setIsPresenter(validPresenter)
+      isPresenterRef.current = validPresenter
 
       const base = `${window.location.origin}/whiteboard/${roomId}`
       setViewerUrl(base)
       setPresenterUrl(`${base}?${PRESENTER_TOKEN_KEY}=${data.presenterToken}`)
     })
 
-    // Real-time listener: apply remote snapshots
+    // Real-time listener
+    // - Presenter: 只在「第一次」載入初始 snapshot，之後完全不接收（避免自己的 echo 洗掉畫面）
+    // - Viewer: 每次都套用最新 snapshot
     const unsub = onSnapshot(ref, (snap) => {
-      if (!snap.exists()) return
+      if (!snap.exists() || !editorRef.current) return
       const data = snap.data()
       const remoteSnap = data.snapshot as TLStoreSnapshot | null
-      const remoteUpdatedAt = data.updatedAt?.toMillis?.() || 0
+      if (!remoteSnap) return
 
-      // Only apply if remote is NEWER than our last local update + buffer
-      if (!remoteSnap || !editorRef.current) return
-      if (remoteUpdatedAt <= lastLocalUpdateRef.current + 200) return
+      // Presenter 只在初始載入一次就不再套用任何遠端資料
+      if (isPresenterRef.current) {
+        if (initialLoadedRef.current) return
+        initialLoadedRef.current = true
+        try {
+          loadSnapshot(editorRef.current.store, remoteSnap)
+        } catch (err) {
+          console.error('Initial load failed:', err)
+        }
+        return
+      }
 
+      // Viewer: 套用每一次更新（這是純唯讀，不會有衝突）
       try {
-        remoteApplyingRef.current = true
         loadSnapshot(editorRef.current.store, remoteSnap)
       } catch (err) {
         console.error('Failed to apply remote snapshot:', err)
-      } finally {
-        // Allow local changes again after a tick
-        setTimeout(() => { remoteApplyingRef.current = false }, 50)
       }
     })
 
@@ -129,22 +137,18 @@ export default function WhiteboardPage() {
   const handleMount = (editor: Editor) => {
     editorRef.current = editor
 
-    // Force readOnly for viewers
-    if (!isPresenter) {
-      editor.updateInstanceState({ isReadonly: true })
-    }
+    // 用 ref 判斷（避免 closure stale）
+    editor.updateInstanceState({ isReadonly: !isPresenterRef.current })
 
     // Listen for changes from local user
     editor.store.listen(() => {
-      if (!isPresenter) return
-      if (remoteApplyingRef.current) return
+      if (!isPresenterRef.current) return
 
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
       debounceTimerRef.current = setTimeout(async () => {
         if (!roomId || !editorRef.current) return
         try {
           const snap = getSnapshot(editorRef.current.store)
-          lastLocalUpdateRef.current = Date.now()
           await setDoc(
             doc(db, COLLECTION, roomId),
             { snapshot: snap, updatedAt: serverTimestamp() },
@@ -157,8 +161,9 @@ export default function WhiteboardPage() {
     }, { source: 'user', scope: 'document' })
   }
 
-  // Re-apply readOnly when isPresenter resolves
+  // 當 isPresenter resolved 後，更新 ref + readOnly
   useEffect(() => {
+    isPresenterRef.current = isPresenter
     if (editorRef.current) {
       editorRef.current.updateInstanceState({ isReadonly: !isPresenter })
     }
