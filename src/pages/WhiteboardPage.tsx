@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Tldraw, Editor, TLStoreSnapshot, getSnapshot, loadSnapshot } from 'tldraw'
+import { Tldraw, Editor, TLStoreSnapshot, getSnapshot } from 'tldraw'
 import 'tldraw/tldraw.css'
-import { doc, onSnapshot, setDoc, getDoc, collection, addDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from 'firebase/firestore'
+import { doc, onSnapshot, setDoc, getDoc, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'firebase/firestore'
 import { db } from '../firebase'
-import { ArrowLeft, Save, Share2, Eye, Users, Copy, Check, History } from 'lucide-react'
+import { ArrowLeft, Save, Share2, Eye, Users, Check, History, Loader2 } from 'lucide-react'
 
-// --- Config ---
 const COLLECTION = 'whiteboards'
-const SYNC_DEBOUNCE_MS = 250
+const SYNC_DEBOUNCE_MS = 400
 const PRESENTER_TOKEN_KEY = 'p'
 
 function generateId(len = 8): string {
@@ -16,11 +15,9 @@ function generateId(len = 8): string {
   for (let i = 0; i < len; i++) id += chars[Math.floor(Math.random() * chars.length)]
   return id
 }
-
 function generateToken(): string {
   return generateId(24)
 }
-
 function parseRoute(): { roomId: string | null; presenterToken: string | null } {
   const path = window.location.pathname
   const match = path.match(/^\/whiteboard\/([a-z0-9]+)/)
@@ -31,33 +28,62 @@ function parseRoute(): { roomId: string | null; presenterToken: string | null } 
 }
 
 export default function WhiteboardPage() {
-  const [view, setView] = useState<'home' | 'board' | 'history'>('home')
+  const [view, setView] = useState<'home' | 'board' | 'history' | 'loading'>('home')
   const [roomId, setRoomId] = useState<string | null>(null)
   const [presenterToken, setPresenterToken] = useState<string | null>(null)
   const [isPresenter, setIsPresenter] = useState(false)
+  const [initialSnapshot, setInitialSnapshot] = useState<TLStoreSnapshot | undefined>(undefined)
   const [presenterUrl, setPresenterUrl] = useState<string>('')
   const [viewerUrl, setViewerUrl] = useState<string>('')
   const [copied, setCopied] = useState<'presenter' | 'viewer' | null>(null)
-  const [viewerCount, setViewerCount] = useState(1)
   const [historyList, setHistoryList] = useState<any[]>([])
   const [saved, setSaved] = useState(false)
   const editorRef = useRef<Editor | null>(null)
-  const initialLoadedRef = useRef(false) // 是否已載入初始 snapshot（presenter 只載入一次）
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const isPresenterRef = useRef(false) // 給 listener 用的 ref（避免 stale closure）
-  const viewerUnsubRef = useRef<(() => void) | null>(null) // viewer mode 的 onSnapshot 取消函式
+  const isPresenterRef = useRef(false)
+  const viewerUnsubRef = useRef<(() => void) | null>(null)
 
-  // Detect route on mount
+  // === 偵測 route + 載入初始狀態 ===
   useEffect(() => {
     const { roomId: rid, presenterToken: tok } = parseRoute()
-    if (rid) {
-      setRoomId(rid)
-      setPresenterToken(tok)
-      setView('board')
-    }
+    if (!rid) return // 留在首頁
+    setRoomId(rid)
+    setPresenterToken(tok)
+    setView('loading')
+
+    ;(async () => {
+      try {
+        const ref = doc(db, COLLECTION, rid)
+        const snap = await getDoc(ref)
+        if (!snap.exists()) {
+          alert('白板不存在')
+          window.location.href = '/whiteboard'
+          return
+        }
+        const data = snap.data()
+        const validPresenter = !!tok && data.presenterToken === tok
+        setIsPresenter(validPresenter)
+        isPresenterRef.current = validPresenter
+
+        const base = `${window.location.origin}/whiteboard/${rid}`
+        setViewerUrl(base)
+        setPresenterUrl(`${base}?${PRESENTER_TOKEN_KEY}=${data.presenterToken}`)
+
+        // 注意：snapshot 直接傳給 Tldraw，不在 onMount 後才 load
+        const remoteSnap = data.snapshot as TLStoreSnapshot | null
+        if (remoteSnap) {
+          setInitialSnapshot(remoteSnap)
+        }
+        setView('board')
+      } catch (err) {
+        console.error('Load whiteboard failed:', err)
+        alert('載入白板失敗')
+        window.location.href = '/whiteboard'
+      }
+    })()
   }, [])
 
-  // ===== Create new whiteboard =====
+  // === Create new whiteboard ===
   const handleCreate = async () => {
     const newRoomId = generateId(8)
     const newToken = generateToken()
@@ -69,81 +95,18 @@ export default function WhiteboardPage() {
       title: `白板 ${new Date().toLocaleString('zh-TW')}`,
     })
     const base = `${window.location.origin}/whiteboard/${newRoomId}`
-    window.history.pushState({}, '', `${base}?${PRESENTER_TOKEN_KEY}=${newToken}`)
-    setRoomId(newRoomId)
-    setPresenterToken(newToken)
-    setView('board')
+    window.location.href = `${base}?${PRESENTER_TOKEN_KEY}=${newToken}`
   }
 
-  // ===== Validate presenter token (一次性) =====
-  useEffect(() => {
-    if (view !== 'board' || !roomId) return
-    let isCurrentRoom = true
-    const ref = doc(db, COLLECTION, roomId)
-
-    getDoc(ref).then((snap) => {
-      if (!isCurrentRoom) return
-      if (!snap.exists()) {
-        alert('白板不存在')
-        window.location.href = '/whiteboard'
-        return
-      }
-      const data = snap.data()
-      const validPresenter = !!presenterToken && data.presenterToken === presenterToken
-      setIsPresenter(validPresenter)
-      isPresenterRef.current = validPresenter
-
-      const base = `${window.location.origin}/whiteboard/${roomId}`
-      setViewerUrl(base)
-      setPresenterUrl(`${base}?${PRESENTER_TOKEN_KEY}=${data.presenterToken}`)
-    })
-
-    return () => {
-      isCurrentRoom = false
-    }
-  }, [view, roomId, presenterToken])
-
-  // ===== Editor mounted — 根據角色分流 =====
-  // Presenter: 一次性讀取初始 snapshot + 用 store.listen 寫入 Firestore
-  // Viewer:    onSnapshot 訂閱遠端 → 套用到 editor（純唯讀）
-  // 重點：Presenter 完全不訂閱 Firestore，避免自己的 echo
-  const handleMount = async (editor: Editor) => {
+  // === Editor mount: 設定 readOnly + 訂閱 / 寫入 ===
+  const handleMount = (editor: Editor) => {
     editorRef.current = editor
-    if (!roomId) return
-
-    // 等 isPresenter 解析完成（token 驗證可能還沒回來）
-    // 最多等 2 秒
-    const waitForPresenterResolved = async () => {
-      const start = Date.now()
-      while (Date.now() - start < 2000) {
-        const initialSnap = await getDoc(doc(db, COLLECTION, roomId))
-        if (initialSnap.exists()) return initialSnap
-        await new Promise(r => setTimeout(r, 100))
-      }
-      return null
-    }
-
-    const initialDoc = await waitForPresenterResolved()
-    const remoteSnap = initialDoc?.data()?.snapshot as TLStoreSnapshot | null
-
-    // 套用初始 snapshot（兩種角色都需要）
-    if (remoteSnap) {
-      try {
-        loadSnapshot(editor.store, remoteSnap)
-      } catch (err) {
-        console.error('Initial snapshot load failed:', err)
-      }
-    }
-    initialLoadedRef.current = true
-
-    // 設定 readOnly
     editor.updateInstanceState({ isReadonly: !isPresenterRef.current })
 
     if (isPresenterRef.current) {
-      // === Presenter mode: 寫入 Firestore，不訂閱 ===
+      // Presenter: 監聽本地變更 → 寫入 Firestore（不訂閱 Firestore）
       editor.store.listen(() => {
         if (!isPresenterRef.current) return
-
         if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
         debounceTimerRef.current = setTimeout(async () => {
           if (!roomId || !editorRef.current) return
@@ -155,29 +118,42 @@ export default function WhiteboardPage() {
               { merge: true }
             )
           } catch (err) {
-            console.error('Failed to sync snapshot:', err)
+            console.error('Sync failed:', err)
           }
         }, SYNC_DEBOUNCE_MS)
       }, { source: 'user', scope: 'document' })
     } else {
-      // === Viewer mode: 訂閱 Firestore，套用所有更新（不寫入） ===
-      const unsub = onSnapshot(doc(db, COLLECTION, roomId), (snap) => {
+      // Viewer: 訂閱 Firestore → 用 mergeRemoteChanges 套用，避免 tldraw 抓到競態
+      const unsub = onSnapshot(doc(db, COLLECTION, roomId!), (snap) => {
         if (!snap.exists() || !editorRef.current) return
         const data = snap.data()
         const newSnap = data.snapshot as TLStoreSnapshot | null
-        if (!newSnap) return
+        if (!newSnap?.store) return
         try {
-          loadSnapshot(editorRef.current.store, newSnap)
+          // 用 mergeRemoteChanges 將遠端記錄寫進 store
+          // 標記為「remote source」，避免觸發我們自己的 user-source listener
+          editorRef.current.store.mergeRemoteChanges(() => {
+            const records = Object.values(newSnap.store)
+            editorRef.current!.store.put(records as any)
+          })
         } catch (err) {
-          console.error('Failed to apply remote snapshot:', err)
+          console.error('Apply remote failed:', err)
         }
       })
-      // 存到 ref 以便 cleanup
       viewerUnsubRef.current = unsub
     }
   }
 
-  // 當 isPresenter resolved 後，更新 ref + readOnly
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      viewerUnsubRef.current?.()
+      viewerUnsubRef.current = null
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    }
+  }, [])
+
+  // 角色變更時更新 readOnly
   useEffect(() => {
     isPresenterRef.current = isPresenter
     if (editorRef.current) {
@@ -185,15 +161,7 @@ export default function WhiteboardPage() {
     }
   }, [isPresenter])
 
-  // Cleanup viewer subscription on unmount
-  useEffect(() => {
-    return () => {
-      viewerUnsubRef.current?.()
-      viewerUnsubRef.current = null
-    }
-  }, [])
-
-  // ===== Permanent save (snapshot to history) =====
+  // === Save permanent snapshot ===
   const handleSave = async () => {
     if (!roomId || !editorRef.current) return
     try {
@@ -213,7 +181,6 @@ export default function WhiteboardPage() {
     }
   }
 
-  // ===== Copy URL =====
   const copyUrl = (which: 'presenter' | 'viewer') => {
     const url = which === 'presenter' ? presenterUrl : viewerUrl
     navigator.clipboard.writeText(url).then(() => {
@@ -222,15 +189,10 @@ export default function WhiteboardPage() {
     })
   }
 
-  // ===== History list =====
   const loadHistoryList = async () => {
     setView('history')
     try {
-      const q = query(
-        collection(db, COLLECTION),
-        orderBy('createdAt', 'desc'),
-        limit(20)
-      )
+      const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'), limit(20))
       const snaps = await getDocs(q)
       setHistoryList(snaps.docs.map((d) => ({ id: d.id, ...d.data() })))
     } catch (err) {
@@ -243,7 +205,19 @@ export default function WhiteboardPage() {
     window.location.href = url
   }
 
-  // ============ HOME VIEW ============
+  // ============ LOADING ============
+  if (view === 'loading') {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 size={32} className="animate-spin text-amber-500 mx-auto mb-3" />
+          <p className="text-slate-400">載入白板中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ============ HOME ============
   if (view === 'home') {
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6 flex flex-col items-center justify-center">
@@ -278,7 +252,7 @@ export default function WhiteboardPage() {
     )
   }
 
-  // ============ HISTORY VIEW ============
+  // ============ HISTORY ============
   if (view === 'history') {
     return (
       <div className="min-h-screen bg-slate-950 text-white p-6">
@@ -317,10 +291,9 @@ export default function WhiteboardPage() {
     )
   }
 
-  // ============ BOARD VIEW ============
+  // ============ BOARD ============
   return (
     <div className="fixed inset-0 flex flex-col bg-slate-950">
-      {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800 text-sm">
         <div className="flex items-center gap-3">
           <button onClick={() => { window.location.href = '/whiteboard' }} className="text-slate-400 hover:text-white">
@@ -360,9 +333,11 @@ export default function WhiteboardPage() {
         </div>
       </div>
 
-      {/* tldraw fills remaining space */}
+      {/* tldraw: snapshot 透過 prop 傳入，不在 onMount 後才 load */}
       <div className="flex-1 relative">
         <Tldraw
+          key={roomId} // 確保 roomId 改變時重新建立 editor
+          snapshot={initialSnapshot}
           onMount={handleMount}
           autoFocus
         />
