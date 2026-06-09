@@ -40,20 +40,16 @@ const registerServiceWorker = async () => {
 
       console.log('[SW] Service Worker registered:', registration.scope);
 
-      // 監聽更新
+      // 監聽更新（靜默更新，不打擾用戶）
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
         console.log('[SW] New Service Worker installing...');
 
         newWorker?.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // 新版本可用，通知用戶
-            console.log('[SW] New version available! Refresh to update.');
-
-            // 可選：顯示更新提示
-            if (window.confirm('Ultra Advisor 有新版本可用，是否立即更新？')) {
-              window.location.reload();
-            }
+            console.log('[SW] New version installed in background. Will activate on next page load.');
+            // 不顯示彈窗 — 新版本會在下次切換頁面時自動生效（skipWaiting + clients.claim）
+            // 避免在使用中（例如畫白板）被打擾
           }
         });
       });
