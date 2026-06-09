@@ -29,6 +29,12 @@
       "short_name": "文章",
       "description": "財務規劃知識庫",
       "url": "/blog"
+    },
+    {
+      "name": "Ultra 白板",
+      "short_name": "白板",
+      "description": "即時協作白板",
+      "url": "/whiteboard"
     }
   ],
   "categories": ["finance", "business", "productivity"],

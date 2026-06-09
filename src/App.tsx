@@ -61,6 +61,7 @@ const BookingPage = lazy(() => import('./pages/BookingPage'));
 const AlliancePage = lazy(() => import('./pages/AlliancePage'));
 const PartnerApplicationPage = lazy(() => import('./pages/PartnerApplicationPage'));
 const UltraCloudDemo = lazy(() => import('./pages/UltraCloudDemo'));
+const WhiteboardPage = lazy(() => import('./pages/WhiteboardPage'));
 const EnglishLandingPage = lazy(() => import('./pages/EnglishLandingPage'));
 
 // 🆕 主題切換
@@ -163,6 +164,7 @@ export default function App() {
   const [isAllianceRoute, setIsAllianceRoute] = useState(() => window.location.pathname === '/alliance'); // 🆕 傲創聯盟路由
   const [isPartnerApplyRoute, setIsPartnerApplyRoute] = useState(() => window.location.pathname === '/partner-apply'); // 🆕 合作夥伴申請路由
   const [isUltraCloudDemoRoute, setIsUltraCloudDemoRoute] = useState(() => window.location.pathname === '/ultracloud'); // 🆕 UltraCloud Demo 路由
+  const [isWhiteboardRoute, setIsWhiteboardRoute] = useState(() => window.location.pathname.startsWith('/whiteboard')); // 🆕 Ultra 白板
   const [isEnglishRoute, setIsEnglishRoute] = useState(() => window.location.pathname === '/en'); // 🆕 英文版
   const [clientLoading, setClientLoading] = useState(false); 
   const [currentClient, setCurrentClient] = useState<any>(null);
@@ -383,8 +385,9 @@ export default function App() {
       setIsAllianceRoute(path === '/alliance'); // 🆕 傲創聯盟
       setIsPartnerApplyRoute(path === '/partner-apply'); // 🆕 合作夥伴申請
       setIsUltraCloudDemoRoute(path === '/ultracloud'); // 🆕 UltraCloud Demo
+      setIsWhiteboardRoute(path.startsWith('/whiteboard')); // 🆕 Ultra 白板
       setIsEnglishRoute(path === '/en'); // 🆕 英文版
-      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsEnglishRoute(false); }
+      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -402,6 +405,7 @@ export default function App() {
     else if (path === '/alliance') setIsAllianceRoute(true); // 🆕 傲創聯盟
     else if (path === '/partner-apply') setIsPartnerApplyRoute(true); // 🆕 合作夥伴申請
     else if (path === '/ultracloud') setIsUltraCloudDemoRoute(true); // 🆕 UltraCloud Demo
+    else if (path.startsWith('/whiteboard')) setIsWhiteboardRoute(true); // 🆕 Ultra 白板
     else if (path === '/en') setIsEnglishRoute(true); // 🆕 英文版
 
     // 🆕 SplashScreen 只在這個 session 第一次進入時顯示
@@ -654,6 +658,15 @@ export default function App() {
           window.location.reload();
         }}
       />
+      </Suspense>
+    );
+  }
+
+  // 🆕 Ultra 白板 — 即時協作白板，iPad 友善
+  if (isWhiteboardRoute || window.location.pathname.startsWith('/whiteboard')) {
+    return (
+      <Suspense fallback={<SplashScreen />}>
+        <WhiteboardPage />
       </Suspense>
     );
   }

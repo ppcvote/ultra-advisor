@@ -157,7 +157,31 @@ service cloud.firestore {
     }
 
     // ============================================
-    // 6. 安全保底（預設拒絕）
+    // 7. Ultra 白板（公開讀取連結即可看，主持人 token 才能寫）
+    // ============================================
+    match /whiteboards/{roomId} {
+      // 任何人有連結都能看
+      allow read: if true;
+      // 建立新白板：需要登入
+      allow create: if isSignedIn();
+      // 更新：本來就應該由主持人做，但 Firestore 拿不到自定義 token；
+      // 改用「文件已存在且 presenterToken 不被改」+「snapshot/updatedAt/title 可改」的限制
+      // 實務上前端只在驗證 token 後才寫，這裡是第二層保護
+      allow update: if request.resource.data.presenterToken == resource.data.presenterToken
+                    && request.resource.data.createdAt == resource.data.createdAt;
+      // 不允許刪除
+      allow delete: if false;
+
+      // 歷史快照（已儲存的版本）
+      match /history/{snapshotId} {
+        allow read: if true;
+        allow create: if isSignedIn();
+        allow update, delete: if false;
+      }
+    }
+
+    // ============================================
+    // 8. 安全保底（預設拒絕）
     // ============================================
     match /{document=**} {
       allow read, write: if false;

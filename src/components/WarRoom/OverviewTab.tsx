@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   BookOpen, ExternalLink, RefreshCw, Share2, TrendingUp,
-  Crown, Users, Wrench, ArrowRight, Newspaper, Plus, Zap, Mic
+  Crown, Users, Wrench, ArrowRight, Newspaper, Plus, Zap, Mic, PencilRuler
 } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -304,6 +304,27 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
             <p className="text-[11px] text-slate-400">會議錄音 → 逐字稿 → AI 摘要 → 簡報，一鍵交差</p>
           </div>
           <ArrowRight size={16} className="text-slate-600 group-hover:text-amber-400 transition-colors shrink-0" />
+        </div>
+      </a>
+
+      {/* ====== Ultra 白板 ====== */}
+      <a href="/whiteboard"
+        className="w-full rounded-2xl overflow-hidden relative group text-left
+                   bg-gradient-to-br from-sky-950/40 to-slate-900 border border-sky-800/30
+                   hover:border-sky-500/40 hover:shadow-lg hover:shadow-sky-500/10 transition-all p-5 block">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-sky-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-sky-500/15 flex items-center justify-center shrink-0">
+            <PencilRuler size={22} className="text-sky-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-sm font-bold text-white">Ultra 白板</span>
+              <span className="text-[9px] bg-sky-500/15 text-sky-400 px-2 py-0.5 rounded-full font-bold">NEW</span>
+            </div>
+            <p className="text-[11px] text-slate-400">即時協作白板 · iPad 友善 · 一連結分享給團隊</p>
+          </div>
+          <ArrowRight size={16} className="text-slate-600 group-hover:text-sky-400 transition-colors shrink-0" />
         </div>
       </a>
     </div>
