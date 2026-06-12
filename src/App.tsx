@@ -58,6 +58,7 @@ const LiffRegister = lazy(() => import('./pages/LiffRegister'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const BlogPage = lazy(() => import('./pages/BlogPage'));
 const BookingPage = lazy(() => import('./pages/BookingPage'));
+const ResearchPage = lazy(() => import('./pages/ResearchPage')); // 🆕 研究報告（AI Trust Thesis）
 const AlliancePage = lazy(() => import('./pages/AlliancePage'));
 const PartnerApplicationPage = lazy(() => import('./pages/PartnerApplicationPage'));
 const UltraCloudDemo = lazy(() => import('./pages/UltraCloudDemo'));
@@ -166,6 +167,7 @@ export default function App() {
   const [isUltraCloudDemoRoute, setIsUltraCloudDemoRoute] = useState(() => window.location.pathname === '/ultracloud'); // 🆕 UltraCloud Demo 路由
   const [isWhiteboardRoute, setIsWhiteboardRoute] = useState(() => window.location.pathname.startsWith('/whiteboard')); // 🆕 Ultra 白板
   const [isEnglishRoute, setIsEnglishRoute] = useState(() => window.location.pathname === '/en'); // 🆕 英文版
+  const [isResearchRoute, setIsResearchRoute] = useState(() => window.location.pathname.startsWith('/research')); // 🆕 研究報告
   const [clientLoading, setClientLoading] = useState(false); 
   const [currentClient, setCurrentClient] = useState<any>(null);
   // 🆕 activeTab 持久化：重新整理後保持在原工具介面
@@ -387,7 +389,8 @@ export default function App() {
       setIsUltraCloudDemoRoute(path === '/ultracloud'); // 🆕 UltraCloud Demo
       setIsWhiteboardRoute(path.startsWith('/whiteboard')); // 🆕 Ultra 白板
       setIsEnglishRoute(path === '/en'); // 🆕 英文版
-      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); }
+      setIsResearchRoute(path.startsWith('/research')); // 🆕 研究報告
+      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -688,6 +691,21 @@ export default function App() {
           window.history.pushState({}, '', '/register');
         }}
       />
+      </Suspense>
+    );
+  }
+
+  // 🆕 研究報告（公開，不需登入）— /research、/research/:slug
+  if (isResearchRoute || window.location.pathname.startsWith('/research')) {
+    return (
+      <Suspense fallback={<SplashScreen />}>
+        <ResearchPage
+          onBack={() => {
+            setIsResearchRoute(false);
+            window.history.pushState({}, '', '/');
+            window.location.reload();
+          }}
+        />
       </Suspense>
     );
   }

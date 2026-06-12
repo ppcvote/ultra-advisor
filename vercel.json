@@ -8,6 +8,12 @@
       "runtime": "@vercel/node@5.6.3"
     }
   },
+  "redirects": [
+    { "source": "/research/vol1-the-gateway.html", "destination": "/research/the-gateway", "permanent": true },
+    { "source": "/research/vol2-the-brain.html", "destination": "/research/the-brain", "permanent": true },
+    { "source": "/research/vol3-the-parachute.html", "destination": "/research/the-parachute", "permanent": true },
+    { "source": "/research/index.html", "destination": "/research", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/calculator", "destination": "/api/calculator" },
     { "source": "/blog/:slug", "destination": "/api/blog/:slug" },

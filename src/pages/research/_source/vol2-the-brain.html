@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大腦。Anatomy of an AI Server — Ultra Advisor 研究報告 Vol. II</title>
+<meta name="description" content="解剖一台 AI 伺服器：十個台灣名字、三道關卡、兩檔基金的選擇指南。AI Trust Thesis 系列第二卷。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./assets/note.css">
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <a class="brand" href="https://ultra-advisor.tw">ULTRA ADVISOR</a>
+  <nav>
+    <a href="./index.html">SERIES</a>
+    <a href="./vol1-the-gateway.html">VOL.I</a>
+    <a class="active" href="./vol2-the-brain.html">VOL.II</a>
+    <a href="./vol3-the-parachute.html">VOL.III</a>
+  </nav>
+</div></div>
+
+<header class="cover"><div class="wrap">
+  <div class="meta-row">
+    <div>RESEARCH NOTE<b>NO. 2026-02</b></div>
+    <div>SECTOR<b>AI HARDWARE STACK</b></div>
+    <div>TIME HORIZON<b>5–10 YEARS</b></div>
+    <div>AUTHOR<b>PPC, RFC · CHRP · MDRT</b></div>
+  </div>
+  <div class="kicker">The Brain.</div>
+  <h1 class="display">大腦。</h1>
+  <div class="subtitle-en">Anatomy of an AI Server.</div>
+  <div class="subtitle">解剖一台 AI 伺服器 · 兩檔基金的選擇指南</div>
+  <div class="lede">
+    Vol.I 預測 AI 5,000 億美元資本會經過台灣這個收費站。<br>
+    <span class="hl">Vol.II 不用預測了——每一份財報都在寫下證據。</span>
+  </div>
+  <p class="note">本簡報內容僅供參考，不構成投資建議。投資有賺有賠，申購前請詳閱公開說明書。</p>
+</div></header>
+
+<section><div class="wrap">
+  <div class="sec-label">§ 01 · EXECUTIVE SUMMARY</div>
+  <h2>論述被驗證了</h2>
+  <div class="h2-en">The Thesis, Vindicated</div>
+  <p>去年我寫了一份報告，預測<span class="hl">全球 5,000 億美元 AI 資本，會經過台灣這個「收費站」</span>。當時還是預測。</p>
+  <div class="big-claim">現在不用預測了。</div>
+  <p>2026 年第一季——台灣 AI 供應鏈的核心公司，<span class="hl">幾乎集體刷新營收紀錄</span>。</p>
+  <div class="cards c5">
+    <div class="card"><div class="badge">NEW HIGH</div><h4>信驊</h4><div class="sub">5274 · Aspeed</div>
+      <p style="font-size:13px;margin:0 0 8px">伺服器大腦<br>BMC 全球市佔 80%</p>
+      <div class="stat" style="font-size:19px">月營收 9.0 億</div><div class="stat-note">2026/1 月 · 史上新高（YoY +28%）</div></div>
+    <div class="card"><div class="badge">NEW HIGH</div><h4>致茂</h4><div class="sub">2360 · Chroma</div>
+      <p style="font-size:13px;margin:0 0 8px">AI 晶片<br>測試設備龍頭</p>
+      <div class="stat" style="font-size:19px">+63.49% YoY</div><div class="stat-note">2026/3 月 · 月營收新高</div></div>
+    <div class="card"><div class="badge">NEW HIGH</div><h4>智邦</h4><div class="sub">2345 · Accton</div>
+      <p style="font-size:13px;margin:0 0 8px">資料中心交換器<br>白牌全球 49%</p>
+      <div class="stat" style="font-size:19px">EPS 47.13 元</div><div class="stat-note">2025 全年 · 史上新高（2026 Q1 單季 14.92 元，YoY +62.7%）</div></div>
+    <div class="card"><div class="badge">NEW HIGH</div><h4>創意電子</h4><div class="sub">3443 · GUC</div>
+      <p style="font-size:13px;margin:0 0 8px">Google TPU<br>共同設計夥伴</p>
+      <div class="stat" style="font-size:19px">+62.99% YoY</div><div class="stat-note">2026 Q1 · 營收年增</div></div>
+    <div class="card"><div class="badge">NEW HIGH</div><h4>旺矽</h4><div class="sub">6223 · MPI</div>
+      <p style="font-size:13px;margin:0 0 8px">AI 晶片<br>探針卡龍頭</p>
+      <div class="stat" style="font-size:19px">EPS 4.3 元</div><div class="stat-note">2026/2 月 · 單月新高</div></div>
+  </div>
+  <p>這不是七家公司各自運氣好——<span class="hl">是同一筆錢，按照預測的路徑，準時抵達</span>。</p>
+
+  <h3>但這份報告不是慶功</h3>
+  <p>兌現只是起點。下一個問題是——</p>
+  <div class="big-claim">收費站不是只有一座。</div>
+  <p class="h2-en" style="margin-bottom:18px">Taiwan is not one tollgate · Taiwan is a network of tollgates.</p>
+  <div class="cards c3">
+    <div class="card"><div class="mono-label">TOLLGATE · 01</div><h4>晶片測試</h4><p style="font-size:15px;margin:0">每一顆 AI 晶片出貨前，都要過旺矽 / 穎崴 / 致茂的關</p></div>
+    <div class="card"><div class="mono-label">TOLLGATE · 02</div><h4>伺服器大腦</h4><p style="font-size:15px;margin:0">每一台伺服器運轉前，都要裝上信驊的 BMC</p></div>
+    <div class="card"><div class="mono-label">TOLLGATE · 03</div><h4>網通交換器</h4><p style="font-size:15px;margin:0">每一筆 AI 訊號傳輸，都要過智邦的設備</p></div>
+  </div>
+  <div class="cards c2">
+    <div class="card"><div class="mono-label">FUND A · 引擎派</div><h4>安聯台灣科技基金</h4>
+      <p style="font-size:15px;margin:0">押注 AI 晶片的「最後一關」<br><b>近一年績效：+257.58%</b><span class="stat-note">（截至 2026/Q1，依基金公司公開月報；過去績效不代表未來表現）</span></p></div>
+    <div class="card navy"><div class="mono-label">FUND B · 整車派</div><h4>安聯台灣智慧基金</h4>
+      <p style="font-size:15px;margin:0">押注 AI 資料中心的「整條鏈」<br><b>近一年績效：+259.37%</b><span class="stat-note">（截至 2026/Q1，依基金公司公開月報；過去績效不代表未來表現）</span></p></div>
+  </div>
+  <div class="takeaway"><div class="mono-label">CORE QUESTION · 這份報告要回答的問題</div>
+    <p style="margin:0;font-size:20px"><b class="hl">你的錢，要押 AI 的「鋒尖」，還是 AI 的「整鏈」？</b></p></div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-label">§ 02 · ANATOMY OF AN AI SERVER</div>
+  <h2>十個台灣名字</h2>
+  <div class="h2-en">Ten Taiwan Names · Inside One AI Server</div>
+  <p>如果你拆開一台 NVIDIA 最新的 AI 伺服器——不是 iPhone 那種小裝置，是一台<span class="hl">重達 60 公斤、市價超過 1 億新台幣</span>的怪物。從外殼一層一層拆，你會發現一件事——</p>
+  <div class="big-claim">這台機器裡，有 10 個台灣公司的名字。</div>
+  <p>從骨架到大腦、從晶片到記憶——<span class="hl">每一層關鍵零件，背後都站著一家台灣的隱形冠軍</span>。一台 1 億的伺服器，<span class="hl">超過 50% 的價值流向台灣供應鏈</span>。這不是巧合——這是 30 年產業聚落的結構性結果。</p>
+  <div class="card plain" style="margin:20px 0"><div class="mono-label">A USD 350,000 MACHINE · 一台 AI 伺服器值多少？</div>
+    <p style="font-size:15px;margin:0">· 一台抵 <b>50 台 Toyota Camry</b>　· 等於台北市區一棟<b>小套房</b>　· 2026 年全球將賣出<b>幾萬台</b><br>
+    這不是消費性電子——是<span class="hl">用整棟房子的價格、每年買幾萬棟</span>的工業裝備。</p></div>
+  <div class="cards c3">
+    <div class="card"><div class="mono-label">大腦 · BMC</div><h4>信驊 5274</h4><p style="font-size:14px;margin:0">全球市佔 80% · 台股股王<br>Amazon · Microsoft · Meta</p></div>
+    <div class="card"><div class="mono-label">出貨前必經 · 探針卡</div><h4>旺矽 · 穎崴</h4><p style="font-size:14px;margin:0">6223 · 6515 · 全球前五<br>AI 晶片畢業考的監考官</p></div>
+    <div class="card"><div class="mono-label">量產體檢 · 測試設備</div><h4>致茂 2360</h4><p style="font-size:14px;margin:0">NVIDIA 御用測試廠<br>2026/3 月營收史上新高</p></div>
+    <div class="card"><div class="mono-label">神經網路 · 800G/1.6T</div><h4>智邦 2345</h4><p style="font-size:14px;margin:0">白牌交換器市佔 49%<br>AI 流量在這裡跑</p></div>
+    <div class="card"><div class="mono-label">晶片裁縫 · ASIC 設計</div><h4>創意電子 3443</h4><p style="font-size:14px;margin:0">台積電持股 35%<br>Google TPU 共同設計</p></div>
+    <div class="card"><div class="mono-label">晶片本體 · 先進製程</div><h4>台積電 2330</h4><p style="font-size:14px;margin:0">2/3/5nm 全球壟斷<br>所有 AI 晶片的母體</p></div>
+    <div class="card"><div class="mono-label">骨架 · CCL 基材</div><h4>台光電 2383</h4><p style="font-size:14px;margin:0">M9 等級全球唯一認證<br>M8+ 全球市佔 75%+</p></div>
+    <div class="card"><div class="mono-label">記憶 · DRAM/SSD</div><h4>威剛 3260</h4><p style="font-size:14px;margin:0">全球第 2 大記憶體模組品牌<br>ADATA · XPG · Industrial</p></div>
+    <div class="card plain"><div class="mono-label">配角群像</div><h4>華邦電 + 其他</h4><p style="font-size:14px;margin:0">利基記憶體 · 先進封裝<br>在基金中合計 7-10%</p></div>
+  </div>
+
+  <h3>這張圖告訴我們什麼？</h3>
+  <p>把上面 10 個台灣名字加總——<span class="hl">一台 1 億的 NVIDIA AI 伺服器，超過 50% 的價值流向台灣供應鏈</span>。</p>
+  <div class="cards c2">
+    <div class="card"><div class="mono-label">2026 年的台灣 AI 訂單規模</div>
+      <p style="font-size:15px">如果 2026 年全球賣出 <b>10 萬台</b>這種機器（保守估計）——</p>
+      <div class="stat">5,000 億台幣訂單</div>
+      <p style="font-size:15px;margin:8px 0 0">會在這一年內，流進新竹、台中、台南、高雄的工廠。這個數字相當於——<span class="hl">整個台灣 2026 年中央政府總預算的 19%</span>。</p></div>
+    <div class="card"><div class="mono-label">而這裡才是關鍵</div>
+      <p style="font-size:15px">上面這 10 層，<span class="hl">沒有任何一層是「可被取代」的</span>。</p>
+      <p style="font-size:15px;margin:0">· 你可以換掉 NVIDIA → 換 Google TPU、AMD MI300，但<b>創意設計、台光電供基材、旺矽穎崴測試</b><br>
+      · 你可以把資料中心搬到美國、沙烏地阿拉伯，但<b>核心晶片、模組、測試設備全部還是來自台灣</b></p></div>
+  </div>
+  <div class="takeaway"><div class="mono-label">KEY TAKEAWAY · 接下來的章節</div>
+    <p style="margin:0">後面的章節，會把這 10 層裡的<b class="hl">核心五家公司</b>——信驊 · 致茂 · 智邦 · 旺矽 · 創意電子——一家一家拆開來看。各自的故事、各自的護城河、各自為什麼別人追不上。而最重要的——<b class="hl">這五家公司，全部在同一支基金裡</b>。</p></div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-label">§ 03 · ASPEED TECHNOLOGY</div>
+  <h2>第一個關卡：信驊（5274）</h2>
+  <div class="h2-en">Aspeed · The Hotel Concierge of Servers</div>
+  <h3>它怎麼賺錢</h3>
+  <p>信驊做一顆叫 <span class="hl">BMC（Baseboard Management Controller）</span>的晶片，藏在伺服器主機板裡——就像<span class="hl">飯店的前台</span>，沒有它，整台 1 億的伺服器就是一塊 1 億的磚頭。</p>
+  <p>全球 BMC 市場——<span class="hl">信驊一家拿走 80%</span>。Amazon、Microsoft、Meta 的雲端帝國，每一台伺服器裡都有一顆。</p>
+  <h3>直接買的問題</h3>
+  <div class="cards c3">
+    <div class="card plain"><h4>門檻太高</h4><p style="font-size:15px;margin:0">股價 15,650 元——<span class="hl">一張 1,565 萬</span></p></div>
+    <div class="card plain"><h4>本益比破百</h4><p style="font-size:15px;margin:0">利空一來<span class="hl">單日 −30%</span>，心臟要強</p></div>
+    <div class="card plain"><h4>單一公司風險</h4><p style="font-size:15px;margin:0">OpenBMC 開源若崛起——<span class="hl">一夜變天</span></p></div>
+  </div>
+  <h3>所以你應該做的事</h3>
+  <p>透過<span class="hl">基金</span>買進——讓專業經理人幫你把信驊放進一個分散的組合裡。</p>
+  <table>
+    <tr><th>基金</th><th>信驊在基金中的位置</th></tr>
+    <tr><td>安聯台灣科技（A36004）</td><td>前 20 大持股</td></tr>
+    <tr><td>安聯台灣智慧（A36019）</td><td class="em">第 3 大 · 8.64%</td></tr>
+  </table>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-label">§ 04 · THE THREE TOLLGATES</div>
+  <h2>三道關卡 · 三家公司</h2>
+  <div class="h2-en">Following a Chip Home · Three Tollgates</div>
+  <p>一顆 AI 晶片從台積電出來，到 Amazon 維吉尼亞州的資料中心開機運轉——中間要過<span class="hl">三道台灣的關卡</span>。每一關都是一家世界級公司，每一關都<span class="hl">少了它就過不去</span>。</p>
+  <div class="cards c3">
+    <div class="card"><div class="mono-label">TOLLGATE · 01</div><h4>旺矽 · 6223</h4>
+      <p style="font-size:15px"><span class="hl">畢業考的監考老師</span>——晶片出貨前要過的「探針卡」測試。全球做得到這個精度的公司不到 5 家。</p>
+      <div class="stat-note">股價 3,900 元 · 一張 390 萬</div></div>
+    <div class="card"><div class="mono-label">TOLLGATE · 02</div><h4>致茂 · 2360</h4>
+      <p style="font-size:15px"><span class="hl">NVIDIA 的驗車中心</span>——每顆 GPU 出貨前要在高溫下連測 24 小時。NVIDIA 不自己做，只信致茂。</p>
+      <div class="stat-note">股價 1,000 元 · 一張 100 萬</div></div>
+    <div class="card"><div class="mono-label">TOLLGATE · 03</div><h4>智邦 · 2345</h4>
+      <p style="font-size:15px"><span class="hl">資料中心的 ETC 收費站</span>——AI 訊號要傳輸都得過交換器。<span class="hl">全球白牌交換器市佔 49%</span>。</p>
+      <div class="stat-note">股價 2,000 元 · 一張 200 萬</div></div>
+  </div>
+  <blockquote><div class="mono-label">CALIFORNIA · 1849 · GOLD RUSH</div>
+    真正大賺的，<span class="hl">不是淘金的人</span>——是賣鏟子的、賣牛仔褲的。<br>
+    這三家就是 AI 時代的 Levi's——你不需要知道最後是 NVIDIA、Google TPU、還是 Amazon Trainium 贏。<span class="hl">他們全部都需要過這三道關卡</span>。</blockquote>
+
+  <h3>三張買齊 = 700 萬</h3>
+  <p>想要把這三家「鏟子公司」全部蒐集到自己的帳戶——旺矽 + 致茂 + 智邦各買一張，<span class="hl">總共 690 萬台幣</span>。對絕大多數人來說，<span class="hl">不切實際</span>。</p>
+  <p>而且——買完還要承受集中度風險：三家全在 AI 鏈，<span class="hl">一個 AI 泡沫訊號出來，三張同時跌 30%</span>。你要怎麼配置不相關的避震器？</p>
+  <p><b>答案是——讓<span class="hl">基金經理人幫你買整套鏟子</span>。</b></p>
+  <table>
+    <tr><th>公司</th><th>安聯台灣科技</th><th>安聯台灣智慧</th></tr>
+    <tr><td>旺矽 6223</td><td class="em">第 1 大持股 · 9.14%</td><td>前 10 大</td></tr>
+    <tr><td>致茂 2360</td><td>前 10 大</td><td class="em">前 10 大</td></tr>
+    <tr><td>智邦 2345</td><td>前 10 大</td><td class="em">前 10 大</td></tr>
+    <tr><td>三家合計</td><td>聚焦於旺矽（探針卡）</td><td class="em">三家合計約 17%</td></tr>
+  </table>
+  <div class="takeaway"><div class="mono-label">KEY TAKEAWAY · §03 + §04 收尾</div>
+    <p style="margin:0">四家公司、四個關卡——<b class="hl">信驊（伺服器大腦）+ 旺矽（晶片畢業考）+ 致茂（驗車中心）+ 智邦（ETC 收費站）</b>。全部直接買進——<b class="hl">需要 2,255 萬</b>，且風險集中。透過安聯這兩檔基金——<b class="hl">10 萬台幣起步，分散持有</b>。</p></div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-label">§ 04.5 · WHY NOT ETF</div>
+  <h2>客戶最常問的四個問題</h2>
+  <div class="h2-en">FAQ · Why Not 0050 / 00981A / 半導體 ETF</div>
+  <p>這些問題我每週都會被問到。一次回答清楚——</p>
+  <div class="cards c2">
+    <div class="card"><div class="mono-label">QUESTION · 01</div><h4>「為什麼不買 0050？費用低、又分散」</h4>
+      <p style="font-size:15px;margin:0">0050 包含<span class="hl">台灣前 50 大市值的公司</span>——金控、塑化、鋼鐵、食品<span class="hl">全部都在裡面</span>。台積電佔 50%＋，但其他 49 家——<span class="hl">跟 AI 沒什麼關係</span>。你想押 AI，買到的卻是<span class="hl">大半個台灣經濟的縮影</span>。<b style="color:var(--accent)">純度不夠。</b></p></div>
+    <div class="card"><div class="mono-label">QUESTION · 02</div><h4>「為什麼不買 00981A？它是主動式 ETF、又能配息」</h4>
+      <p style="font-size:15px;margin:0">00981A 持股<span class="hl">每天公告</span>——這是 ETF 的設計，公開透明。但這也帶來一個結構性缺陷——「ETF 容易被跟單，<span class="hl">只能買大型有量的股票</span>。<span class="hl">如果發現新的飆股，必須用基金來購買</span>。」（該檔 ETF 經理人於媒體訪談所言）<br>連經理人自己都這樣說——<span class="hl">主動式 ETF 在制度上就追不上同樣經理人操盤的傳統基金</span>。</p></div>
+    <div class="card"><div class="mono-label">QUESTION · 03</div><h4>「為什麼不買半導體 ETF（00891 / 00926）？」</h4>
+      <p style="font-size:15px;margin:0">半導體 ETF 包含<span class="hl">整個半導體類股</span>——記憶體、車用晶片、消費電子、面板驅動 IC、類比 IC⋯⋯<span class="hl">這不是 AI 鏈，是「半導體鏈」</span>。當 AI 漲、消費電子跌的時候，半導體 ETF 的績效會被拖住——因為<span class="hl">它的設計目的就是「平均涵蓋整個半導體」</span>。安聯台灣智慧的 10 大持股則明確<span class="hl">對應 AI 伺服器的 10 個零件</span>——這是純 AI 配置。</p></div>
+    <div class="card"><div class="mono-label">QUESTION · 04</div><h4>「那統一系列的主動式 ETF（00981A / 00403A）呢？」</h4>
+      <p style="font-size:15px;margin:0">統一投信操盤風格<span class="hl">偏積極、高週轉</span>——根據 SITCA 公開資料，<span class="hl">多檔基金 2024 年總費用率超過 3%</span>，其中統一龍馬基金總費用率<span class="hl">高達 5.28%</span>。高週轉雖然帶來操作彈性，但<span class="hl">內扣成本會吃掉你的長期報酬</span>。安聯這兩檔的週轉率管理穩定，<span class="hl">長期持有的內扣負擔較低</span>。</p></div>
+  </div>
+  <div class="takeaway"><div class="mono-label">CORE · 為什麼是這兩檔，不是別的</div>
+    <p style="margin:0">① <b class="hl">純度</b>——不買金控塑化（vs 0050），不包記憶體車用（vs 半導體 ETF），<b>純 AI 資料中心鏈</b>。<br>
+    ② <b class="hl">結構優勢</b>——基金月報、ETF 日報——<b>基金能買的飆股範圍大過 ETF</b>（連 ETF 經理人都這樣說）。<br>
+    ③ <b class="hl">成本紀律</b>——不過度週轉（vs 統一系列），<b>內扣可預期</b>。</p></div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-label">§ 05 · TWO PHILOSOPHIES OF BETTING</div>
+  <h2>兩種押注哲學</h2>
+  <div class="h2-en">Two Philosophies of Betting · 載具選擇</div>
+  <blockquote>兩檔安聯——名字像、都是台股、都重倉半導體、2025 年績效幾乎一樣（都漲了 250% 以上，依基金公司公開月報）。但它們的<span class="hl">押注哲學完全不同</span>——挑錯，<span class="hl">未來十年的差距會放大成 30%、50%、甚至更多</span>。</blockquote>
+  <h3>想像兩種押注 NBA 冠軍隊的方式</h3>
+  <div class="cards c2">
+    <div class="card navy"><div class="mono-label">PHILOSOPHY · 01</div><h4>押當家球星 — 安聯台灣科技</h4><div class="sub">「賭 LeBron 個人爆發」</div>
+      <p style="font-size:15px;margin:0">集中在最強位置（探針卡）——兩大持股<b>旺矽 + 穎崴 = 17.6%</b>。一旦球星狀況好，整隊跟著贏。<br><b>2025 績效：+257% · 風險等級 RR5</b></p></div>
+    <div class="card" style="border-top-color:#B0492A"><div class="mono-label">PHILOSOPHY · 02</div><h4>押整支冠軍隊 — 安聯台灣智慧</h4><div class="sub">「賭整隊默契」</div>
+      <p style="font-size:15px;margin:0">10 大持股對應 AI 伺服器的 10 個零件——主將、副將、後衛、教練都在。球星狀況差時，其他人補上。<br><b>2025 績效：+259% · 風險等級 RR4</b></p></div>
+  </div>
+  <h3>把兩種押注攤開來比</h3>
+  <table>
+    <tr><th>比較項目</th><th>押當家球星</th><th>押整支冠軍隊</th></tr>
+    <tr><td>押注方式</td><td>集中、純粹</td><td class="em">分散、整合</td></tr>
+    <tr><td>核心持股</td><td>探針卡雙雄 17.6%</td><td class="em">10 大覆蓋全鏈</td></tr>
+    <tr><td>風險等級</td><td>RR5（最高）</td><td class="em">RR4（次高）</td></tr>
+    <tr><td>球星狀況好時</td><td>最猛</td><td class="em">也很猛</td></tr>
+    <tr><td>球星狀況差時</td><td>最痛</td><td class="em">其他位置補上</td></tr>
+    <tr><td>適合心臟</td><td>強壯</td><td class="em">普通</td></tr>
+  </table>
+  <h3>那到底該怎麼選？</h3>
+  <p>我不替你決定——但<span class="hl">你可以從三件事自己判斷</span>：</p>
+  <div class="cards c3">
+    <div class="card"><div class="mono-label">FACTOR · 01</div><h4>你的年齡</h4>
+      <p style="font-size:15px;margin:0"><b>30 歲</b> → 還能等 35 年市場恢復，<span class="hl">承受高波動</span><br><b>55 歲</b> → 沒時間等了，<span class="hl">需要穩定</span></p></div>
+    <div class="card"><div class="mono-label">FACTOR · 02</div><h4>你的胃口</h4>
+      <p style="font-size:15px;margin:0">買 100 萬，半年後跌到 65 萬——<span class="hl">你會半夜起來砍倉嗎？</span><br>這是<b>自我認知</b>問題，不是膽量問題</p></div>
+    <div class="card"><div class="mono-label">FACTOR · 03</div><h4>你的目標</h4>
+      <p style="font-size:15px;margin:0"><b>追求十年最大化</b> → 押球星<br><b>想參與但要均衡</b> → 押整隊<br><b>不確定</b> → 兩檔都買</p></div>
+  </div>
+  <h3>「兩檔都買」也是合理答案</h3>
+  <p>球星 + 整隊——<span class="hl">你不一定要二選一</span>。球隊老闆也會這樣分配資源：給球星一份頂薪、再花錢補強整隊深度。</p>
+  <p>引擎型 + 整車型，<span class="hl">是看 AI 產業的兩副眼鏡——戴兩副眼鏡，你會看得更立體</span>。這兩檔的差異<span class="hl">不是一個好一個壞</span>，是<span class="hl">你想看到 AI 的哪個面向</span>。</p>
+  <div class="takeaway"><div class="mono-label">KEY TAKEAWAY · §05 核心</div>
+    <p style="margin:0">這不是「<b class="hl">哪個比較好</b>」的問題——是「<b class="hl">你想押 AI 的哪個階段</b>」的問題。三件事決定你是哪一派：<b class="hl">年齡 · 胃口 · 目標</b>。如果還不確定——<b class="hl">兩檔都買也是合理答案</b>。</p></div>
+  <h3>但這只是「思考的起點」</h3>
+  <p>你可能心裡已經有答案了——但如果你還不確定，<span class="hl">這就是為什麼你需要一個顧問</span>。因為這三件事的答案，<span class="hl">和你個人的現金流、家庭責任、稅務狀況、退休規劃</span>全部綁在一起。而<span class="hl">沒有兩個人的狀況是一樣的</span>。</p>
+  <p>在 §08，我會講一個更深的問題——<span class="hl">「不管你選哪一檔基金，這筆錢要怎麼放，才能在 10 年的尺度下被保護住？」</span>這個答案，叫做<b>保單載具</b>。</p>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-label">§ 06 · BEAR CASES</div>
+  <h2>如果我錯了，會錯在哪裡</h2>
+  <div class="h2-en">Three Bear Cases · 誠實的研究員必須說出來</div>
+  <p>到這邊為止，你聽到的都是「為什麼台灣 AI 供應鏈很強」。但一份誠實的研究報告，必須<span class="hl">主動說出——「如果我錯了，會錯在哪裡？」</span></p>
+  <div class="cards c3">
+    <div class="card"><div class="mono-label">BEAR CASE 01 · AI 泡沫</div><h4>OpenAI 一年燒 100 億美元，營收追不上資本支出</h4>
+      <p style="font-size:15px">一間咖啡廳買了 100 台義式咖啡機（每台 50 萬），但一天只賣 30 杯——<span class="hl">撐不了多久</span>。如果 AI 服務追不上資本支出，<span class="hl">會像 2000 年 dot-com 泡沫</span>。</p>
+      <div class="mono-label">RESPONSE</div>
+      <p style="font-size:15px;margin:0"><span class="hl">泡沫破，不代表基本面消失</span>——Amazon 在 2000 年跌 94%，但 25 年後是 2 兆美元市值。<span class="hl">用「定期定額」吸收波動，不要單筆梭哈</span>。</p></div>
+    <div class="card"><div class="mono-label">BEAR CASE 02 · 記憶體反轉</div><h4>中國 CXMT、YMTC 大規模擴產，2027 產能開出</h4>
+      <p style="font-size:15px">鎮上只有一家麵包店——突然<span class="hl">對面開了 3 家新麵包店</span>，麵包價格會崩盤。記憶體 2027 年面臨類似情境，<span class="hl">相關公司股價可能腰斬</span>。</p>
+      <div class="mono-label">RESPONSE</div>
+      <p style="font-size:15px;margin:0"><span class="hl">基金會「換股」——你不會</span>。安聯科技基金 2025 週轉率 <b>221%</b>，當訊號出現，<span class="hl">經理人會把資金搬到下一波</span>——這就是專業價值。</p></div>
+    <div class="card"><div class="mono-label">BEAR CASE 03 · 供應鏈搬走</div><h4>台積電亞利桑那廠 1,650 億美元、2029 量產 2 奈米</h4>
+      <p style="font-size:15px">百年老店的老闆被鎮長告知——「<span class="hl">從明年開始，所有店鋪要搬到工業區</span>」。客戶會跟著過去嗎？台灣的「收費站」優勢，會逐漸消失嗎？</p>
+      <div class="mono-label">RESPONSE</div>
+      <p style="font-size:15px;margin:0"><span class="hl">台積電比我們還擔心</span>——美國亞利桑那廠生產 4 奈米（5-6 年前的技術），台灣最先進是 1.6 奈米——<span class="hl">落後台灣兩個世代</span>。張忠謀親口說：「<span class="hl">90-95% 的產能，會留在台灣</span>」。</p></div>
+  </div>
+  <h3>三個 Bear Case 的共同回答</h3>
+  <table>
+    <tr><th>BEAR CASE</th><th>真正的風險</th><th>我們的工具</th></tr>
+    <tr><td>AI 泡沫</td><td>短期回檔 30-50%</td><td class="em">定期定額</td></tr>
+    <tr><td>記憶體反轉</td><td>部分持股表現變差</td><td class="em">基金經理人換股</td></tr>
+    <tr><td>供應鏈搬走</td><td>長期競爭力稀釋</td><td class="em">台積電刻意維護護城河</td></tr>
+  </table>
+  <p><span class="hl">每一個風險都不是「無法處理」——只是需要對的工具</span>。但有一個風險我們處理不了——<b>兩岸有事</b>。下一章 §07 告訴你為什麼這個風險，全世界都不會讓它發生。</p>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-label">§ 07 · SILICON SHIELD 2.0</div>
+  <h2>為什麼台灣不會被打</h2>
+  <div class="h2-en">The Silicon Shield 2.0</div>
+  <p>很多人問我「兩岸有事怎麼辦？」我的回答只有一句——<span class="hl">如果台灣被打，全世界的科技會倒退 20 年</span>。</p>
+  <div class="cards c3">
+    <div class="card"><div class="mono-label">SCENE · 01 · USA</div><h4>美國商務部長公開說過——</h4>
+      <p style="font-size:15px">「<span class="hl">美國九成以上的先進晶片依賴台灣。這對國家安全，是無法接受的脆弱</span>。」這句話之後，美國通過<span class="hl">晶片法案、520 億美元補貼</span>。但補貼了三年，台積電亞利桑那廠量產的還是 4 奈米——落後台灣兩個世代。<span class="hl">砸了 520 億，美國還是離不開台灣</span>。</p>
+      <p style="font-size:15px;margin:0"><b>美國會袖手旁觀嗎？不會——因為美國的 AI 不是娛樂，是國家安全。</b></p></div>
+    <div class="card"><div class="mono-label">SCENE · 02 · JAPAN</div><h4>日本經濟產業省白皮書——</h4>
+      <p style="font-size:15px">「<span class="hl">日本汽車產業的車用晶片，高度依賴台灣</span>。任何台海情勢變化，將直接威脅日本汽車產業的存續。」豐田、本田、日產、馬自達——日本汽車業是國家命脈。如果台灣斷供，<span class="hl">日本汽車業會在 2-3 個月內集體停產</span>。</p>
+      <p style="font-size:15px;margin:0"><b>日本會袖手旁觀嗎？不會。</b></p></div>
+    <div class="card"><div class="mono-label">SCENE · 03 · KOREA</div><h4>三星 · SK 海力士 · 跟台灣也綁在一起——</h4>
+      <p style="font-size:15px">韓國半導體雙雄看似是台積電競爭對手，但供應鏈高度交織——設備、材料、零組件的全球網絡中台灣是關鍵節點。韓國的半導體佔出口 25%——比汽車、造船、化工加起來還多。</p>
+      <p style="font-size:15px;margin:0"><b>韓國會袖手旁觀嗎？不會。</b></p></div>
+  </div>
+  <h3>把三個畫面連起來</h3>
+  <p><span class="hl">美國</span>要保護台灣——為了 AI · <span class="hl">日本</span>要保護台灣——為了汽車 · <span class="hl">韓國</span>要保護台灣——為了半導體。</p>
+  <div class="big-claim">台灣不是「可能被保護」——是「沒有人能讓它倒下」。</div>
+  <p>過去的矽盾 = <span class="hl">半導體 = 一層鎧甲</span>　·　現在的矽盾 2.0 = <span class="hl">AI + 半導體 + 整套供應鏈 = 整套戰鬥服</span>。</p>
+  <div class="takeaway"><div class="mono-label">KEY TAKEAWAY · §07 收尾</div>
+    <p style="margin:0">「兩岸有事怎麼辦」——<b class="hl">不是台灣自己的問題，是全世界都不能讓台灣有事的問題</b>。未來十年，押注台灣 AI 供應鏈——是押注<b class="hl">一個被全世界共同保護的島嶼</b>。</p></div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-label">§ 08 · VEHICLE UPGRADE</div>
+  <h2>為什麼一份基金，需要被一張保單裝起來</h2>
+  <div class="h2-en">The Vehicle Upgrade · 配置工具</div>
+  <blockquote>到這邊你可能知道答案了——「<span class="hl">我想買安聯台灣智慧（或台灣科技）</span>」。接下來的問題是——<span class="hl">透過哪裡買？</span><br>兩條路：<span class="hl">銀行直接申購</span>或<span class="hl">投資型保單連結</span>。兩條路買到的標的物完全一樣，但<span class="hl">包裝這筆錢的方式完全不同</span>。</blockquote>
+  <h3>想像一個畫面：你領了 1,000 萬現金放在家裡。兩個選項——</h3>
+  <div class="cards c2">
+    <div class="card plain"><div class="mono-label">OPTION · A · 直接堆在書房桌上</div>
+      <p style="font-size:15px;line-height:2.1;margin:0">
+      → 萬一身故 → 1,000 萬進<b>遺產</b>，等家人分配<br>
+      → 國稅局來查 → 列入<b>遺產稅基（累進 10%–20%）</b><br>
+      → 被強制執行 → 可<b>直接被查封</b><br>
+      → 想指定給某個人 → <b>不能</b>，照法定比例<br>
+      → 萬一遭小偷、火災 → <b>沒有保護</b></p></div>
+    <div class="card navy"><div class="mono-label">OPTION · B · 放進銀行保險箱</div>
+      <p style="font-size:15px;line-height:2.1;margin:0">
+      → 萬一身故 → 受益人<b>直接領</b><br>
+      → 國稅局來查 → 符合條件下<b>不計遺產稅</b><br>
+      → 被強制執行 → 需<b>告知程序，有緩衝</b><br>
+      → 想指定給某個人 → <b>你自己決定比例</b><br>
+      → 萬一遭小偷、火災 → <b>銀行有完整保護</b></p></div>
+  </div>
+  <p>同樣 1,000 萬、同樣的錢——<span class="hl">但這 1,000 萬被一個保險箱裝起來了</span>。</p>
+
+  <h3>為什麼這件事現在變得更重要</h3>
+  <p>§05 我們談到——「<span class="hl">不管你選哪一檔基金，這筆錢要在 10 年的尺度下被保護住</span>」。10 年內——你可能換工作、結婚、離婚、有小孩、買房、照顧長輩、生病——<span class="hl">每一件事都可能讓你想動用這筆錢</span>。而人最常做錯的決定——就是在最需要冷靜時，<span class="hl">砍倉</span>。</p>
+  <div class="cards c2">
+    <div class="card plain"><div class="mono-label">歷史告訴我們</div>
+      <p style="font-size:15px;margin:0">2008 金融海嘯時——多少人在低點賣掉？<br>2020 疫情爆發時——多少人在恐慌中砍倉？<br>2022 升息時——多少人受不了波動退場？<br><span class="hl">而那些撐過去的人，後來都參與到了完整的市場回升。</span></p></div>
+    <div class="card"><div class="mono-label">保單是「綁住你的手」的工具</div>
+      <p style="font-size:15px;margin:0">直接申購基金——<span class="hl">你按一個鍵就能贖回</span>。<br>投資型保單——<span class="hl">贖回有手續費、有時間成本、流程慢</span>。<br>這聽起來像缺點——<span class="hl">但它其實是優點</span>。</p></div>
+  </div>
+  <div class="takeaway"><p style="margin:0"><b class="hl">保單的「不方便」，剛好幫你保住了「不要做錯決定」的能力。</b></p></div>
+
+  <h3>一個示意對比：王先生的故事</h3>
+  <p>王先生 55 歲，遺產總額約 <b>1 億元</b>，其中 <b>1,200 萬</b>是五年前用 500 萬申購、已成長的安聯台灣智慧基金部位。不幸的是——王先生因病過世。這 1,200 萬會發生什麼事？</p>
+  <div class="cards c2">
+    <div class="card plain"><div class="mono-label">A · 如果直接申購</div><h4>這 1,200 萬跟著遺產程序走</h4>
+      <p style="font-size:15px;line-height:2;margin:0">
+      → 1,200 萬<b>列入遺產總額</b>，與其他資產合併課稅<br>
+      → 以王先生的級距，這個部位的邊際稅負<b>約 15%（約 180 萬）</b><br>
+      → 全部遺產走完分割、申報、繳清——<b>約 6-12 個月</b>才能動用<br>
+      → 分給誰、分多少——<b>依法定繼承，不能指定</b></p></div>
+    <div class="card navy"><div class="mono-label">B · 如果用投資型保單</div><h4>這 1,200 萬作為死亡保險金</h4>
+      <p style="font-size:15px;line-height:2;margin:0">
+      → 直接給<b>指定受益人</b>（王太太）<br>
+      → 符合條件下<b>不計入遺產總額</b><br>
+      → 約 <b>30 天內</b>理賠到位，家庭現金流不中斷<br>
+      → 給誰、給多少比例——<b>王先生生前自己決定</b></p></div>
+  </div>
+  <div class="takeaway"><div class="mono-label">THE GAP · 一個工具的差距</div>
+    <p style="margin:0">同樣的基金、同樣的績效——載具的差距是：<b class="hl">約 180 萬的稅、近一年的等待、和「指定給誰」的權利</b>。<br>保單不會讓你的基金漲更多——但它會讓你的基金，<b class="hl">不會在不該發生的時候消失</b>。</p></div>
+  <p class="note">※ 示意試算：以遺產總額 1 億、適用免稅額與常見扣除額後落於 15% 級距估算，實際稅負依個案資產結構、扣除額與最新法規而定。保險死亡給付不計入遺產總額須符合要保安排等條件，且超過最低稅負制門檻部分仍應計入基本所得額；若涉重病投保、高齡躉繳等情形，可能依實質課稅原則計入遺產。請以專業個案評估為準。</p>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-label">§ 09 · CONCLUSION &amp; NEXT STEPS</div>
+  <h2>你已經知道了，現在呢？</h2>
+  <div class="h2-en">You Know Now · What's Next?</div>
+  <p>如果你讀到這裡——<span class="hl">你已經比 99% 的台灣投資人，更了解你身邊正在發生的事</span>。</p>
+  <p>但「知道」和「做」之間，有一條河——<span class="hl">真正讓人「做出來」的，不是更多資訊，是有一個人陪你走過這條河</span>。</p>
+  <div class="cards c2">
+    <div class="card"><div class="mono-label">TOOL · 01</div><h4>30 分鐘投資組合健檢</h4>
+      <p style="font-size:15px;margin:0">一對一、線上或實體、<span class="hl">完全免費、不推銷</span>。我們會一起檢視——<br>
+      · 你目前的資產配置，在 AI 時代是「加分」還是「稀釋」？<br>
+      · 你的保障結構，能不能撐過下一次黑天鵝？<br>
+      · 你的稅務和傳承安排，跟得上資產規模嗎？</p></div>
+    <div class="card navy"><div class="mono-label">TOOL · 02 · VOL.II 獨家</div><h4>兩檔基金試算表</h4>
+      <p style="font-size:15px;margin:0">根據你的<span class="hl">年齡 / 風險屬性 / 投資金額</span>，自動計算——<br>
+      · 「安聯台灣科技 vs 台灣智慧」建議配置比例<br>
+      · 連結投資型保單後，<b>10 年、20 年預估報酬 + 保障</b><br>
+      · 同樣金額<b>直接申購 vs 保單包裝</b>的稅務差異<br>
+      <i>只給讀完 Vol.II 的人。</i></p></div>
+  </div>
+  <div class="takeaway" style="text-align:center">
+    <p style="margin:0;font-family:var(--serif);font-size:22px"><b>PPC · Ultra Advisor</b></p>
+    <p style="margin:4px 0 12px;font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:#E8A87C">RFC · CHRP · MDRT</p>
+    <p style="margin:0;font-style:italic">投資從來不是「找對一支股票」——是<b class="hl">把對的工具放在對的位置</b>。<br>未來十年，我希望我可以陪你走一段。</p>
+    <p style="margin:14px 0 0"><a href="https://ultra-advisor.tw/booking" style="color:#E8A87C;font-weight:700">預約諮詢 →</a></p>
+  </div>
+  <a class="next-link" href="./vol3-the-parachute.html"><span>NEXT · VOL. III</span>降落傘。How to Stay in the AI Story →</a>
+</div></section>
+
+<footer><div class="wrap">
+  <div class="legal">© 2026 Ultra Advisor · All Rights Reserved. 本簡報內容為獨立研究成果，僅供參考，不構成投資建議。基金績效數據截至 2026/Q1，依基金公司公開月報與 SITCA 公開資料；過往績效不代表未來表現，投資有賺有賠，申購基金前應詳閱公開說明書。個股財務數據依公開資訊觀測站與公開財報。投資型保險商品涉及保險成本、投資風險、資金流動性風險，稅務處理依個案與最新法規而定，詳細內容應以保險契約條款與商品說明為準。</div>
+</div></footer>
+
+<script src="./assets/note.js" defer></script>
+</body>
+</html>
