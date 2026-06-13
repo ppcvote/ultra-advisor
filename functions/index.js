@@ -54,6 +54,20 @@ const APP_LOGIN_URL = functions.config().app?.login_url || 'https://ultra-adviso
 // Set in functions/.env: PIN_WEBHOOK_BASE=https://pin.quartz.tw  PIN_WEBHOOK_SECRET=<secret>
 const PIN_WEBHOOK_BASE = process.env.PIN_WEBHOOK_BASE;
 const PIN_WEBHOOK_SECRET = process.env.PIN_WEBHOOK_SECRET;
+// Passwordless Pin→Advisor auto-login: sign a short-lived link per bound member.
+// The Pin binding already proves they own that LINE/TG; the link is HMAC-signed,
+// 24h, and delivered only to their private channel. (pinAuth verifies + mints a
+// Firebase custom token → frontend signs in → lands on the intended tab.)
+const PIN_AUTH_SECRET = process.env.PIN_AUTH_SECRET;
+
+function signPinAuthUrl(uid, tab = 'share') {
+  // No secret → fall back to the plain (login-required) link.
+  if (!PIN_AUTH_SECRET) return `https://ultra-advisor.tw/?tab=${tab}`;
+  const exp = Date.now() + 24 * 60 * 60 * 1000; // 24h
+  const sig = crypto.createHmac('sha256', PIN_AUTH_SECRET).update(`${uid}.${exp}.${tab}`).digest('hex');
+  const base = 'https://us-central1-grbt-f87fa.cloudfunctions.net/pinAuth';
+  return `${base}?u=${encodeURIComponent(uid)}&exp=${exp}&tab=${encodeURIComponent(tab)}&sig=${sig}`;
+}
 
 const { validatePinToken, computePinSignature } = require('./pin-helpers');
 
@@ -5359,7 +5373,8 @@ async function _sendPinDailyQuote() {
     // Serialize once → sign the exact bytes that will be sent (no re-serialize)
     const bodyStr = JSON.stringify({
       pin_user_id: pinUserId,
-      data: { date: quote.date, text: quote.text },
+      // auth_url = passwordless auto-login link for THIS member (docSnap.id = uid).
+      data: { date: quote.date, text: quote.text, auth_url: signPinAuthUrl(docSnap.id, 'share') },
     });
     const bodyBytes = Buffer.from(bodyStr);
     const sig = computePinSignature(PIN_WEBHOOK_SECRET, bodyBytes);
@@ -5406,6 +5421,31 @@ exports.triggerPinDailyQuote = functions.https.onCall(async (data, context) => {
   await verifyAdminAccess(context);
   const result = await _sendPinDailyQuote();
   return { success: true, ...result };
+});
+
+/**
+ * Passwordless Pin→Advisor auto-login (boss 2026-06-13: LINE 內建瀏覽器不留登入).
+ * Verifies the HMAC-signed short-lived link minted in signPinAuthUrl, then mints
+ * a Firebase custom token and redirects the member into the app already signed in.
+ */
+exports.pinAuth = functions.https.onRequest(async (req, res) => {
+  const tab = String(req.query.tab || 'share');
+  const fallback = `https://ultra-advisor.tw/?tab=${encodeURIComponent(tab)}`;
+  try {
+    const u = String(req.query.u || '');
+    const exp = String(req.query.exp || '');
+    const provided = String(req.query.sig || '');
+    if (!u || !exp || !provided || !PIN_AUTH_SECRET) return res.redirect(302, fallback);
+    if (Date.now() > Number(exp)) return res.status(410).send('🔗 連結已過期，請回 Pin 重新點一次「做今日金句圖卡」。');
+    const expected = crypto.createHmac('sha256', PIN_AUTH_SECRET).update(`${u}.${exp}.${tab}`).digest('hex');
+    const a = Buffer.from(provided), b = Buffer.from(expected);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.status(403).send('連結無效。');
+    const customToken = await auth.createCustomToken(u);
+    return res.redirect(302, `https://ultra-advisor.tw/?ct=${encodeURIComponent(customToken)}&tab=${encodeURIComponent(tab)}`);
+  } catch (e) {
+    console.error('[pinAuth] error:', e.message);
+    return res.redirect(302, fallback);
+  }
 });
 
 console.log('Ultra Advisor Cloud Functions loaded');

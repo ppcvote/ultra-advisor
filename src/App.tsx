@@ -6,7 +6,7 @@ import {
   Sparkles, HeartPulse, GitBranch
 } from 'lucide-react';
 
-import { signOut, onAuthStateChanged } from 'firebase/auth';
+import { signOut, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { doc, setDoc, onSnapshot, Timestamp, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
@@ -146,6 +146,22 @@ export default function App() {
 
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // 免登入自動進場（Pin pinAuth 帶 ?ct=<Firebase custom token>）：用它登入後清掉 URL，
+  // onAuthStateChanged 會設 user → WarRoom 讀 pendingTab 開分享頁。
+  const [pinSigningIn, setPinSigningIn] = useState(() => {
+    try { return !!new URLSearchParams(window.location.search).get('ct'); } catch { return false; }
+  });
+  useEffect(() => {
+    let ct: string | null = null;
+    try { ct = new URLSearchParams(window.location.search).get('ct'); } catch { /* ignore */ }
+    if (!ct) return;
+    signInWithCustomToken(auth, ct)
+      .catch((err) => console.error('[pinAuth] custom-token sign-in failed:', err?.message))
+      .finally(() => {
+        try { window.history.replaceState({}, '', '/'); } catch { /* ignore */ }
+        setPinSigningIn(false);
+      });
+  }, []);
   // 🆕 SplashScreen 只在這個 session 第一次進入時顯示
   const [minSplashTimePassed, setMinSplashTimePassed] = useState(() => {
     return sessionStorage.getItem('splash_shown') === 'true';
@@ -747,6 +763,18 @@ export default function App() {
           setIsSecretSignupRoute(false);
           window.location.href = '/'; 
       }} />;
+  }
+
+  // 免登入自動進場進行中：別閃登入頁，給個過場
+  if (pinSigningIn && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300">
+        <div className="text-center">
+          <div className="w-10 h-10 mx-auto mb-3 border-2 border-slate-600 border-t-teal-400 rounded-full animate-spin" />
+          登入中…
+        </div>
+      </div>
+    );
   }
 
   if (!user || needsLoginInteraction) {
