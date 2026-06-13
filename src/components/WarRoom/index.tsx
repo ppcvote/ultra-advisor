@@ -35,7 +35,15 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
   const { membership } = useMembership(user?.uid || null);
 
   // ===== Tab 狀態 =====
-  const [activeTab, setActiveTab] = useState<WarRoomTab>('overview');
+  // 支援深連結（Pin「做金句圖卡」一鍵直達分享頁）：?tab=share 或 #share
+  const [activeTab, setActiveTab] = useState<WarRoomTab>(() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get('tab');
+      const h = window.location.hash.replace('#', '');
+      const t = (p || h) as WarRoomTab;
+      return (['overview', 'clients', 'tools', 'share'] as string[]).includes(t) ? t : 'overview';
+    } catch { return 'overview'; }
+  });
 
   // ===== 客戶 =====
   const [clients, setClients] = useState<any[]>([]);
