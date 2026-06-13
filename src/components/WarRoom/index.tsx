@@ -60,6 +60,18 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
+  // ===== Pin 連結提醒橫幅（提醒一次：未連 Pin 才顯示、可關） =====
+  const [pinConnected, setPinConnected] = useState<boolean | null>(null);
+  const [pinBannerDismissed, setPinBannerDismissed] = useState(() => {
+    try { return localStorage.getItem('pinBannerDismissed') === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    if (!user?.uid) return;
+    getDoc(doc(db, 'users', user.uid))
+      .then(snap => setPinConnected(snap.exists() ? !!snap.data().pinUserId : false))
+      .catch(() => setPinConnected(false));
+  }, [user?.uid]);
+
   // ===== 通知 =====
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -320,6 +332,27 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
           </nav>
         </div>
       </header>
+
+      {/* ===== Pin 連結提醒（未連 Pin 的會員提醒一次） ===== */}
+      {pinConnected === false && !pinBannerDismissed && (
+        <div className="max-w-5xl mx-auto px-4 pt-4">
+          <div className="flex items-center gap-3 rounded-xl border border-teal-500/30 bg-teal-500/10 px-4 py-3">
+            <span className="text-xl shrink-0">✨</span>
+            <div className="flex-1 text-sm dark:text-slate-200 text-slate-700">
+              <strong>新功能：</strong>把 Ultra Advisor 連到 Telegram，每天自動收到金句。
+            </div>
+            <button
+              onClick={() => setShowEditProfile(true)}
+              className="shrink-0 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium px-3 py-1.5 transition-colors"
+            >立即連結</button>
+            <button
+              onClick={() => { try { localStorage.setItem('pinBannerDismissed', '1'); } catch { /* ignore */ } setPinBannerDismissed(true); }}
+              className="shrink-0 text-slate-400 hover:text-slate-200 transition-colors"
+              aria-label="關閉提醒"
+            ><X size={16} /></button>
+          </div>
+        </div>
+      )}
 
       {/* ===== 主內容 ===== */}
       <main className="max-w-5xl mx-auto px-4 py-6">
