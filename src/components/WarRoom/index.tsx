@@ -35,13 +35,16 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
   const { membership } = useMembership(user?.uid || null);
 
   // ===== Tab 狀態 =====
-  // 支援深連結（Pin「做金句圖卡」一鍵直達分享頁）：?tab=share 或 #share
+  // 支援深連結（Pin「做金句圖卡」一鍵直達分享頁）：?tab=share 或 #share。
+  // 未登入時 App 會先導去官網/登入，URL 參數可能在登入流程中遺失 ——
+  // 所以登入前先把意圖存進 sessionStorage（見 App.tsx），這裡讀回後清掉。
   const [activeTab, setActiveTab] = useState<WarRoomTab>(() => {
+    const valid = (t: string | null) => t && (['overview', 'clients', 'tools', 'share'] as string[]).includes(t) ? (t as WarRoomTab) : null;
     try {
-      const p = new URLSearchParams(window.location.search).get('tab');
-      const h = window.location.hash.replace('#', '');
-      const t = (p || h) as WarRoomTab;
-      return (['overview', 'clients', 'tools', 'share'] as string[]).includes(t) ? t : 'overview';
+      const fromUrl = valid(new URLSearchParams(window.location.search).get('tab')) || valid(window.location.hash.replace('#', ''));
+      const pending = valid(sessionStorage.getItem('pendingTab'));
+      sessionStorage.removeItem('pendingTab');
+      return fromUrl || pending || 'overview';
     } catch { return 'overview'; }
   });
 

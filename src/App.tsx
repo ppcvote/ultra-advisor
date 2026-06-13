@@ -132,6 +132,15 @@ const NavItem = ({ icon: Icon, label, active, onClick, disabled = false, locked 
   </div>
 );
 
+// 深連結意圖捕捉（Pin「做金句圖卡」→ ?tab=share）：在 auth gate 把未登入用戶
+// 導去官網/登入「之前」就先存起來，登入後 WarRoom 讀回去開對的 tab（見 WarRoom/index.tsx）。
+try {
+  const _dlt = new URLSearchParams(window.location.search).get('tab') || window.location.hash.replace('#', '');
+  if (_dlt && ['overview', 'clients', 'tools', 'share'].includes(_dlt)) {
+    sessionStorage.setItem('pendingTab', _dlt);
+  }
+} catch { /* ignore */ }
+
 export default function App() {
   // 網域重導向已移除 - 避免與 CDN 快取衝突造成無限循環
 
@@ -741,8 +750,12 @@ export default function App() {
   }
 
   if (!user || needsLoginInteraction) {
-    if (isLoginRoute || user) {
-      return <LoginPage 
+    // 帶深連結意圖（Pin「做金句圖卡」→ ?tab=share）的未登入用戶，直接給登入頁、
+    // 別丟去行銷官網 —— 登入後 WarRoom 會用 sessionStorage 的 pendingTab 開對的頁。
+    let _hasPendingDeepLink = false;
+    try { _hasPendingDeepLink = !!sessionStorage.getItem('pendingTab'); } catch { /* ignore */ }
+    if (isLoginRoute || user || _hasPendingDeepLink) {
+      return <LoginPage
         user={user}
         onLoginSuccess={async () => {
           sessionStorage.setItem('last_login_page_shown', Date.now().toString());
