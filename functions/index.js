@@ -5393,10 +5393,10 @@ async function _sendPinDailyQuote() {
  * TODO: 設好 pin.webhook_base + pin.webhook_secret、Pin advisor skill 宣告 webhooks 後，
  *       取消下方 exports 的註解並重新部署。
  */
-// exports.sendPinDailyQuote = functions.pubsub
-//   .schedule('0 8 * * *')
-//   .timeZone('Asia/Taipei')
-//   .onRun(async () => { await _sendPinDailyQuote(); });
+exports.sendPinDailyQuote = functions.pubsub
+  .schedule('0 8 * * *')
+  .timeZone('Asia/Taipei')
+  .onRun(async () => { await _sendPinDailyQuote(); });
 
 /**
  * 手動觸發每日金句推播（管理員）
