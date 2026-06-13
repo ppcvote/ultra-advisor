@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Camera, Mail, Phone, MessageCircle, Instagram, Info, Save, Loader2, X, Bell, BellOff } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { doc, getDoc } from 'firebase/firestore';
+import { storage, db, functions } from '../../../firebase';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import type { ProfileData } from '../types';
 
@@ -55,6 +57,114 @@ const PushNotificationSection = ({ userId }: { userId: string | null }) => {
           {isLoading ? <Loader2 size={16} className="animate-spin" /> : isSubscribed ? <><BellOff size={16} /> 關閉</> : <><Bell size={16} /> 開啟</>}
         </button>
       </div>
+    </div>
+  );
+};
+
+// Pin（Telegram）通知綁定區塊
+const PinNotificationSection = ({ userId }: { userId: string | null }) => {
+  const [pinUserId, setPinUserId] = useState<string | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [token, setToken] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) { setChecking(false); return; }
+    getDoc(doc(db, 'users', userId))
+      .then((snap) => { if (snap.exists()) setPinUserId(snap.data().pinUserId ?? null); })
+      .catch(console.error)
+      .finally(() => setChecking(false));
+  }, [userId]);
+
+  const handleConnect = async () => {
+    const trimmed = token.trim();
+    if (!trimmed) { setError('請輸入 Token'); return; }
+    setLoading(true); setError(null); setSuccess(null);
+    try {
+      const fn = httpsCallable(functions, 'connectPinNotifications');
+      const result = await fn({ token: trimmed }) as { data: { pinUserId: string } };
+      setPinUserId(result.data.pinUserId);
+      setToken('');
+      setSuccess('已成功連結！之後每日金句會推送到你的 Telegram。');
+    } catch (err: any) {
+      setError(err.message || '連結失敗，請稍後再試');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setLoading(true); setError(null); setSuccess(null);
+    try {
+      const fn = httpsCallable(functions, 'disconnectPin');
+      await fn({});
+      setPinUserId(null);
+      setSuccess('已解除 Pin 連結');
+    } catch (err: any) {
+      setError(err.message || '解除失敗，請稍後再試');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (checking) return null;
+
+  return (
+    <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl space-y-3">
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-lg ${pinUserId ? 'bg-blue-600/20' : 'bg-slate-700'}`}>
+          {pinUserId
+            ? <Bell size={20} className="text-blue-400" />
+            : <BellOff size={20} className="text-slate-400" />}
+        </div>
+        <div>
+          <h4 className="text-white font-medium">Pin 通知（Telegram）</h4>
+          <p className="text-slate-500 text-xs">
+            {pinUserId
+              ? '已連結 — 每日金句會推送到你的 Telegram'
+              : '連結後每日金句自動推送到 Telegram'}
+          </p>
+        </div>
+      </div>
+
+      {pinUserId ? (
+        <button
+          onClick={handleDisconnect}
+          disabled={loading}
+          className="w-full py-2 bg-slate-700 text-slate-300 rounded-lg text-sm font-medium hover:bg-slate-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <BellOff size={14} />}
+          解除連結
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs text-slate-500">
+            在 <strong className="text-slate-300">Pin</strong> 輸入「/advisor」→「🔔 綁定通知」取得 8 碼 Token，貼到下方
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={token}
+              onChange={e => { setToken(e.target.value.trim()); setError(null); }}
+              placeholder="貼上 8 碼 Token"
+              maxLength={8}
+              className="flex-1 bg-slate-950 border border-slate-700 rounded-lg py-2 px-3 text-white text-sm font-mono tracking-widest focus:border-blue-500 outline-none transition-all"
+            />
+            <button
+              onClick={handleConnect}
+              disabled={loading || token.length !== 8}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-500 transition-all disabled:opacity-50 flex items-center gap-2"
+            >
+              {loading ? <Loader2 size={14} className="animate-spin" /> : '連結'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && <p className="text-red-400 text-xs">{error}</p>}
+      {success && <p className="text-blue-400 text-xs">{success}</p>}
     </div>
   );
 };
@@ -194,6 +304,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
           </div>
 
           <PushNotificationSection userId={user?.uid} />
+
+          <PinNotificationSection userId={user?.uid ?? null} />
         </div>
 
         <div className="sticky bottom-0 bg-slate-900 flex gap-3 p-6 border-t border-slate-800">
