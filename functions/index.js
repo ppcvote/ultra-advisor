@@ -49,6 +49,13 @@ const LINE_CHANNEL_SECRET = functions.config().line?.channel_secret;
 const LINE_CHANNEL_ACCESS_TOKEN = functions.config().line?.channel_access_token;
 const APP_LOGIN_URL = functions.config().app?.login_url || 'https://ultra-advisor.tw';
 
+// Pin (Telegram) webhook config
+// Set before deploy: firebase functions:config:set pin.webhook_base="https://pin.8338.hk" pin.webhook_secret="<secret>"
+const PIN_WEBHOOK_BASE = functions.config().pin?.webhook_base;
+const PIN_WEBHOOK_SECRET = functions.config().pin?.webhook_secret;
+
+const { validatePinToken, computePinSignature } = require('./pin-helpers');
+
 // ==========================================
 // 工具函數
 // ==========================================
@@ -5223,5 +5230,181 @@ ${dataStr}
 
   return { status: 'success', date: docId, headline: aiSummary.headline };
 }
+
+// ==========================================
+// 🔔 Pin 通知整合
+// ==========================================
+// 部署前設定：
+//   firebase functions:config:set pin.webhook_base="https://pin.8338.hk" pin.webhook_secret="<secret>"
+// Pin 端：advisor skill 需先宣告 webhooks（HQ 負責）
+// ==========================================
+
+/**
+ * 連結 Pin（Telegram）通知
+ * 前端傳入從 Pin advisor 選單取得的 8 碼 hex token，
+ * 後端呼叫 Pin /_bind 換取 pin_user_id，存入 users/{uid}
+ */
+exports.connectPinNotifications = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', '請先登入');
+  }
+
+  const { token } = data || {};
+
+  if (!validatePinToken(token)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Token 格式不正確（需為 8 碼十六進位）');
+  }
+
+  if (!PIN_WEBHOOK_BASE || !PIN_WEBHOOK_SECRET) {
+    console.error('[Pin] Missing pin.webhook_base or pin.webhook_secret config');
+    throw new functions.https.HttpsError('internal', '系統設定不完整，請聯絡管理員');
+  }
+
+  let pinUserId;
+  try {
+    const response = await axios.post(
+      `${PIN_WEBHOOK_BASE}/webhooks/_bind`,
+      { token },
+      {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000,
+      }
+    );
+    pinUserId = response.data?.pin_user_id;
+  } catch (error) {
+    const status = error.response?.status;
+    if (status === 401 || status === 404 || status === 410) {
+      throw new functions.https.HttpsError('not-found', 'Token 無效或已過期，請重新從 Pin 取得');
+    }
+    console.error('[Pin] bind error status:', status, 'message:', error.message);
+    throw new functions.https.HttpsError('internal', '綁定失敗，請稍後再試');
+  }
+
+  if (!pinUserId) {
+    throw new functions.https.HttpsError('internal', 'Pin 回傳資料不完整');
+  }
+
+  await db.collection('users').doc(context.auth.uid).set(
+    {
+      pinUserId,
+      pinConnectedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  return { success: true, pinUserId };
+});
+
+/**
+ * 解除 Pin 綁定
+ */
+exports.disconnectPin = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', '請先登入');
+  }
+
+  await db.collection('users').doc(context.auth.uid).update({
+    pinUserId: admin.firestore.FieldValue.delete(),
+    pinConnectedAt: admin.firestore.FieldValue.delete(),
+  });
+
+  return { success: true };
+});
+
+/**
+ * 每日金句推播主邏輯（shared by scheduled & manual trigger）
+ * @returns {{ sent: number, total: number } | { skipped: true, reason: string }}
+ */
+async function _sendPinDailyQuote() {
+  if (!PIN_WEBHOOK_BASE || !PIN_WEBHOOK_SECRET) {
+    console.error('[Pin] Missing pin.webhook_base or pin.webhook_secret — skip daily quote');
+    return { skipped: true, reason: 'missing config' };
+  }
+
+  // Build date string in Taiwan local time (UTC+8)
+  const now = new Date();
+  const twOffset = 8 * 60 * 60 * 1000;
+  const twDate = new Date(now.getTime() + twOffset);
+  const dateStr = twDate.toISOString().slice(0, 10);
+
+  let quote;
+  try {
+    const qRes = await axios.get(
+      `https://ultra-advisor.tw/api/daily-quote?date=${dateStr}`,
+      { timeout: 10000 }
+    );
+    quote = qRes.data?.data;
+  } catch (err) {
+    console.error('[Pin] Failed to fetch daily quote:', err.message);
+    return { skipped: true, reason: 'quote fetch failed' };
+  }
+
+  if (!quote?.text) {
+    console.error('[Pin] daily-quote response missing text field');
+    return { skipped: true, reason: 'no quote text' };
+  }
+
+  const snapshot = await db.collection('users').where('pinUserId', '!=', null).get();
+  if (snapshot.empty) {
+    console.log('[Pin] No users with pinUserId, skip daily quote');
+    return { sent: 0, total: 0 };
+  }
+
+  let successCount = 0;
+  const sendPromises = snapshot.docs.map(async (docSnap) => {
+    const pinUserId = docSnap.data().pinUserId;
+    if (!pinUserId) return;
+
+    // Serialize once → sign the exact bytes that will be sent (no re-serialize)
+    const bodyStr = JSON.stringify({
+      pin_user_id: pinUserId,
+      data: { date: quote.date, text: quote.text },
+    });
+    const bodyBytes = Buffer.from(bodyStr);
+    const sig = computePinSignature(PIN_WEBHOOK_SECRET, bodyBytes);
+
+    try {
+      await axios.post(
+        `${PIN_WEBHOOK_BASE}/webhooks/advisor/daily_quote.scheduled`,
+        bodyBytes,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Pin-Signature': sig,
+          },
+          timeout: 10000,
+        }
+      );
+      successCount++;
+    } catch (err) {
+      // Do not log pinUserId — it contains chat ID (privacy)
+      console.error(`[Pin] daily_quote send failed (${err.response?.status}):`, err.message);
+    }
+  });
+
+  await Promise.allSettled(sendPromises);
+  console.log(`[Pin] Daily quote sent: ${successCount}/${snapshot.docs.length}`);
+  return { sent: successCount, total: snapshot.docs.length };
+}
+
+/**
+ * 每日金句定時推播 — 每天 08:00 台灣時間
+ * TODO: 設好 pin.webhook_base + pin.webhook_secret、Pin advisor skill 宣告 webhooks 後，
+ *       取消下方 exports 的註解並重新部署。
+ */
+// exports.sendPinDailyQuote = functions.pubsub
+//   .schedule('0 8 * * *')
+//   .timeZone('Asia/Taipei')
+//   .onRun(async () => { await _sendPinDailyQuote(); });
+
+/**
+ * 手動觸發每日金句推播（管理員）
+ * 供驗收 / 測試用
+ */
+exports.triggerPinDailyQuote = functions.https.onCall(async (data, context) => {
+  await verifyAdminAccess(context);
+  const result = await _sendPinDailyQuote();
+  return { success: true, ...result };
+});
 
 console.log('Ultra Advisor Cloud Functions loaded');
