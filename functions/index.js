@@ -49,10 +49,11 @@ const LINE_CHANNEL_SECRET = functions.config().line?.channel_secret;
 const LINE_CHANNEL_ACCESS_TOKEN = functions.config().line?.channel_access_token;
 const APP_LOGIN_URL = functions.config().app?.login_url || 'https://ultra-advisor.tw';
 
-// Pin (Telegram) webhook config
-// Set before deploy: firebase functions:config:set pin.webhook_base="https://pin.8338.hk" pin.webhook_secret="<secret>"
-const PIN_WEBHOOK_BASE = functions.config().pin?.webhook_base;
-const PIN_WEBHOOK_SECRET = functions.config().pin?.webhook_secret;
+// Pin (Telegram) webhook config — via functions/.env (functions.config() is
+// deprecated/removed in firebase-tools 15 / Runtime Config shut down 2026-03).
+// Set in functions/.env: PIN_WEBHOOK_BASE=https://pin.quartz.tw  PIN_WEBHOOK_SECRET=<secret>
+const PIN_WEBHOOK_BASE = process.env.PIN_WEBHOOK_BASE;
+const PIN_WEBHOOK_SECRET = process.env.PIN_WEBHOOK_SECRET;
 
 const { validatePinToken, computePinSignature } = require('./pin-helpers');
 
