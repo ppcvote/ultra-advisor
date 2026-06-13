@@ -141,7 +141,7 @@ const PinNotificationSection = ({ userId }: { userId: string | null }) => {
       ) : (
         <div className="space-y-2">
           <p className="text-xs text-slate-500">
-            在 <strong className="text-slate-300">Pin</strong>（<a href="https://t.me/UltraPinaibot" target="_blank" rel="noreferrer" className="text-teal-400 underline">t.me/UltraPinaibot</a>）選單點「📚 advisor」→「🔔 綁定通知」取得 8 碼 Token（10 分鐘內有效），貼到下方
+            在 <strong className="text-slate-300">Pin</strong>（<a href="https://t.me/UltraPinaibot" target="_blank" rel="noreferrer" className="text-teal-400 underline">t.me/UltraPinaibot</a>）選單點「📚 Ultra Advisor」→「🔔 綁定通知」取得 8 碼 Token（10 分鐘內有效），貼到下方
           </p>
           <div className="flex gap-2">
             <input
