@@ -13,7 +13,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart
 } from 'recharts';
 import html2canvas from 'html2canvas';
-import * as htmlToImage from 'html-to-image';
+// 移除: import * as htmlToImage from 'html-to-image'; — 全檔零使用
 import { getTodayQuote, getTodayBackground, formatDateChinese, getRandomQuote, getRandomBackground, DailyQuote, getTodayIGQuote, getRandomIGQuote, IGStyleQuote } from '../data/dailyQuotes';
 import { useTheme } from '../context/ThemeContext';
 import { 

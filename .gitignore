@@ -13,3 +13,11 @@ nul
 shioaji.log
 *.log
 research-notes-src/
+
+# 防止 Windows Explorer 「複製」誤建檔（已清過 2 次又跑出來）
+* copy.tsx
+* copy.jsx
+* copy.ts
+* copy.js
+*\ copy.tsx
+*\ copy.jsx
