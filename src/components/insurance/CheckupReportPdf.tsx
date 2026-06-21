@@ -8,6 +8,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import type { FamilyMember, MergedCoverage, CoverageGapAnalysis } from '../../types/insurance';
 
+import { toast } from '../../utils/toast';
 interface CheckupReportPdfProps {
   familyName: string;
   members: FamilyMember[];
@@ -64,7 +65,7 @@ export default function CheckupReportPdf({
       pdf.save(`${familyName}_保單健診報告_${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch (err) {
       console.error('PDF 匯出失敗:', err);
-      alert('PDF 匯出失敗，請稍後再試');
+      toast.error('PDF 匯出失敗，請稍後再試');
     } finally {
       setExporting(false);
     }

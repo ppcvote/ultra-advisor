@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, CheckCircle, AlertCircle, Eye, EyeOff, Gift, User, Mail, Lock } from 'lucide-react';
 
+import { toast } from '../utils/toast';
 // LIFF SDK 類型
 declare global {
   interface Window {
@@ -207,7 +208,7 @@ export default function LiffRegister({ onSuccess }: LiffRegisterProps) {
   const copyReferralCode = () => {
     if (successData?.referralCode) {
       navigator.clipboard.writeText(successData.referralCode);
-      alert('推薦碼已複製！');
+      toast.info('推薦碼已複製！');
     }
   };
 

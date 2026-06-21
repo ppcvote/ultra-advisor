@@ -73,6 +73,7 @@ const EnglishLandingPage = lazy(() => import('./pages/EnglishLandingPage'));
 // 🆕 主題切換
 import { ThemeProvider } from './context/ThemeContext';
 
+import { toast } from './utils/toast';
 const generateSessionId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 
 const PrintStyles = () => (
@@ -91,23 +92,7 @@ const PrintStyles = () => (
   `}</style>
 );
 
-const Toast = ({ message, type = 'success', onClose }: { message: string, type: string, onClose: () => void }) => {
-  useEffect(() => {
-    const timer = setTimeout(() => { onClose(); }, 4000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-  const bgColors: Record<string, string> = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600' };
-  return (
-    <div className={`fixed bottom-6 right-6 ${bgColors[type] || 'bg-blue-600'} text-white pl-5 pr-3 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-fade-in z-[200] toast-container max-w-[90vw]`}>
-      {type === 'success' && <Check size={20} className="shrink-0" />}
-      {type === 'error' && <ShieldAlert size={20} className="shrink-0" />}
-      <span className="font-bold text-sm md:text-base break-words flex-1">{message}</span>
-      <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg transition-colors shrink-0">
-        <X size={16} />
-      </button>
-    </div>
-  );
-};
+// 🗑️ 移除本地 Toast 元件：改用 utils/toast singleton（避免跟 import { toast } 撞名）
 
 // 🆕 修改 NavItem 支援 locked 屬性
 const NavItem = ({ icon: Icon, label, active, onClick, disabled = false, locked = false }: any) => (
@@ -205,7 +190,7 @@ export default function App() {
     const saved = localStorage.getItem('ultra_advisor_active_tab');
     return saved || 'golden_safe';
   }); 
-  const [toast, setToast] = useState<{message: string, type: string} | null>(null);
+  // 🗑️ 移除本地 toast state：改用 utils/toast singleton
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false); 
   const [isSaving, setIsSaving] = useState(false);
@@ -259,7 +244,7 @@ export default function App() {
     return savedStep ? { activeStep: parseInt(savedStep) as 1 | 2 } : defaultStates.insurance_checkup;
   });
 
-  const showToast = (message: string, type = 'success') => { setToast({ message, type }); };
+  // 🗑️ 移除本地 showToast：改用 toast.success/.error/.info/.warning
 
   // ==========================================
   // 1. 安全機制：雙裝置限制邏輯
@@ -304,7 +289,7 @@ export default function App() {
         if (activeSessions.length > 0 && !activeSessions.includes(localSessionId)) {
           localStorage.removeItem('my_app_session_id');
           await signOut(auth);
-          alert("裝置數量超過限制：您的帳號已在其他裝置登入，此連線已自動登出。");
+          toast.info("裝置數量超過限制：您的帳號已在其他裝置登入，此連線已自動登出。");
           window.location.reload();
         }
       }
@@ -539,7 +524,7 @@ export default function App() {
       await signOut(auth); 
       setCurrentClient(null);
       setIsDataLoaded(false);
-      showToast("已安全登出", "info"); 
+      toast.info("已安全登出"); 
   };
 
   const getCurrentData = () => {
@@ -764,7 +749,7 @@ export default function App() {
 
   if (isSecretSignupRoute) {
       return <SecretSignupPage onSignupSuccess={() => {
-          alert("🎉 帳號開通成功！");
+          toast.success("🎉 帳號開通成功！");
           setIsSecretSignupRoute(false);
           window.location.href = '/'; 
       }} />;
@@ -842,7 +827,7 @@ export default function App() {
   if (!currentClient) {
       return (
           <ThemeProvider>
-            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+            {/* 🗑️ 本地 Toast 移除 — toast singleton 自己負責 DOM mount */}
             {/* 🆕 點數獲得通知 */}
             {pointsNotification && (
               <PointsNotification
@@ -880,8 +865,8 @@ export default function App() {
     {/* 規劃系統強制使用淺色背景，不受主題切換影響 */}
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
       <PrintStyles />
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      
+      {/* 🗑️ 本地 Toast 移除 — utils/toast singleton 自己負責 DOM mount */}
+
       {/* 🆕 點數獲得通知 */}
       {pointsNotification && (
         <PointsNotification

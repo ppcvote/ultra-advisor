@@ -19,6 +19,7 @@ import {
   BlogArticle
 } from '../data/blog';
 
+import { toast } from '../utils/toast';
 interface BlogPageProps {
   onBack: () => void;
   onLogin: () => void;
@@ -435,7 +436,7 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
     } else {
       // 複製連結
       navigator.clipboard.writeText(window.location.href);
-      alert('已複製連結到剪貼簿！');
+      toast.info('已複製連結到剪貼簿！');
     }
   };
 
@@ -734,7 +735,7 @@ const BlogPage: React.FC<BlogPageProps> = ({ onBack, onLogin }) => {
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.href);
-                  alert('已複製連結！可以貼到 LINE 或 Email 分享給同事');
+                  toast.info('已複製連結！可以貼到 LINE 或 Email 分享給同事');
                 }}
                 className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-bold px-5 py-2.5 rounded-xl transition-all"
               >

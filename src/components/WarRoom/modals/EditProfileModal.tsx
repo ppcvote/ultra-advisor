@@ -7,6 +7,7 @@ import { storage, db, functions } from '../../../firebase';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import type { ProfileData } from '../types';
 
+import { toast } from '../../../utils/toast';
 // 推播通知區塊
 const PushNotificationSection = ({ userId }: { userId: string | null }) => {
   const {
@@ -196,7 +197,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
       setFormData(prev => ({ ...prev, photoURL: downloadURL }));
     } catch (error) {
       console.error('Upload failed:', error);
-      alert('上傳失敗，請稍後再試');
+      toast.error('上傳失敗，請稍後再試');
     } finally {
       setUploading(false);
     }
@@ -209,7 +210,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, us
       onClose();
     } catch (error) {
       console.error('Save failed:', error);
-      alert('儲存失敗');
+      toast.error('儲存失敗');
     } finally {
       setLoading(false);
     }

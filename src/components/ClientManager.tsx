@@ -6,6 +6,7 @@ import {
 import { collection, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
+import { toast } from '../utils/toast';
 // ============================================================
 // 型別定義
 // ============================================================
@@ -318,7 +319,7 @@ const ClientManager: React.FC<Props> = ({ isOpen, onClose, user, clients }) => {
       setFormData({ ...EMPTY_FORM });
     } catch (error) {
       console.error('[ClientManager] Save error:', error);
-      alert('儲存失敗，請稍後再試');
+      toast.error('儲存失敗，請稍後再試');
     } finally {
       setSaving(false);
     }
@@ -333,7 +334,7 @@ const ClientManager: React.FC<Props> = ({ isOpen, onClose, user, clients }) => {
       setView('list');
     } catch (error) {
       console.error('[ClientManager] Delete error:', error);
-      alert('刪除失敗，請稍後再試');
+      toast.error('刪除失敗，請稍後再試');
     }
   }, [user?.uid]);
 

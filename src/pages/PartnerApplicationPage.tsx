@@ -7,6 +7,7 @@ import {
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
+import { toast } from '../utils/toast';
 interface PartnerApplicationPageProps {
   onBack: () => void;
 }
@@ -143,7 +144,7 @@ const PartnerApplicationPage: React.FC<PartnerApplicationPageProps> = ({ onBack 
       setIsSubmitted(true);
     } catch (error) {
       console.error('提交失敗:', error);
-      alert('提交失敗，請稍後再試');
+      toast.error('提交失敗，請稍後再試');
     } finally {
       setIsSubmitting(false);
     }

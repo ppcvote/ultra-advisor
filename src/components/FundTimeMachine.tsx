@@ -27,6 +27,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tool
 import { fundDatabase, generateFundHistory, generateDCAHistory } from '../data/fundData';
 import html2canvas from 'html2canvas';
 
+import { toast } from '../utils/toast';
 // ==========================================
 // 數字動畫 Hook (CountUp)
 // ==========================================
@@ -318,7 +319,7 @@ const FundTimeMachine = () => {
       link.click();
     } catch (error) {
       console.error('匯出失敗:', error);
-      alert('匯出失敗，請稍後再試');
+      toast.error('匯出失敗，請稍後再試');
     } finally {
       setIsExporting(false);
     }

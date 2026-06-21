@@ -10,6 +10,7 @@ import { Loader2, CheckCircle, AlertCircle, Eye, EyeOff, Gift, User, Mail, Lock,
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
 
+import { toast } from '../utils/toast';
 interface RegisterPageProps {
   onSuccess?: () => void;
   onBack?: () => void;
@@ -315,7 +316,7 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
   const copyReferralCode = () => {
     if (successData?.referralCode) {
       navigator.clipboard.writeText(successData.referralCode);
-      alert('推薦碼已複製！');
+      toast.info('推薦碼已複製！');
     }
   };
 

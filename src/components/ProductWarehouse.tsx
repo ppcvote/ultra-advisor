@@ -11,6 +11,7 @@ import {
   ClaimSummary, TAIWAN_INSURERS
 } from '../types/insurance';
 
+import { toast } from '../utils/toast';
 // ============================================================
 // 型別定義
 // ============================================================
@@ -193,7 +194,7 @@ const ProductWarehouse: React.FC<Props> = ({ isOpen, onClose, user }) => {
   // ─── 儲存商品 ───
   const handleSaveProduct = async () => {
     if (!formData.insurer || !formData.productName) {
-      alert('請填寫保險公司和商品名稱');
+      toast.warning('請填寫保險公司和商品名稱');
       return;
     }
 
@@ -241,7 +242,7 @@ const ProductWarehouse: React.FC<Props> = ({ isOpen, onClose, user }) => {
       setView('list');
     } catch (error) {
       console.error('儲存商品失敗:', error);
-      alert('儲存失敗，請稍後再試');
+      toast.error('儲存失敗，請稍後再試');
     } finally {
       setSaving(false);
     }
@@ -258,7 +259,7 @@ const ProductWarehouse: React.FC<Props> = ({ isOpen, onClose, user }) => {
       }
     } catch (error) {
       console.error('刪除商品失敗:', error);
-      alert('刪除失敗');
+      toast.error('刪除失敗');
     }
   };
 
@@ -370,13 +371,13 @@ const ProductWarehouse: React.FC<Props> = ({ isOpen, onClose, user }) => {
       });
 
       await batch.commit();
-      alert(`成功匯入 ${importPreview.length} 筆商品`);
+      toast.success(`成功匯入 ${importPreview.length} 筆商品`);
       setImportText('');
       setImportPreview([]);
       setView('list');
     } catch (error) {
       console.error('批次匯入失敗:', error);
-      alert('匯入失敗，請稍後再試');
+      toast.error('匯入失敗，請稍後再試');
     } finally {
       setSaving(false);
     }

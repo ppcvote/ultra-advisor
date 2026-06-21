@@ -29,6 +29,7 @@ import { User as FirebaseUser } from 'firebase/auth';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 
+import { toast } from '../utils/toast';
 // ============================================================
 // 類型定義
 // ============================================================
@@ -516,7 +517,7 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (error) {
       console.error('存檔失敗:', error);
-      alert('存檔失敗，請稍後再試');
+      toast.error('存檔失敗，請稍後再試');
     } finally {
       setIsSaving(false);
     }
@@ -562,7 +563,7 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
   const addCustomer = useCallback(async () => {
     if (!user) return;
     if (!customerForm.name.trim()) {
-      alert('請輸入客戶姓名');
+      toast.warning('請輸入客戶姓名');
       return;
     }
     try {
@@ -591,7 +592,7 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
       setShowCustomerForm(false);
     } catch (error) {
       console.error('新增客戶失敗:', error);
-      alert('新增失敗，請稍後再試');
+      toast.error('新增失敗，請稍後再試');
     }
   }, [user, customerForm]);
 
@@ -599,7 +600,7 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
   const updateCustomer = useCallback(async () => {
     if (!user || !editingCustomer) return;
     if (!customerForm.name.trim()) {
-      alert('請輸入客戶姓名');
+      toast.warning('請輸入客戶姓名');
       return;
     }
     try {
@@ -623,7 +624,7 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
       setShowCustomerForm(false);
     } catch (error) {
       console.error('更新客戶失敗:', error);
-      alert('更新失敗，請稍後再試');
+      toast.error('更新失敗，請稍後再試');
     }
   }, [user, editingCustomer, customerForm]);
 
@@ -637,7 +638,7 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
       setCustomers(prev => prev.filter(c => c.id !== customerId));
     } catch (error) {
       console.error('刪除客戶失敗:', error);
-      alert('刪除失敗，請稍後再試');
+      toast.error('刪除失敗，請稍後再試');
     }
   }, [user]);
 
