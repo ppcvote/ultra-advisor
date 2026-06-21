@@ -5,7 +5,9 @@ import {
 } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { blogArticles } from '../../data/blog/index';
+// 🔧 PERF: 只 import 輕量 metadata（id/slug/title/excerpt/publishDate），不拉 content 全文
+// 原本 index.ts ~900KB raw → 改用 metadata.ts ~57KB raw（content 改 BlogPage 動態 import）
+import { blogMetadata as blogArticles } from '../../data/blog/metadata';
 import { getTodayQuote, getTodayBackground, formatDateChinese } from '../../data/dailyQuotes';
 import { ALL_TOOLS } from '../../constants/tools';
 import type { ProfileData, WarRoomTab } from './types';

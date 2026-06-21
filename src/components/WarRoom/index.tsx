@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LogOut, Settings, Bell, X, ChevronDown, Lightbulb,
   LayoutDashboard, Users, Wrench, Share2, Calculator,
@@ -20,7 +20,9 @@ import type { WarRoomTab, ProfileData, WarRoomProps } from './types';
 import OverviewTab from './OverviewTab';
 import ClientsTab from './ClientsTab';
 import ToolsTab from './ToolsTab';
-import ShareTab from './ShareTab';
+// 🔧 PERF: ShareTab lazy-load — 它透過 MarketDataCard 拉進 UltraWarRoom 6960 行
+// 大多數用戶不會切到 share tab，main bundle 不需要包這塊
+const ShareTab = lazy(() => import('./ShareTab'));
 import { AddClientModal, EditClientModal, FeedbackModal, EditProfileModal, ChangePasswordModal } from './modals';
 
 // Tab 定義
@@ -403,12 +405,14 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
         )}
 
         {activeTab === 'share' && (
-          <ShareTab
-            userId={user?.uid}
-            userDisplayName={profileData.displayName || user?.displayName}
-            userPhotoURL={profileData.photoURL || user?.photoURL}
-            membership={membership}
-          />
+          <Suspense fallback={<div className="text-center py-12 text-slate-500">載入中...</div>}>
+            <ShareTab
+              userId={user?.uid}
+              userDisplayName={profileData.displayName || user?.displayName}
+              userPhotoURL={profileData.photoURL || user?.photoURL}
+              membership={membership}
+            />
+          </Suspense>
         )}
       </main>
 

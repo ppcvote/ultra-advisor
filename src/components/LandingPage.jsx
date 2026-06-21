@@ -13,7 +13,8 @@ import {
   Eye, Brain, Cpu
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
-import { blogArticles } from '../data/blog';
+// 🔧 PERF: 改用輕量 metadata，不要拉全部 blog content 進主 bundle
+import { blogMetadata as blogArticles } from '../data/blog/metadata';
 import { getTodayQuote, getTodayBackground, formatDateChinese } from '../data/dailyQuotes';
 
 // ==========================================
