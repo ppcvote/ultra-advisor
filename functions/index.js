@@ -13,6 +13,41 @@ const db = admin.firestore();
 const auth = admin.auth();
 
 // ==========================================
+// 🔒 共用：每日 Rate Limit（防 AI 函數被狂打）
+// ==========================================
+/**
+ * 每日 rate limit — 用法：在 callable function 開頭 `await enforceDailyLimit('ocr', context, 20);`
+ * @param {string} prefix — 計數器類別前綴
+ * @param {object} context — Firebase Callable context (含 auth + rawRequest)
+ * @param {number} dailyLimit — 登入用戶上限
+ * @param {number} [anonLimit] — 匿名上限（預設為 dailyLimit / 3）
+ * 失敗時拋 HttpsError('resource-exhausted', '...');
+ */
+async function enforceDailyLimit(prefix, context, dailyLimit, anonLimit) {
+  const uid = context.auth?.uid;
+  const ip = context.rawRequest?.ip || context.rawRequest?.headers?.['x-forwarded-for'] || 'unknown';
+  const limit = uid ? dailyLimit : (anonLimit || Math.ceil(dailyLimit / 3));
+  const key = uid || String(ip).replace(/[^a-zA-Z0-9]/g, '_');
+  const today = new Date().toISOString().split('T')[0];
+  const ref = db.collection('rateLimits').doc(`${prefix}_${key}_${today}`);
+  try {
+    const snap = await ref.get();
+    const current = snap.exists ? (snap.data().count || 0) : 0;
+    if (current >= limit) {
+      throw new functions.https.HttpsError('resource-exhausted',
+        `今日 ${prefix} 次數已達上限 (${limit})，請明天再試`);
+    }
+    await ref.set({
+      count: current + 1,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    if (err.code === 'resource-exhausted') throw err;
+    console.warn(`⚠️ Rate limit (${prefix}) 檢查失敗，放行:`, err.message);
+  }
+}
+
+// ==========================================
 // CORS 白名單設定（資安規格書 1.2）
 // ==========================================
 const ALLOWED_ORIGINS = [
@@ -4373,6 +4408,9 @@ exports.processInsuranceOCR = functions
     throw new functions.https.HttpsError('unauthenticated', '請先登入');
   }
 
+  // 1.5. 🔒 每日上限 — OCR 是 Cloud Vision + Gemini 雙費用，限 20/天
+  await enforceDailyLimit('ocr', context, 20);
+
   const { imageBase64, storagePath } = data;
 
   // 支援兩種模式：base64 直傳 或 Storage 路徑
@@ -4456,6 +4494,9 @@ exports.parseInsuranceOCR = functions
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', '請先登入');
     }
+
+    // 🔒 每日上限 — Gemini Vision 直接辨識，限 20/天
+    await enforceDailyLimit('parse_ocr', context, 20);
 
     const { imageBase64, mimeType, imageUrl, familyMemberId } = data;
     if (!imageBase64 && !imageUrl) {
@@ -4603,6 +4644,9 @@ exports.lookupInsuranceProduct = functions
     if (!context.auth) {
       throw new functions.https.HttpsError('unauthenticated', '請先登入');
     }
+
+    // 🔒 每日上限 — 搜尋 + Gemini 摘要，限 50/天（比 OCR 高，因為有快取）
+    await enforceDailyLimit('product_lookup', context, 50);
 
     const { insurer, productName } = data;
     if (!productName) {

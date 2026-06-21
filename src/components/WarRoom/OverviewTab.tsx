@@ -3,8 +3,7 @@ import {
   BookOpen, ExternalLink, RefreshCw, Share2, TrendingUp,
   Crown, Users, Wrench, ArrowRight, Newspaper, Plus, Zap, Mic, PencilRuler
 } from 'lucide-react';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../firebase';
+// 移除：dailyMarketReports 改走 /api/market-report，不再 import db / onSnapshot
 // 🔧 PERF: 只 import 輕量 metadata（id/slug/title/excerpt/publishDate），不拉 content 全文
 // 原本 index.ts ~900KB raw → 改用 metadata.ts ~57KB raw（content 改 BlogPage 動態 import）
 import { blogMetadata as blogArticles } from '../../data/blog/metadata';
@@ -39,13 +38,27 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   const isNewUser = clientCount === 0;
 
   useEffect(() => {
-    const now = new Date();
-    const twDate = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-    const today = twDate.toISOString().split('T')[0];
-    const unsub = onSnapshot(doc(db, 'dailyMarketReports', today), snap => {
-      setMarketReport(snap.exists() ? snap.data() : null);
-    });
-    return () => unsub();
+    // 🔧 PERF: 改走 /api/market-report（5min CDN s-maxage）取代 onSnapshot
+    // 同頁面（UltraWarRoom 也有同一個 listener）兩個 listener 同步同一份全域文件，浪費 Firestore reads
+    // 報告每天才更新一次，5min stale 完全夠用
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/market-report', { cache: 'no-store' });
+        if (!res.ok) {
+          if (!cancelled) setMarketReport(null);
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled) setMarketReport(data);
+      } catch {
+        if (!cancelled) setMarketReport(null);
+      }
+    };
+    load();
+    // 15 分鐘重抓一次（搭配 CDN cache）
+    const id = setInterval(load, 15 * 60 * 1000);
+    return () => { cancelled = true; clearInterval(id); };
   }, []);
 
   const displayName = profileData.displayName || user?.displayName || user?.email?.split('@')[0] || '用戶';
