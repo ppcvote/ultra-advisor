@@ -16,6 +16,7 @@ import html2canvas from 'html2canvas';
 // 移除: import * as htmlToImage from 'html-to-image'; — 全檔零使用
 import { getTodayQuote, getTodayBackground, formatDateChinese, getRandomQuote, getRandomBackground, DailyQuote, getTodayIGQuote, getRandomIGQuote, IGStyleQuote } from '../data/dailyQuotes';
 import { useTheme } from '../context/ThemeContext';
+import { toast } from '../utils/toast';
 import { 
   getAuth, 
   updatePassword, 
@@ -956,7 +957,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
     const remainingSlots = 7 - customBackgrounds.length;
     if (remainingSlots <= 0) {
-      alert('最多只能上傳 7 張自訂背景');
+      toast.warning('最多只能上傳 7 張自訂背景');
       return;
     }
 
@@ -967,7 +968,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
     for (const file of filesToUpload) {
       if (!file.type.startsWith('image/')) continue;
       if (file.size > 5 * 1024 * 1024) {
-        alert(`${file.name} 超過 5MB 限制`);
+        toast.error(`${file.name} 超過 5MB 限制`);
         continue;
       }
 
@@ -1272,7 +1273,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
     }
 
     if (!hasContent) {
-      alert('請先簽名');
+      toast.warning('請先簽名');
       return;
     }
 
@@ -1676,7 +1677,7 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
       await recordShare();
     } catch (error) {
       console.error('生成圖片失敗:', error);
-      alert('生成圖片失敗，請稍後再試');
+      toast.error('生成圖片失敗，請稍後再試');
     } finally {
       setIsGenerating(false);
     }

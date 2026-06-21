@@ -52,7 +52,8 @@ import type { InsuranceCheckupData } from './types/insurance';
 // 點數系統與會員權限
 import { pointsApi } from './hooks/usePoints';
 import { useMembership } from './hooks/useMembership';
-const PointsDashboard = lazy(() => import('./components/PointsDashboard'));
+// 🗑️ PointsDashboard 移除：0 觸發者，已從 UI 拿掉
+// const PointsDashboard = lazy(() => import('./components/PointsDashboard'));
 import PointsNotification from './components/PointsNotification';
 import ToolLockedOverlay from './components/ToolLockedOverlay';
 
@@ -212,7 +213,7 @@ export default function App() {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   
   // 🆕 點數系統狀態
-  const [isPointsDashboardOpen, setIsPointsDashboardOpen] = useState(false);
+  // 🗑️ 移除：const [isPointsDashboardOpen, setIsPointsDashboardOpen] = useState(false);
   const [pointsNotification, setPointsNotification] = useState<{points: number, reason: string, streak?: number} | null>(null);
 
   // 🆕 會員權限
@@ -851,13 +852,7 @@ export default function App() {
                 onClose={() => setPointsNotification(null)}
               />
             )}
-            {/* 🆕 點數儀表板 */}
-            <Suspense fallback={null}>
-            <PointsDashboard
-              isOpen={isPointsDashboardOpen}
-              onClose={() => setIsPointsDashboardOpen(false)}
-            />
-            </Suspense>
+            {/* 🗑️ PointsDashboard 已移除 — 0 觸發者，僅後端記點 */}
             <Suspense fallback={<SplashScreen />}>
               <UltraWarRoom
                 user={user}
@@ -897,12 +892,10 @@ export default function App() {
         />
       )}
 
-      {/* 🆕 點數儀表板 */}
-      <PointsDashboard 
-        isOpen={isPointsDashboardOpen} 
-        onClose={() => setIsPointsDashboardOpen(false)} 
-      />
-      
+      {/* 🗑️ PointsDashboard 已移除 — setIsPointsDashboardOpen(true) 整個 src/ 0 個呼叫者
+          dailyLogin 仍會記點數到 Firestore（用於 backend analytics），但用戶 UI 不顯示。
+          要恢復時：sidebar 加觸發按鈕 + 還原 lazy import + state */}
+
       {clientLoading && (
           <div className="fixed inset-0 z-[100] bg-white/80 backdrop-blur-sm flex items-center justify-center">
               <div className="text-center">

@@ -5,6 +5,7 @@ import { doc, onSnapshot, setDoc, getDoc, collection, addDoc, serverTimestamp, q
 import { getAuth } from 'firebase/auth'
 import { db } from '../firebase'
 import { ArrowLeft, Save, Share2, Eye, Users, Check, History, Loader2 } from 'lucide-react'
+import { toast } from '../utils/toast'
 
 const COLLECTION = 'whiteboards'
 // 🔧 debounce 提高到 2000ms — Aug 流動車 demo 20 個 iPad 同時 viewer 才不會把 Firestore 寫爆
@@ -58,7 +59,7 @@ export default function WhiteboardPage() {
         const ref = doc(db, COLLECTION, rid)
         const snap = await getDoc(ref)
         if (!snap.exists()) {
-          alert('白板不存在')
+          toast.error('白板不存在')
           window.location.href = '/whiteboard'
           return
         }
@@ -79,7 +80,7 @@ export default function WhiteboardPage() {
         setView('board')
       } catch (err) {
         console.error('Load whiteboard failed:', err)
-        alert('載入白板失敗')
+        toast.error('載入白板失敗')
         window.location.href = '/whiteboard'
       }
     })()
@@ -89,7 +90,7 @@ export default function WhiteboardPage() {
   const handleCreate = async () => {
     const user = getAuth().currentUser
     if (!user) {
-      alert('請先登入才能建立白板')
+      toast.warning('請先登入才能建立白板')
       return
     }
     const newRoomId = generateId(8)
@@ -185,7 +186,7 @@ export default function WhiteboardPage() {
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {
       console.error('Save failed:', err)
-      alert('儲存失敗')
+      toast.error('儲存失敗')
     }
   }
 
