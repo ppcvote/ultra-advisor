@@ -13,7 +13,10 @@ import { auth, db } from './firebase';
 // 組件匯入
 import { LoginPage } from './components/auth/LoginPage';
 import { SecretSignupPage } from './components/auth/SecretSignupPage';
-import { LandingPage } from './components/LandingPage';
+// 🔧 PERF: LandingPage 2,699 行只給未登入訪客用 → lazy（splash 3 秒夠載入）
+const LandingPage = lazy(() =>
+  import('./components/LandingPage').then(m => ({ default: m.LandingPage }))
+);
 
 import ReportModal from './components/ReportModal';
 import SplashScreen from './components/SplashScreen';
@@ -26,7 +29,8 @@ import { getMembershipInfo, MembershipInfo, defaultMembershipInfo } from './util
 
 // ✅ 新版戰情室（整合個人資料、密碼修改、客戶管理）
 // 新版 WarRoom（Tab 架構）
-import UltraWarRoom from './components/WarRoom';
+// 🔧 PERF: 登入後才會用到的 WarRoom（含 ShareTab 等子分頁），延後到登入後再載
+const UltraWarRoom = lazy(() => import('./components/WarRoom'));
 
 // Lazy-loaded 工具元件（Code Splitting）
 const FinancialRealEstateTool = lazy(() => import('./components/FinancialRealEstateTool'));
@@ -822,11 +826,13 @@ export default function App() {
     }
     return (
       <ThemeProvider>
-        <LandingPage
-          onStart={() => navigateTo('/login', () => setIsLoginRoute(true))}
-          onSignup={() => navigateTo('/signup-secret', () => setIsSecretSignupRoute(true))}
-          onHome={() => navigateTo('/', () => { setIsLoginRoute(false); setIsSecretSignupRoute(false); })}
-        />
+        <Suspense fallback={<SplashScreen />}>
+          <LandingPage
+            onStart={() => navigateTo('/login', () => setIsLoginRoute(true))}
+            onSignup={() => navigateTo('/signup-secret', () => setIsSecretSignupRoute(true))}
+            onHome={() => navigateTo('/', () => { setIsLoginRoute(false); setIsSecretSignupRoute(false); })}
+          />
+        </Suspense>
       </ThemeProvider>
     );
   }
@@ -852,22 +858,24 @@ export default function App() {
               onClose={() => setIsPointsDashboardOpen(false)}
             />
             </Suspense>
-            <UltraWarRoom
-              user={user}
-              onSelectClient={setCurrentClient}
-              onLogout={handleLogout}
-              onNavigateToTool={(toolId) => {
-                // 以虛擬客戶進入工具介面，然後跳轉到指定工具
-                setCurrentClient({ id: 'self-checkup', name: '保單健診（個人）', phone: '', note: '' });
-                setActiveTab(toolId);
-              }}
-              onStartCheckup={(clientId, clientName) => {
-                // 保單健診：綁定真實客戶
-                setCurrentClient({ id: clientId, name: clientName, phone: '', note: '' });
-                setInsuranceCheckupData({ activeStep: 1, clientId });
-                setActiveTab('insurance_checkup');
-              }}
-            />
+            <Suspense fallback={<SplashScreen />}>
+              <UltraWarRoom
+                user={user}
+                onSelectClient={setCurrentClient}
+                onLogout={handleLogout}
+                onNavigateToTool={(toolId) => {
+                  // 以虛擬客戶進入工具介面，然後跳轉到指定工具
+                  setCurrentClient({ id: 'self-checkup', name: '保單健診（個人）', phone: '', note: '' });
+                  setActiveTab(toolId);
+                }}
+                onStartCheckup={(clientId, clientName) => {
+                  // 保單健診：綁定真實客戶
+                  setCurrentClient({ id: clientId, name: clientName, phone: '', note: '' });
+                  setInsuranceCheckupData({ activeStep: 1, clientId });
+                  setActiveTab('insurance_checkup');
+                }}
+              />
+            </Suspense>
           </ThemeProvider>
       );
   }

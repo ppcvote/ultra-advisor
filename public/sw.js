@@ -8,12 +8,13 @@ const STATIC_CACHE = 'ultra-advisor-static-v2';
 const DYNAMIC_CACHE = 'ultra-advisor-dynamic-v2';
 
 // 靜態資源（App Shell）- 優先快取
+// 🔧 FIX: 移除不存在的 logo-192/512 PNG（cache.addAll 是 atomic，其中一個 404 就整個拒絕）
+//        導致 STATIC_CACHE 永遠空、offline.html fallback 從未生效
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
+  '/logo.svg',
   '/logo.png',
-  '/logo-192.png',
-  '/logo-512.png',
   '/offline.html',
 ];
 
@@ -216,8 +217,8 @@ self.addEventListener('push', (event) => {
   const data = event.data.json();
   const options = {
     body: data.body || '',
-    icon: '/logo-192.png',
-    badge: '/logo-192.png',
+    icon: '/logo.png',
+    badge: '/logo.png',
     vibrate: [100, 50, 100],
     data: {
       url: data.url || '/',
