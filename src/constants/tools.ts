@@ -221,6 +221,13 @@ export const ALL_TOOLS = TOOL_CATEGORIES.flatMap(cat => cat.tools);
 // 取得免費工具列表
 export const FREE_TOOLS = ALL_TOOLS.filter(tool => tool.isFree);
 
+// 試用會員開放的工具 ID — 包含 isFree 標記的 + 老牌「試用三件套」（reservoir/estate/tax）
+// 這是 SoT。useMembership.ts 和 ToolsTab.tsx 都從這裡讀
+export const FREE_ACCESS_TOOL_IDS = [
+  ...ALL_TOOLS.filter(t => t.isFree).map(t => t.id),
+  'reservoir', 'estate', 'tax', // 試用三件套（與 ToolsTab.FREE_ACCESS 對齊）
+];
+
 // 取得 PRO 工具列表
 export const PRO_TOOLS = ALL_TOOLS.filter(tool => !tool.isFree);
 

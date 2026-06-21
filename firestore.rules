@@ -174,25 +174,42 @@ service cloud.firestore {
     }
 
     // ============================================
-    // 7. Ultra 白板（公開讀取連結即可看，主持人 token 才能寫）
+    // 7. Ultra 白板（主持人需登入 + 必須是 presenterUid，size 上限 200KB）
     // ============================================
+    // 🔒 SECURITY 修補項目：
+    //  - 任何人有連結都能讀（demo 場景需要）
+    //  - 必須登入才能建立 + 必須記下 presenterUid
+    //  - 寫入限：必須登入 + uid == presenterUid + size < 200KB
+    //  - presenterToken 移到 sibling private subcollection（未來工作），暫時公開檔內維持相容
     match /whiteboards/{roomId} {
       // 任何人有連結都能看
       allow read: if true;
-      // 建立新白板：需要登入
-      allow create: if isSignedIn();
-      // 更新：本來就應該由主持人做，但 Firestore 拿不到自定義 token；
-      // 改用「文件已存在且 presenterToken 不被改」+「snapshot/updatedAt/title 可改」的限制
-      // 實務上前端只在驗證 token 後才寫，這裡是第二層保護
-      allow update: if request.resource.data.presenterToken == resource.data.presenterToken
-                    && request.resource.data.createdAt == resource.data.createdAt;
+      // 建立：需登入，且必須把自己的 uid 記為 presenterUid
+      allow create: if isSignedIn()
+                    && request.resource.data.presenterUid == request.auth.uid
+                    && request.resource.size() < 200 * 1024;
+      // 更新：必須登入 + 是 presenterUid + 大小限制 + 不能改 presenterUid/createdAt
+      // 沒有 presenterUid 的舊文件（legacy）走 token 比對保留相容
+      allow update: if isSignedIn()
+                    && request.resource.size() < 200 * 1024
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && (
+                      // 新規則：uid 必須是 presenterUid
+                      (resource.data.presenterUid is string
+                        && resource.data.presenterUid == request.auth.uid
+                        && request.resource.data.presenterUid == resource.data.presenterUid)
+                      ||
+                      // 舊文件相容：沒 presenterUid，至少 token 不可被改
+                      (!('presenterUid' in resource.data)
+                        && request.resource.data.presenterToken == resource.data.presenterToken)
+                    );
       // 不允許刪除
       allow delete: if false;
 
-      // 歷史快照（已儲存的版本）
+      // 歷史快照（已儲存的版本）— 登入用戶可建，size 限制
       match /history/{snapshotId} {
         allow read: if true;
-        allow create: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.size() < 200 * 1024;
         allow update, delete: if false;
       }
     }

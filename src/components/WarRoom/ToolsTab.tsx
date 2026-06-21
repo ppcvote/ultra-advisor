@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, AlertCircle } from 'lucide-react';
-import { TOOL_CATEGORIES } from '../../constants/tools';
+import { TOOL_CATEGORIES, FREE_ACCESS_TOOL_IDS } from '../../constants/tools';
+import { pointsApi } from '../../hooks/usePoints';
 
 interface ToolsTabProps {
   isPaid: boolean;
@@ -13,18 +14,24 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ isPaid, onSelectTool, onSelectClien
   const [hoveredTool, setHoveredTool] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
 
-  const FREE_ACCESS = ['reservoir', 'estate', 'tax'];
-
+  // 🔧 SoT: 從 tools.ts 讀（取代舊的硬編碼 FREE_ACCESS）
   const canAccess = (toolId: string, isFree: boolean) => {
     if (isPaid) return true;
     if (isFree) return true;
-    if (FREE_ACCESS.includes(toolId)) return true;
+    if (FREE_ACCESS_TOOL_IDS.includes(toolId)) return true;
     return false;
   };
 
   const handleToolClick = (toolId: string, isFree: boolean) => {
-    if (!hasClients) {
-      // 顯示 toast 提示，然後跳轉
+    // 📊 ANALYTICS: 追蹤工具使用（不論成功失敗，知道用戶想用什麼）
+    pointsApi.toolUse(toolId).catch(() => { /* silent — 不影響 UX */ });
+
+    // 🔧 UX: 免費工具（FREE_ACCESS_TOOL_IDS）允許在沒有客戶時直接試算
+    // 修掉「試完金句想用工具 → 被推到客戶頁 → bounce」的轉換漏斗
+    const isFreeAccess = canAccess(toolId, isFree);
+
+    if (!hasClients && !isFreeAccess) {
+      // PRO 工具才需要先建客戶
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
       onSelectClient();

@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { Tldraw, Editor, TLStoreSnapshot, getSnapshot } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { doc, onSnapshot, setDoc, getDoc, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'firebase/firestore'
+import { getAuth } from 'firebase/auth'
 import { db } from '../firebase'
 import { ArrowLeft, Save, Share2, Eye, Users, Check, History, Loader2 } from 'lucide-react'
 
 const COLLECTION = 'whiteboards'
-const SYNC_DEBOUNCE_MS = 400
+// 🔧 debounce 提高到 2000ms — Aug 流動車 demo 20 個 iPad 同時 viewer 才不會把 Firestore 寫爆
+const SYNC_DEBOUNCE_MS = 2000
 const PRESENTER_TOKEN_KEY = 'p'
 
 function generateId(len = 8): string {
@@ -85,12 +87,18 @@ export default function WhiteboardPage() {
 
   // === Create new whiteboard ===
   const handleCreate = async () => {
+    const user = getAuth().currentUser
+    if (!user) {
+      alert('請先登入才能建立白板')
+      return
+    }
     const newRoomId = generateId(8)
     const newToken = generateToken()
     const ref = doc(db, COLLECTION, newRoomId)
     await setDoc(ref, {
       createdAt: serverTimestamp(),
       presenterToken: newToken,
+      presenterUid: user.uid, // 🔒 SECURITY: 綁定建立者 UID（rules 用這個檢查寫入權限）
       snapshot: null,
       title: `白板 ${new Date().toLocaleString('zh-TW')}`,
     })

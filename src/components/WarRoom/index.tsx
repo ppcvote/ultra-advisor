@@ -12,6 +12,7 @@ import { getAuth, updateProfile } from 'firebase/auth';
 import { db } from '../../firebase';
 
 import { useMembership } from '../../hooks/useMembership';
+import { pointsApi } from '../../hooks/usePoints';
 import ReferralEngineModal from '../ReferralEngineModal';
 import CheckupClientSelector from '../insurance/CheckupClientSelector';
 
@@ -185,6 +186,9 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
   };
 
   const handleToolSelect = (toolId: string) => {
+    // 📊 ANALYTICS: 追蹤工具使用（fire-and-forget，不擋主流程）
+    pointsApi.toolUse(toolId).catch(() => { /* silent */ });
+
     // 如果有客戶，直接導航到工具
     if (clients.length > 0) {
       onSelectClient(clients[0]); // 預設選第一個客戶

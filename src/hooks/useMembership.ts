@@ -8,13 +8,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+// 🔧 SoT: 從 tools.ts 讀 FREE_TOOLS，不再維護獨立的硬編碼清單
+import { FREE_ACCESS_TOOL_IDS } from '../constants/tools';
 
-// 免費/試用會員可用的工具
-export const FREE_TOOLS = [
-  'reservoir',      // 大小水庫
-  'estate',         // 金融房產
-  'tax',            // 稅務傳承
-];
+// 免費/試用會員可用的工具（從 tools.ts 推導，保持與 UI 一致）
+export const FREE_TOOLS = FREE_ACCESS_TOOL_IDS;
 
 // 所有工具列表
 export const ALL_TOOLS = [
