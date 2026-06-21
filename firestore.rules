@@ -18,6 +18,13 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    // --- helper function: 檢查 users 寫入是否觸碰受保護欄位（防 paywall 繞過）---
+    function hasProtectedFieldChange() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['primaryTierId', 'tierId', 'role', 'plan', 'status', 'isAdmin',
+                 'membershipTier', 'membershipExpiresAt', 'points', 'totalPoints']);
+    }
+
     // ============================================
     // 1. 系統配置（公開讀取，管理員可寫）
     // ============================================
@@ -47,9 +54,19 @@ service cloud.firestore {
     // ============================================
 
     // 用戶資料：自己或管理員可讀寫
+    // 🔒 SECURITY: 用戶不可自行修改會員等級/角色/付費狀態（防止 devtools 一行繞過 paywall）
     match /users/{userId} {
       allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
-      allow write: if isSignedIn() && (isOwner(userId) || isAdmin());
+      // 建立：只有自己（首次註冊），但不可預設付費欄位
+      allow create: if isSignedIn() && isOwner(userId)
+                    && !request.resource.data.keys().hasAny(['primaryTierId', 'tierId', 'role', 'plan', 'isAdmin', 'membershipTier']);
+      // 更新：自己可改，但不能動受保護欄位（除非是 admin）
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (isOwner(userId) && !hasProtectedFieldChange())
+      );
+      // 刪除：只有 admin
+      allow delete: if isAdmin();
 
       // 社群助理 - 發文紀錄：只能新增，不能修改和刪除（審計用途）
       match /threadsPosts/{docId} {

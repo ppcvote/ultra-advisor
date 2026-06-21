@@ -21,8 +21,12 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
           <p style="color:#94a3b8;">${String(error_description || error || '未知錯誤')}</p>
           <p style="color:#64748b;font-size:14px;">你可以關閉此頁面，回到 Ultra Advisor 重試。</p>
           <script>
+            // 🔒 SECURITY: 限定 origin，不再用 '*'
+            var TRUSTED_ORIGINS = ['https://ultra-advisor.tw', 'https://www.ultra-advisor.tw'];
             if (window.opener) {
-              window.opener.postMessage({ type: 'threads-oauth-error', error: ${JSON.stringify(String(error_description || error))} }, '*');
+              for (var i = 0; i < TRUSTED_ORIGINS.length; i++) {
+                try { window.opener.postMessage({ type: 'threads-oauth-error', error: ${JSON.stringify(String(error_description || error))} }, TRUSTED_ORIGINS[i]); } catch(e){}
+              }
               setTimeout(() => window.close(), 2000);
             }
           </script>
@@ -61,8 +65,12 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
         <p style="color:#64748b;font-size:14px;">此頁面將自動關閉。</p>
         <script>
           var code = ${JSON.stringify(String(code))};
+          // 🔒 SECURITY: 限定 origin，不再用 '*'，避免 code 外洩到任意 opener
+          var TRUSTED_ORIGINS = ['https://ultra-advisor.tw', 'https://www.ultra-advisor.tw'];
           if (window.opener) {
-            window.opener.postMessage({ type: 'threads-oauth-code', code: code }, '*');
+            for (var i = 0; i < TRUSTED_ORIGINS.length; i++) {
+              try { window.opener.postMessage({ type: 'threads-oauth-code', code: code }, TRUSTED_ORIGINS[i]); } catch(e){}
+            }
             setTimeout(function() { window.close(); }, 1500);
           } else {
             // 如果不是 popup 開啟的，顯示授權碼讓用戶手動複製

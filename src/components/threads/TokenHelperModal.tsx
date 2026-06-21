@@ -50,7 +50,15 @@ const TokenHelperModal: React.FC<TokenHelperModalProps> = ({ isOpen, onClose, on
   } | null>(null);
 
   // 監聽 OAuth popup 回傳的 postMessage
+  // 🔒 SECURITY: 驗證 origin，只接受自己的網域（避免第三方 popup 偽造 OAuth code）
   const handleMessage = useCallback((event: MessageEvent) => {
+    const TRUSTED_ORIGINS = [
+      'https://ultra-advisor.tw',
+      'https://www.ultra-advisor.tw',
+      window.location.origin, // dev / preview
+    ];
+    if (!TRUSTED_ORIGINS.includes(event.origin)) return;
+
     if (event.data?.type === 'threads-oauth-code') {
       setAuthCode(event.data.code);
       setAuthError('');

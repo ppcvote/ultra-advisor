@@ -4,6 +4,11 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // 🔒 SECURITY: production build 移除所有 console / debugger
+  // 修掉 216 個 console.log + CheckupReport.tsx:706 PII 外洩
+  esbuild: {
+    drop: ['console', 'debugger'],
+  },
   build: {
     rollupOptions: {
       output: {
