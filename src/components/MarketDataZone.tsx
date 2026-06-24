@@ -230,7 +230,7 @@ export default function MarketDataZone() {
     const hasSeenHint = localStorage.getItem(HINT_STORAGE_KEY);
     if (!hasSeenHint) {
       const timer = setTimeout(() => {
-        setShowTripleClickHint(true);
+        /* auto-popup disabled (brand-safe): use triple-click gesture instead */
       }, 1500); // 延遲 1.5 秒顯示
       return () => clearTimeout(timer);
     }

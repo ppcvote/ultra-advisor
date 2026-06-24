@@ -79,13 +79,19 @@ export const LaborPensionTool = ({ data, setData }: any) => {
 
       // 5. 延遲成本 (計算基礎也隨之變大)
       const investRateForGap = 0.06 / 12;
-      const targetGapFund = gap * 240; 
-      
-      const monthlySaveNow = Math.round(targetGapFund * investRateForGap / (Math.pow(1 + investRateForGap, monthsToInvest) - 1));
-      
+      const targetGapFund = gap * 240;
+
+      // gap=0 (退休金已夠) 或 monthsToInvest=0 (今年就退休)：不需再存
+      const annuityFactor = (months: number) =>
+        months > 0 ? (Math.pow(1 + investRateForGap, months) - 1) : 0;
+
+      const monthlySaveNow = (targetGapFund > 0 && monthsToInvest > 0)
+        ? Math.round(targetGapFund * investRateForGap / annuityFactor(monthsToInvest))
+        : 0;
+
       const monthsToInvestLater = (yearsToRetire - 10) * 12;
-      const monthlySaveLater = monthsToInvestLater > 0 
-        ? Math.round(targetGapFund * investRateForGap / (Math.pow(1 + investRateForGap, monthsToInvestLater) - 1))
+      const monthlySaveLater = (targetGapFund > 0 && monthsToInvestLater > 0)
+        ? Math.round(targetGapFund * investRateForGap / annuityFactor(monthsToInvestLater))
         : 0;
 
       return {
@@ -459,7 +465,11 @@ export const LaborPensionTool = ({ data, setData }: any) => {
 
               <div className="bg-slate-50 rounded-lg p-3 text-center">
                   <p className="text-slate-700 text-sm font-bold">
-                      您的猶豫，讓負擔加重了 <span className="text-rose-600">{Math.round(calculations.monthlySaveLater / calculations.monthlySaveNow * 100 / 100)} 倍</span>
+                      {calculations.monthlySaveNow > 0 ? (
+                        <>您的猶豫，讓負擔加重了 <span className="text-rose-600">{(calculations.monthlySaveLater / calculations.monthlySaveNow).toFixed(1)} 倍</span></>
+                      ) : (
+                        <span className="text-emerald-600">您的退休金結構已足以支應目標</span>
+                      )}
                   </p>
               </div>
           </div>

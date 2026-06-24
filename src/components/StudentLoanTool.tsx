@@ -86,7 +86,7 @@ export const StudentLoanTool = ({ data, setData, userId }: any) => {
     const hasSeenHint = localStorage.getItem(HINT_STORAGE_KEY);
     if (!hasSeenHint) {
       const timer = setTimeout(() => {
-        setShowTripleClickHint(true);
+        /* auto-popup disabled (brand-safe): use triple-click gesture instead */
       }, 1000);
       return () => clearTimeout(timer);
     }

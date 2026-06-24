@@ -196,7 +196,7 @@ const FundTimeMachine = () => {
     const hasSeenHint = localStorage.getItem(HINT_STORAGE_KEY);
     if (!hasSeenHint) {
       const timer = setTimeout(() => {
-        setShowTripleClickHint(true);
+        /* auto-popup disabled (brand-safe): use triple-click gesture instead */
       }, 1500);
       return () => clearTimeout(timer);
     }
@@ -255,29 +255,17 @@ const FundTimeMachine = () => {
     }
   }, [mode, selectedFund, amount, monthlyAmount]);
 
-  if (!data || data.length === 0) return <div className="p-8 text-center text-slate-500">數據載入中...</div>;
-
-  const finalResult = data[data.length - 1];
-  const totalPrincipal = finalResult.investedPrincipal;
-  const totalReturnRate = ((finalResult.totalReturn - totalPrincipal) / totalPrincipal) * 100;
-
-  // 計算 CAGR (年化報酬率)
-  const startYear = parseInt(fundInfo.inceptionDate.split('-')[0]);
-  const currentYear = new Date().getFullYear();
-  const years = currentYear - startYear;
-  const cagr = years > 0 ? (Math.pow(finalResult.totalReturn / totalPrincipal, 1 / years) - 1) * 100 : 0;
-
-  // ==========================================
-  // 🆕 計算最大回撤 (Max Drawdown)
-  // ==========================================
+  // ⚠️ 所有 useMemo 必須在 early return 之前 (Rules of Hooks)
+  // 之前 early return 在 useMemo 中間，若資料時序剛好就 hooks 順序錯位 → crash
   const maxDrawdown = useMemo(() => {
+    if (!data || data.length === 0) return 0;
     let peak = 0;
     let maxDd = 0;
     for (const point of data) {
       if (point.totalReturn > peak) {
         peak = point.totalReturn;
       }
-      const drawdown = ((peak - point.totalReturn) / peak) * 100;
+      const drawdown = peak > 0 ? ((peak - point.totalReturn) / peak) * 100 : 0;
       if (drawdown > maxDd) {
         maxDd = drawdown;
       }
@@ -285,20 +273,29 @@ const FundTimeMachine = () => {
     return maxDd;
   }, [data]);
 
-  // ==========================================
-  // 🆕 計算平均月配息金額 (僅配息型)
-  // ==========================================
   const avgMonthlyDividend = useMemo(() => {
-    if (isGrowth || data.length < 2) return 0;
-    const totalDividends = finalResult.cumulativeDividends;
-    const months = data.length;
-    return totalDividends / months;
-  }, [data, isGrowth, finalResult]);
+    if (!data || data.length < 2 || isGrowth) return 0;
+    const final = data[data.length - 1];
+    return final.cumulativeDividends / data.length;
+  }, [data, isGrowth]);
 
-  // ==========================================
-  // 🆕 計算本金增幅比例 (用於進度條)
-  // ==========================================
-  const growthMultiplier = finalResult.totalReturn / totalPrincipal;
+  if (!data || data.length === 0) return <div className="p-8 text-center text-slate-500">數據載入中...</div>;
+
+  const finalResult = data[data.length - 1];
+  const totalPrincipal = finalResult.investedPrincipal;
+  const totalReturnRate = totalPrincipal > 0
+    ? ((finalResult.totalReturn - totalPrincipal) / totalPrincipal) * 100
+    : 0;
+
+  // 計算 CAGR (年化報酬率)
+  const startYear = parseInt(fundInfo.inceptionDate.split('-')[0]);
+  const currentYear = new Date().getFullYear();
+  const years = currentYear - startYear;
+  const cagr = (years > 0 && totalPrincipal > 0)
+    ? (Math.pow(finalResult.totalReturn / totalPrincipal, 1 / years) - 1) * 100
+    : 0;
+
+  const growthMultiplier = totalPrincipal > 0 ? finalResult.totalReturn / totalPrincipal : 1;
 
   // 匯出圖片功能
   const handleExportImage = async () => {

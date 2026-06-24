@@ -190,6 +190,9 @@ export default function GoldenSafeVault({ data, setData, userId }: any) {
     let val = 0;
     if (mode === 'asset') {
       val = Math.round(amountYuan * Math.pow(1 + r, years));
+    } else if (r === 0) {
+      // 年金 rate=0 退化為純存款（不再除以 0 → NaN）
+      val = Math.round(amountYuan * years);
     } else {
       val = Math.round(amountYuan * ((Math.pow(1 + r, years) - 1) / r) * (1 + r));
     }

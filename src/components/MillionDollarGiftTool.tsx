@@ -329,7 +329,7 @@ const MillionDollarGiftTool = ({ data, setData, userId }: any) => {
     if (!hasSeenHint) {
       // 延遲 1 秒顯示，讓頁面先載入完成
       const timer = setTimeout(() => {
-        setShowTripleClickHint(true);
+        /* auto-popup disabled (brand-safe): use triple-click gesture instead */
       }, 1000);
       return () => clearTimeout(timer);
     }
