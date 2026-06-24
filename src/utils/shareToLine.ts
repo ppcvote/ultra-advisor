@@ -52,8 +52,8 @@ export function canShareFiles(files?: File[]): boolean {
  * 開 LINE 分享 URL（社群外掛官方端點，不需要 SDK 或登入）
  * 注意：LINE 的 lineit 只認 url 必填，純文字場景就把文字塞 url 後面 query
  */
-export function shareToLine({ text, url }: ShareToLinePayload): void {
-  if (typeof window === 'undefined') return;
+export function shareToLine({ text, url }: ShareToLinePayload): Window | null {
+  if (typeof window === 'undefined') return null;
 
   const shareUrl = url || 'https://ultra-advisor.tw';
   // LINE lineit 端點規格：?url=...&text=...
@@ -64,7 +64,8 @@ export function shareToLine({ text, url }: ShareToLinePayload): void {
 
   const lineShareUrl = `https://social-plugins.line.me/lineit/share?${params.toString()}`;
   // 新分頁開（避免吃掉當前 SPA state）
-  window.open(lineShareUrl, '_blank', 'noopener,noreferrer');
+  // 回傳 Window ref 給 caller 可偵測 popup-block（window.open 被擋會回 null、不會 throw）
+  return window.open(lineShareUrl, '_blank', 'noopener,noreferrer');
 }
 
 /**

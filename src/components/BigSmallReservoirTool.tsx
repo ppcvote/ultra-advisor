@@ -34,6 +34,7 @@ import { useMembership } from '../hooks/useMembership';
 import { useCheatSheetTrigger } from '../hooks/useCheatSheetTrigger';
 import DisclaimerFooter from './DisclaimerFooter';
 import ShareButton from './ShareButton';
+import ShareToCustomerButton from './ShareToCustomerButton';
 // Sprint 6 MVF: client profile chip — 顧問切 client 時主動帶入年齡，避免重 key。
 // 只映射 clientAge（age 從 birthday 算）。initialCapital 是「萬」單位、與 client.monthlyIncome 比例差距太大，
 // 強行映射只會讓顧問看到奇怪數字，故略過。
@@ -517,12 +518,42 @@ export const BigSmallReservoirTool = ({ data, setData, userId }: any) => {
               </div>
             )}
 
-            {/* 分享給客戶 — 跟 ReportModal 列印 PDF 並列，預設文字摘要走 LINE */}
-            <div className="flex justify-end pt-1">
+            {/* 分享給客戶 — 兩種並列、用途不同：
+                - ShareButton（摘要）：text 摘要走 LINE，客戶看到一句結論（Sprint 5 既有）
+                - ShareToCustomerButton（連結）：產生 /r/big-small-reservoir URL → readonly 視覺
+                payload 只挑展示用 outputs，dataArr / recommendationReasons / activeConfig
+                這些是顧問端 UI 內部狀態、不放進客戶 readonly payload（URL 不胖、無洩漏） */}
+            <div className="flex flex-wrap justify-end gap-3 pt-1">
               <ShareButton
                 variant="full"
                 title="大小水庫專案"
                 text={`【大小水庫專案】本金 ${formatMoney(initialCapital)} / ${years} 年 — ${years} 年後總資產 ${formatMoney(calculations.totalAsset)}（成長 ${calculations.opportunityCostRate}%）`}
+              />
+              <ShareToCustomerButton
+                tool="big_small_reservoir"
+                reportLabel="大小水庫專案"
+                inputs={{
+                  initialCapital,
+                  years,
+                  configMode,
+                  dividendRate,
+                  reinvestRate,
+                  clientAge,
+                }}
+                outputs={{
+                  actualDividend: calculations.actualDividend,
+                  actualReinvest: calculations.actualReinvest,
+                  annualDividend: calculations.annualDividend,
+                  totalAsset: calculations.totalAsset,
+                  smallReservoir: calculations.smallReservoir,
+                  opportunityCost: calculations.opportunityCost,
+                  opportunityCostRate: calculations.opportunityCostRate,
+                  doubleYear: calculations.doubleYear,
+                  delay5Total: calculations.delay5Total,
+                  delay10Total: calculations.delay10Total,
+                  timeCost5: calculations.timeCost5,
+                  timeCost10: calculations.timeCost10,
+                }}
               />
             </div>
           </div>

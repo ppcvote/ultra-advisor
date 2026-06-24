@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BookOpen, ExternalLink, RefreshCw, Share2, TrendingUp,
-  Crown, Users, Wrench, ArrowRight, Newspaper, Zap, Mic, PencilRuler, Target
+  Crown, Users, Wrench, ArrowRight, Newspaper, Zap, Mic, PencilRuler, Target,
+  Cake, Clock, FileEdit
 } from 'lucide-react';
 import MissionCard from '../MissionCard';
 import { useMissions } from '../../hooks/useMissions';
@@ -13,6 +14,9 @@ import { blogMetadata as blogArticles } from '../../data/blog/metadata';
 import { todayQuote, todayBackground } from '../../data/_today-quote.generated';
 import { formatDateChinese } from '../../utils/dateFormat';
 import { ALL_TOOLS } from '../../constants/tools';
+// Sprint 8 H: 「今日重點」agenda — 每天打開 UA 第一眼看到「該打開誰的檔案」
+// pure helper，nowEpochMs 由 caller runtime 取（對齊 customerReport.ts 鐵則）
+import { buildAgenda, type AgendaItem } from '../../lib/clientAgenda';
 import type { ProfileData, WarRoomTab } from './types';
 
 interface OverviewTabProps {
@@ -20,8 +24,13 @@ interface OverviewTabProps {
   profileData: ProfileData;
   membership: any;
   clientCount: number;
+  /** Sprint 8 H: agenda block 需要實際 client 資料才能算「本週生日 / stale / 不完整」。
+   *  父層 WarRoom index 已有 onSnapshot 訂閱、直接 pass-down 避免重複 listener。 */
+  clients?: any[];
   onSwitchTab: (tab: WarRoomTab) => void;
   onAddClient?: () => void;
+  /** Sprint 8 H: agenda item 點下去要跳到客戶詳情。沿用 ClientsTab 的 onSelectClient callback 模式。 */
+  onSelectClient?: (client: any) => void;
 }
 
 const getGreeting = () => {
@@ -34,11 +43,26 @@ const getGreeting = () => {
 };
 
 const OverviewTab: React.FC<OverviewTabProps> = ({
-  user, profileData, membership, clientCount, onSwitchTab, onAddClient
+  user, profileData, membership, clientCount, clients, onSwitchTab, onAddClient, onSelectClient
 }) => {
   const [marketReport, setMarketReport] = useState<any>(null);
   const todayBg = todayBackground;
   const isNewUser = clientCount === 0;
+
+  // ===== Sprint 8 H: 「今日重點」agenda =====
+  // 鐵則：nowEpochMs 必須 runtime 取（在 useMemo callback 內、不是 module top）
+  // 對齊 customerReport.ts pure codec / Sprint 7 timestamp 鐵則。
+  // 客戶列表變動就重算（useMemo deps = clients），不另設 setInterval。
+  const agenda: AgendaItem[] = useMemo(() => {
+    if (!clients || clients.length === 0) return [];
+    return buildAgenda(clients, Date.now());
+  }, [clients]);
+
+  // 點 agenda item → 跳客戶詳情。沿用 ClientsTab 的 onSelectClient 模式（callback，非 URL routing）。
+  const handleAgendaClick = (item: AgendaItem) => {
+    const target = clients?.find(c => c.id === item.clientId);
+    if (target && onSelectClient) onSelectClient(target);
+  };
 
   // Onboarding missions list — drives the 8-step "快速上手" panel for new users.
   // Hook auto-fetches on auth; we only consume `missions` + `loading` here.
@@ -117,6 +141,63 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ====== Sprint 8 H: 「今日重點」agenda ======
+          顧問每天最該打開 UA 的 trigger — 三類：本週生日 / 近 30 天 stale / 完整度 < 4/8
+          - 沒任何命中 → 整 block 不渲染（避免空狀態壓 hero）
+          - 同客戶被多個 trigger 命中只列一次（buildAgenda 內 dedupe by clientId，priority 已排好）
+          - 點 item → onSelectClient（沿用 ClientsTab 既有路由模式） */}
+      {agenda.length > 0 && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950/60 via-slate-900 to-orange-950/40 border border-amber-500/20 p-5">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-amber-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/4" />
+          <div className="relative">
+            <div className="flex items-center gap-2 mb-1">
+              <Target size={16} className="text-amber-400" />
+              <h3 className="text-sm font-bold text-white">今日重點</h3>
+              <span className="text-[10px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full">
+                {agenda.length}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mb-3">這些客戶今天值得花 5 分鐘</p>
+
+            <div className="space-y-2">
+              {agenda.map(item => {
+                // emoji-as-icon 太情緒化、跟整體 dashboard 不搭 — 用 lucide icon
+                const iconMap = {
+                  birthday: <Cake size={14} className="text-pink-400" />,
+                  stale: <Clock size={14} className="text-blue-400" />,
+                  incomplete: <FileEdit size={14} className="text-emerald-400" />,
+                };
+                const tagBg = {
+                  birthday: 'bg-pink-500/15 text-pink-300 border-pink-500/30',
+                  stale: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+                  incomplete: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+                };
+                return (
+                  <button
+                    key={`${item.kind}-${item.clientId}`}
+                    onClick={() => handleAgendaClick(item)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                               bg-slate-900/60 border border-slate-800/60 hover:border-amber-500/30
+                               hover:bg-slate-800/60 transition-all group text-left"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-slate-800/80 flex items-center justify-center shrink-0">
+                      {iconMap[item.kind]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-white truncate">{item.clientName}</div>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0 ${tagBg[item.kind]}`}>
+                      {item.detail}
+                    </span>
+                    <ArrowRight size={14} className="text-slate-600 group-hover:text-amber-400 transition-colors shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ====== P0: 新用戶引導 — 8 步驟任務看板 ======
           原本只有「新增第一位客戶」單一 CTA，留下其他 7 條黏著動作沒有 surface（連 LINE、設大頭貼、第一次試算…）

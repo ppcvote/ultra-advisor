@@ -392,8 +392,11 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
             profileData={profileData}
             membership={membership}
             clientCount={clients.length}
+            /* Sprint 8 H: pass clients + onSelectClient 給「今日重點」agenda block */
+            clients={clients}
             onSwitchTab={setActiveTab}
             onAddClient={() => setShowAddClient(true)}
+            onSelectClient={onSelectClient}
           />
         )}
 

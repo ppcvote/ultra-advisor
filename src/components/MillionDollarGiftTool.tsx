@@ -38,6 +38,7 @@ import {
 } from 'recharts';
 import DisclaimerFooter from './DisclaimerFooter';
 import ShareButton from './ShareButton';
+import ShareToCustomerButton from './ShareToCustomerButton';
 import { auth } from '../firebase';
 
 // ============================================
@@ -1173,12 +1174,46 @@ const MillionDollarGiftTool = ({ data, setData, userId }: any) => {
           />
         </div>
 
-        {/* 分享給客戶 — 與「三循環成果關鍵指標」並列下方 */}
-        <div className="flex justify-end mt-4">
+        {/* 分享給客戶 — 兩種並列、用途不同：
+            - ShareButton（摘要）：text 摘要走 LINE，客戶看到一句結論（Sprint 5 既有）
+            - ShareToCustomerButton（連結）：產生 /r/million-gift URL → readonly 視覺
+            cycle2/3 顯示值（c2Loan/c2Rate）走 ?? fallback 到 cycle1，payload 帶 effective
+            值而非原始 undefined，避免 readonly 端要重做同樣的 fallback 邏輯 */}
+        <div className="flex flex-wrap justify-end gap-3 mt-4">
           <ShareButton
             variant="full"
             title="百萬禮物專案"
             text={`【百萬禮物專案】首期 ${loanAmount} 萬 / ${loanTerm * 3} 年計畫 — 預估淨收益 ${netProfit_Wan} 萬`}
+          />
+          <ShareToCustomerButton
+            tool="million_gift"
+            reportLabel="百萬禮物專案"
+            inputs={{
+              loanAmount,
+              loanTerm,
+              loanRate,
+              investReturnRate,
+              cycle2Loan: c2Loan,
+              cycle2Rate: c2Rate,
+              cycle3Loan: c3Loan,
+              cycle3Rate: c3Rate,
+              isCompoundMode,
+            }}
+            outputs={{
+              phase1_Asset,
+              phase2_Asset,
+              phase3_Asset,
+              totalCashOut_T0_T7_Wan,
+              totalCashOut_T7_T14_Wan,
+              totalCashOut_T14_T21_Wan,
+              totalProjectCost_Wan,
+              netProfit_Wan,
+              assetMultiplier,
+              efficiencyMultiplier,
+              avgMonthlyNetPay,
+              totalInterestWan,
+              rateSpread,
+            }}
           />
         </div>
       </div>

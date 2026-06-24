@@ -44,6 +44,7 @@ import {
 } from 'recharts';
 import DisclaimerFooter from './DisclaimerFooter';
 import ShareButton from './ShareButton';
+import ShareToCustomerButton from './ShareToCustomerButton';
 import { auth } from '../firebase';
 // Sprint 6 — "use ${client}'s data" chip. Active-client bridge lives in
 // useClientContext; ClientDataPanel renders nothing when no fields are
@@ -638,12 +639,72 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
               </p>
             </div>
 
-            {/* 分享給客戶 — 並列在「應納遺產稅」摘要下方，獨立於 ReportModal 列印 PDF 流程 */}
-            <div className="flex justify-end pt-1">
+            {/* 分享給客戶 — 兩種並列、用途不同：
+                - ShareButton（摘要）：text 摘要走 LINE，客戶看到一句結論（Sprint 5 既有）
+                - ShareToCustomerButton（連結）：產生 /r/tax-planner URL → readonly 視覺
+                bracket.color 是 UI 內部欄位（lib codec type 不接），手動 pick {rate,label}
+                避免 schema drift；recommendationReasons 含話術也不放進客戶 payload */}
+            <div className="flex flex-wrap justify-end gap-3 pt-1">
               <ShareButton
                 variant="full"
                 title="遺產稅試算"
                 text={`【遺產稅試算】遺產總額 ${formatMoney(calculations.totalEstateBefore)} — 應納稅額 ${formatMoney(calculations.taxBefore)}`}
+              />
+              <ShareToCustomerButton
+                tool="tax_planner"
+                reportLabel="遺產稅試算"
+                inputs={{
+                  spouse,
+                  children,
+                  parents,
+                  handicapped,
+                  cash,
+                  realEstateMarket,
+                  realEstateRatio,
+                  stocks,
+                  spouseAssets,
+                  age,
+                  planMode,
+                  lumpSumAmount,
+                  lumpSumLeverage,
+                  annualPremium,
+                  paymentYears,
+                  installmentLeverage,
+                }}
+                outputs={{
+                  totalEstateBefore: calculations.totalEstateBefore,
+                  spousalRightDeduction: calculations.spousalRightDeduction,
+                  totalDeductions: calculations.totalDeductions,
+                  netEstateBefore: calculations.netEstateBefore,
+                  taxBefore: calculations.taxBefore,
+                  bracketBefore: {
+                    rate: calculations.bracketBefore.rate,
+                    label: calculations.bracketBefore.label,
+                  },
+                  lumpSum: {
+                    benefit: calculations.lumpSum.benefit,
+                    taxAfter: calculations.lumpSum.taxAfter,
+                    taxSaved: calculations.lumpSum.taxSaved,
+                    bracketAfter: {
+                      rate: calculations.lumpSum.bracketAfter.rate,
+                      label: calculations.lumpSum.bracketAfter.label,
+                    },
+                  },
+                  installment: {
+                    totalPremium: calculations.installment.totalPremium,
+                    benefit: calculations.installment.benefit,
+                    taxAfter: calculations.installment.taxAfter,
+                    taxSaved: calculations.installment.taxSaved,
+                    bracketAfter: {
+                      rate: calculations.installment.bracketAfter.rate,
+                      label: calculations.installment.bracketAfter.label,
+                    },
+                    year1Benefit: calculations.installment.year1Benefit,
+                    year1Multiple: calculations.installment.year1Multiple,
+                  },
+                  optimalLumpSum: calculations.optimalLumpSum,
+                  liquidityGap: calculations.liquidityGap,
+                }}
               />
             </div>
           </div>
