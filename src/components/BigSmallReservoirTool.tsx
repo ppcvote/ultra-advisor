@@ -34,6 +34,10 @@ import { useMembership } from '../hooks/useMembership';
 import { useCheatSheetTrigger } from '../hooks/useCheatSheetTrigger';
 import DisclaimerFooter from './DisclaimerFooter';
 import ShareButton from './ShareButton';
+// Sprint 6 MVF: client profile chip — 顧問切 client 時主動帶入年齡，避免重 key。
+// 只映射 clientAge（age 從 birthday 算）。initialCapital 是「萬」單位、與 client.monthlyIncome 比例差距太大，
+// 強行映射只會讓顧問看到奇怪數字，故略過。
+import { ClientDataPanel } from './ClientDataPanel';
 import { auth } from '../firebase';
 import { 
   ResponsiveContainer, 
@@ -377,6 +381,24 @@ export const BigSmallReservoirTool = ({ data, setData, userId }: any) => {
           </p>
         </div>
       </div>
+
+      {/* Sprint 6: client profile 帶入區（active client 沒資料時 panel 自己回 null）。
+          只帶 age — initialCapital 是萬單位，跟 client.monthlyIncome 對不齊。
+          帶入時連同 tempClientAge 一起 sync，避免 input UI 還顯示舊值。 */}
+      <ClientDataPanel
+        mapping={{
+          age: {
+            toolField: 'clientAge',
+            label: '客戶年齡',
+            setter: (v) => {
+              const age = Number(v);
+              if (!Number.isFinite(age)) return;
+              setTempClientAge(age);
+              setData({ ...data, clientAge: age });
+            },
+          },
+        }}
+      />
 
       {/* ============================================================ */}
       {/* 第一區：現況分析 (三欄) */}

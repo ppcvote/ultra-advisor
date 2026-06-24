@@ -45,6 +45,10 @@ import {
 import DisclaimerFooter from './DisclaimerFooter';
 import ShareButton from './ShareButton';
 import { auth } from '../firebase';
+// Sprint 6 — "use ${client}'s data" chip. Active-client bridge lives in
+// useClientContext; ClientDataPanel renders nothing when no fields are
+// available, so this is safe to mount unconditionally.
+import { ClientDataPanel } from './ClientDataPanel';
 
 // ============================================================
 // 輔助函式
@@ -465,6 +469,30 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
           </p>
         </div>
       </div>
+
+      {/* Sprint 6 — 主動帶入面板。activeClient 沒值、或對映欄位都沒填時自己回 null，
+          不會佔版面、也不會出現空狀態。每個 setter 都走 updateField，沿用既有
+          commit path、不繞過 safeData / useMemo 的依賴鍊。 */}
+      <ClientDataPanel
+        mapping={{
+          age: {
+            toolField: 'age',
+            label: '投保年齡',
+            // birthday → number；updateField 已被夾在 20-99，這裡只負責帶入。
+            setter: (v) => updateField('age', Number(v)),
+          },
+          hasSpouse: {
+            toolField: 'spouse',
+            label: '配偶',
+            setter: (v) => updateField('spouse', Boolean(v)),
+          },
+          childrenCount: {
+            toolField: 'children',
+            label: '子女人數',
+            setter: (v) => updateField('children', Number(v)),
+          },
+        }}
+      />
 
       {/* ============================================================ */}
       {/* 第一區：資產現況 + 稅務試算 */}

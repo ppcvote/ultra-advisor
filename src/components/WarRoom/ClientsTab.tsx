@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Users, Search, Plus, Edit3, Trash2, Loader2 } from 'lucide-react';
+import { countClientProfileFields, CLIENT_PROFILE_TOTAL } from '../../types/clientProfile';
 
 interface ClientsTabProps {
   clients: any[];
@@ -52,7 +53,17 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
         </div>
       ) : filtered.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {filtered.map(client => (
+          {filtered.map(client => {
+            // Sprint 6: 客戶資料完整度（X/7）— 故意不把 0 染紅，避免「逼填」感
+            const filled = countClientProfileFields(client);
+            // 顏色階梯：0 → 淡灰（不催促）、1-6 → 藍（進度感）、7 → 翠綠（完成感）
+            const completenessClass = filled === 0
+              ? 'bg-slate-800/60 text-slate-500 border border-slate-700/50'
+              : filled === CLIENT_PROFILE_TOTAL
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                : 'bg-blue-500/15 text-blue-400 border border-blue-500/30';
+
+            return (
             <div
               key={client.id}
               onClick={() => onSelectClient(client)}
@@ -65,7 +76,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
                   {client.name.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <div className="font-bold text-white text-sm truncate">{client.name}</div>
                     {/* 示範客戶徽章 — 提示這是 onboarding seed 出來的、可隨時刪除 */}
                     {client.isSample && (
@@ -73,6 +84,13 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
                         示範
                       </span>
                     )}
+                    {/* 資料完整度徽章 — 鼓勵填、不催促 */}
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${completenessClass}`}
+                      title="客戶資料完整度 — 填越多、工具帶入越精準"
+                    >
+                      資料 {filled}/{CLIENT_PROFILE_TOTAL}
+                    </span>
                   </div>
                   <div className="text-[11px] text-slate-500">
                     {client.updatedAt?.toDate?.().toLocaleDateString() || ''}
@@ -102,7 +120,8 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-16 text-slate-500">

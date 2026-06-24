@@ -78,6 +78,9 @@ import { ThemeProvider } from './context/ThemeContext';
 
 import { toast } from './utils/toast';
 import { safeStorage } from './utils/safeStorage';
+// Sprint 6: mirror currentClient → activeClientStore so tool chips can read
+// the active client without prop drilling. App.tsx remains the single writer.
+import { activeClientStore } from './lib/activeClientStore';
 import { trackEvent, identify, resetIdentity } from './lib/analytics';
 import { EVENTS } from './lib/events';
 const generateSessionId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -193,6 +196,11 @@ export default function App() {
   const [isTermsRoute, setIsTermsRoute] = useState(() => window.location.pathname === '/terms');       // 服務條款 / 消保法 §19 冷靜期
   const [clientLoading, setClientLoading] = useState(false); 
   const [currentClient, setCurrentClient] = useState<any>(null);
+  // Sprint 6: mirror currentClient → store. Read-only bridge for tool chips.
+  // App.tsx is still the single writer; this effect just publishes the value.
+  useEffect(() => {
+    activeClientStore.set(currentClient ?? null);
+  }, [currentClient]);
   // 🆕 activeTab 持久化：重新整理後保持在原工具介面
   const [activeTab, setActiveTab] = useState(() => {
     const saved = safeStorage.get('ultra_advisor_active_tab');

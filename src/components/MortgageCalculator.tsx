@@ -203,6 +203,14 @@ const aggregateByYear = (schedule: ReturnType<typeof generateAmortizationSchedul
 // ============================================================
 // 主元件
 // ============================================================
+// Sprint 6 MVF: 本工具刻意不接 ClientDataPanel / UseClientDataChip。
+// 理由：所有 input（loanAmount/萬、interestRate/%、loanTerm/年、extraMonthly、inflationRate）
+// 都是貸款參數，與 ClientProfile（monthlyIncome / retirementAge / hasSpouse / childrenCount
+// / dependentParents）以及 birthday→age 沒有任何語意對映。
+// 強行把 client.monthlyIncome/1000 塞進 loanAmount 會讓顧問看到「客戶月薪變貸款金額」這種
+// 荒謬數字，傷害信任。Phase 1 schema 對映表已明確將本工具列為 MVF 排除。
+// 若未來 ClientProfile 加上 propertyValue / downPayment / desiredLoanAmount 等房貸相關欄位，
+// 再回頭加 chip。
 export default function MortgageCalculator() {
   const [showCheatSheet, setShowCheatSheet] = useState(false);
   const [clickCount, setClickCount] = useState(0);

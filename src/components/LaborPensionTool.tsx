@@ -16,6 +16,7 @@ import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Toolti
 import DisclaimerFooter from './DisclaimerFooter';
 import ShareButton from './ShareButton';
 import { auth } from '../firebase';
+import ClientDataPanel from './ClientDataPanel';
 
 export const LaborPensionTool = ({ data, setData }: any) => {
   const safeData = {
@@ -194,6 +195,41 @@ export const LaborPensionTool = ({ data, setData }: any) => {
           </p>
         </div>
       </div>
+
+      {/* Sprint 6 — 主動帶入 active client profile（年齡/退休年齡/月薪）。
+          只在 activeClient 有資料時渲染、不自動覆蓋顧問正在算的東西。
+          Clamp 範圍與下方 finalize* handler 一致，避免 slider 出界。 */}
+      <ClientDataPanel
+        mapping={{
+          age: {
+            toolField: 'currentAge',
+            label: '目前年齡',
+            setter: (v) => {
+              const n = Math.max(18, Math.min(retireAge - 1, Number(v) || currentAge));
+              setData({ ...safeData, currentAge: n });
+              setTempCurrentAge(n);
+            },
+          },
+          retirementAge: {
+            toolField: 'retireAge',
+            label: '預計退休年齡',
+            setter: (v) => {
+              const n = Math.max(currentAge + 1, Math.min(80, Number(v) || retireAge));
+              setData({ ...safeData, retireAge: n });
+              setTempRetireAge(n);
+            },
+          },
+          monthlyIncome: {
+            toolField: 'salary',
+            label: '月薪',
+            setter: (v) => {
+              const n = Math.max(26400, Math.min(500000, Number(v) || salary));
+              setData({ ...safeData, salary: n });
+              setTempSalary(n);
+            },
+          },
+        }}
+      />
 
       <div className="grid lg:grid-cols-12 gap-8">
         {/* 左側：參數設定 */}
