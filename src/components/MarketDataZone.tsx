@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar } from 'recharts';
 
+import { safeStorage } from '../utils/safeStorage';
 // ==========================================
 // 常數定義（避免每次 render 重建）
 // ==========================================
@@ -174,7 +175,7 @@ export default function MarketDataZone() {
   // 核心狀態管理
   // ==========================================
   const [activeTab, setActiveTab] = useState<TabId>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = safeStorage.get(STORAGE_KEY);
     if (saved && TAB_CONFIG.some(t => t.id === saved)) {
       return saved as TabId;
     }
@@ -183,7 +184,7 @@ export default function MarketDataZone() {
 
   // P2: 持久化 activeTab 到 localStorage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, activeTab);
+    safeStorage.set(STORAGE_KEY, activeTab);
   }, [activeTab]);
 
   const [age, setAge] = useState(40);
@@ -227,7 +228,7 @@ export default function MarketDataZone() {
 
   // 首次進入頁面顯示提示
   useEffect(() => {
-    const hasSeenHint = localStorage.getItem(HINT_STORAGE_KEY);
+    const hasSeenHint = safeStorage.get(HINT_STORAGE_KEY);
     if (!hasSeenHint) {
       const timer = setTimeout(() => {
         /* auto-popup disabled (brand-safe): use triple-click gesture instead */
@@ -239,7 +240,7 @@ export default function MarketDataZone() {
   // 關閉提示並記錄已看過
   const dismissHint = () => {
     setShowTripleClickHint(false);
-    localStorage.setItem(HINT_STORAGE_KEY, 'true');
+    safeStorage.set(HINT_STORAGE_KEY, 'true');
   };
 
   // 複製到剪貼簿

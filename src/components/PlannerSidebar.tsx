@@ -9,6 +9,7 @@ import { MembershipInfo, canAccessTool } from '../utils/membership';
 import NavItem from './NavItem';
 import SaveStatusIndicator, { SaveStatus } from './SaveStatusIndicator';
 
+import { safeStorage } from '../utils/safeStorage';
 // Ultra Advisor LOGO 元件（使用正確的 SVG LOGO）
 const UltraLogo: React.FC<{ size?: number }> = ({ size = 24 }) => {
   // 原始 viewBox 是 320x420，但我們只需要 LOGO 部分（約 40~380 的區域）
@@ -108,13 +109,13 @@ const PlannerSidebar: React.FC<PlannerSidebarProps> = ({
 }) => {
   // 收合狀態（從 localStorage 讀取偏好）
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    const saved = localStorage.getItem('planner-sidebar-collapsed');
+    const saved = safeStorage.get('planner-sidebar-collapsed');
     return saved ? JSON.parse(saved) : false;
   });
 
   // 儲存收合狀態偏好
   useEffect(() => {
-    localStorage.setItem('planner-sidebar-collapsed', JSON.stringify(isCollapsed));
+    safeStorage.set('planner-sidebar-collapsed', JSON.stringify(isCollapsed));
   }, [isCollapsed]);
 
   // 處理工具點擊

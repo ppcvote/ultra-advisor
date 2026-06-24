@@ -4,6 +4,7 @@ import { doc, setDoc, Timestamp, writeBatch } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 import { UserPlus, Lock, Mail, Loader2, CheckCircle2, KeyRound } from 'lucide-react';
 
+import { safeStorage } from '../../utils/safeStorage';
 interface SecretSignupPageProps {
   onSignupSuccess: () => void;
 }
@@ -49,7 +50,7 @@ export const SecretSignupPage: React.FC<SecretSignupPageProps> = ({ onSignupSucc
 
     try {
       const newSessionId = generateSessionId();
-      localStorage.setItem('my_app_session_id', newSessionId);
+      safeStorage.set('my_app_session_id', newSessionId);
 
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -87,7 +88,7 @@ export const SecretSignupPage: React.FC<SecretSignupPageProps> = ({ onSignupSucc
 
     } catch (err: any) {
       console.error(err);
-      localStorage.removeItem('my_app_session_id');
+      safeStorage.remove('my_app_session_id');
       
       if (err.code === 'auth/email-already-in-use') {
           setError("此 Email 已被註冊過，請直接登入。");

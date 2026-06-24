@@ -8,6 +8,7 @@ import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signIn
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../../firebase';
 
+import { safeStorage } from '../../utils/safeStorage';
 // ==========================================
 // 🎯 設計原則：
 // 1. 中央登入為主，周圍低調展示內容
@@ -166,11 +167,11 @@ const LoginForm = ({ onSuccess }: { onSuccess: () => void }) => {
   // 🆕 讀取記住的帳號（僅記住 email，不儲存密碼）
   // 安全修復：移除密碼儲存功能，Base64 不是加密，容易被竊取
   useEffect(() => {
-    const savedEmail = localStorage.getItem('ua_saved_email');
-    const savedRemember = localStorage.getItem('ua_remember_me');
+    const savedEmail = safeStorage.get('ua_saved_email');
+    const savedRemember = safeStorage.get('ua_remember_me');
 
     // 清除舊版本可能儲存的密碼（安全修復）
-    localStorage.removeItem('ua_saved_password');
+    safeStorage.remove('ua_saved_password');
 
     if (savedRemember === 'true' && savedEmail) {
       setEmail(savedEmail);
@@ -188,11 +189,11 @@ const LoginForm = ({ onSuccess }: { onSuccess: () => void }) => {
 
       // 🆕 儲存或清除記住的帳號（僅 email，不儲存密碼）
       if (rememberMe) {
-        localStorage.setItem('ua_saved_email', email);
-        localStorage.setItem('ua_remember_me', 'true');
+        safeStorage.set('ua_saved_email', email);
+        safeStorage.set('ua_remember_me', 'true');
       } else {
-        localStorage.removeItem('ua_saved_email');
-        localStorage.removeItem('ua_remember_me');
+        safeStorage.remove('ua_saved_email');
+        safeStorage.remove('ua_remember_me');
       }
 
       onSuccess();

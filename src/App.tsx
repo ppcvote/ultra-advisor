@@ -74,6 +74,7 @@ const EnglishLandingPage = lazy(() => import('./pages/EnglishLandingPage'));
 import { ThemeProvider } from './context/ThemeContext';
 
 import { toast } from './utils/toast';
+import { safeStorage } from './utils/safeStorage';
 const generateSessionId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 
 const PrintStyles = () => (
@@ -163,7 +164,7 @@ export default function App() {
   // - 如果 localStorage 有 session_id = 曾經登入過（用於跨分頁/重開瀏覽器）
   const [needsLoginInteraction, setNeedsLoginInteraction] = useState(() => {
     const hasLoggedInThisSession = sessionStorage.getItem('last_login_page_shown');
-    const hasSessionId = localStorage.getItem('my_app_session_id');
+    const hasSessionId = safeStorage.get('my_app_session_id');
     // 只要有任一紀錄，就不再顯示登入頁
     if (hasLoggedInThisSession || hasSessionId) return false;
     return true;
@@ -187,7 +188,7 @@ export default function App() {
   const [currentClient, setCurrentClient] = useState<any>(null);
   // 🆕 activeTab 持久化：重新整理後保持在原工具介面
   const [activeTab, setActiveTab] = useState(() => {
-    const saved = localStorage.getItem('ultra_advisor_active_tab');
+    const saved = safeStorage.get('ultra_advisor_active_tab');
     return saved || 'golden_safe';
   }); 
   // 🗑️ 移除本地 toast state：改用 utils/toast singleton
@@ -240,7 +241,7 @@ export default function App() {
   const [freeDashboardLayout, setFreeDashboardLayout] = useState<(string | null)[]>(defaultStates.free_dashboard.layout);
   const [insuranceCheckupData, setInsuranceCheckupData] = useState<InsuranceCheckupData>(() => {
     // 從 localStorage 恢復 activeStep
-    const savedStep = localStorage.getItem('insurance_checkup_step');
+    const savedStep = safeStorage.get('insurance_checkup_step');
     return savedStep ? { activeStep: parseInt(savedStep) as 1 | 2 } : defaultStates.insurance_checkup;
   });
 
@@ -252,7 +253,7 @@ export default function App() {
   const registerDeviceSession = async (uid: string) => {
     isRegistering.current = true;
     const newSessionId = generateSessionId();
-    localStorage.setItem('my_app_session_id', newSessionId);
+    safeStorage.set('my_app_session_id', newSessionId);
     
     const metaRef = doc(db, 'users', uid, 'system', 'metadata');
     try {
@@ -278,7 +279,7 @@ export default function App() {
 
   useEffect(() => {
     if (isSecretSignupRoute || !user) return;
-    const localSessionId = localStorage.getItem('my_app_session_id');
+    const localSessionId = safeStorage.get('my_app_session_id');
     if (isRegistering.current || !localSessionId) return;
 
     const userMetaRef = doc(db, 'users', user.uid, 'system', 'metadata');
@@ -287,7 +288,7 @@ export default function App() {
       if (docSnap.exists()) {
         const activeSessions = docSnap.data().activeSessions || [];
         if (activeSessions.length > 0 && !activeSessions.includes(localSessionId)) {
-          localStorage.removeItem('my_app_session_id');
+          safeStorage.remove('my_app_session_id');
           await signOut(auth);
           toast.info("裝置數量超過限制：您的帳號已在其他裝置登入，此連線已自動登出。");
           window.location.reload();
@@ -367,7 +368,7 @@ export default function App() {
   // 保存 insurance_checkup 的 activeStep 到 localStorage（即時保存）
   useEffect(() => {
     if (insuranceCheckupData.activeStep) {
-      localStorage.setItem('insurance_checkup_step', insuranceCheckupData.activeStep.toString());
+      safeStorage.set('insurance_checkup_step', insuranceCheckupData.activeStep.toString());
     }
   }, [insuranceCheckupData.activeStep]);
 
@@ -447,7 +448,7 @@ export default function App() {
 
   // 🆕 activeTab 變化時保存到 localStorage（重新整理後保持原介面）
   useEffect(() => {
-    localStorage.setItem('ultra_advisor_active_tab', activeTab);
+    safeStorage.set('ultra_advisor_active_tab', activeTab);
   }, [activeTab]);
 
   // 🆕 監聽 Firestore 用戶資料，更新會員資訊
@@ -520,7 +521,7 @@ export default function App() {
   }, [currentClient?.id, user]); 
 
   const handleLogout = async () => { 
-      localStorage.removeItem('my_app_session_id');
+      safeStorage.remove('my_app_session_id');
       await signOut(auth); 
       setCurrentClient(null);
       setIsDataLoaded(false);

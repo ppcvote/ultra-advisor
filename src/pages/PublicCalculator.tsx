@@ -13,6 +13,7 @@ import SimpleCalculator from '../components/SimpleCalculator';
 import CashFlowVisualizer from '../components/CashFlowVisualizer';
 import { User as FirebaseUser } from 'firebase/auth';
 
+import { safeStorage } from '../utils/safeStorage';
 interface PublicCalculatorProps {
   onBack: () => void;
   onLogin: () => void;
@@ -24,7 +25,7 @@ type ToolTab = 'mortgage' | 'calculator' | 'cashflow';
 const PublicCalculator: React.FC<PublicCalculatorProps> = ({ onBack, onLogin, user }) => {
   // 🆕 持久化 activeTab：重新整理後保持在原工具
   const [activeTab, setActiveTab] = useState<ToolTab>(() => {
-    const saved = localStorage.getItem('public_calculator_tab');
+    const saved = safeStorage.get('public_calculator_tab');
     if (saved === 'mortgage' || saved === 'calculator' || saved === 'cashflow') {
       return saved;
     }
@@ -33,7 +34,7 @@ const PublicCalculator: React.FC<PublicCalculatorProps> = ({ onBack, onLogin, us
 
   // 🆕 當 activeTab 變化時儲存到 localStorage
   useEffect(() => {
-    localStorage.setItem('public_calculator_tab', activeTab);
+    safeStorage.set('public_calculator_tab', activeTab);
   }, [activeTab]);
 
   // SEO: 動態更新頁面標題和 Meta

@@ -30,6 +30,7 @@ import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, serverTimestamp
 import { db } from '../firebase';
 
 import { toast } from '../utils/toast';
+import { safeStorage } from '../utils/safeStorage';
 // ============================================================
 // 類型定義
 // ============================================================
@@ -75,7 +76,7 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
   const [copied, setCopied] = useState(false);
   // 🆕 持久化 activeTab：重新整理後保持在原工具標籤
   const [activeTab, setActiveTab] = useState<'basic' | 'percent' | 'split' | 'interest' | 'customer'>(() => {
-    const saved = localStorage.getItem('simple_calculator_tab');
+    const saved = safeStorage.get('simple_calculator_tab');
     if (saved && ['basic', 'percent', 'split', 'interest', 'customer'].includes(saved)) {
       return saved as 'basic' | 'percent' | 'split' | 'interest' | 'customer';
     }
@@ -84,7 +85,7 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
 
   // 🆕 當 activeTab 變化時儲存到 localStorage
   useEffect(() => {
-    localStorage.setItem('simple_calculator_tab', activeTab);
+    safeStorage.set('simple_calculator_tab', activeTab);
   }, [activeTab]);
 
   // 百分比計算狀態

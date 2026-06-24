@@ -28,6 +28,7 @@ import { fundDatabase, generateFundHistory, generateDCAHistory } from '../data/f
 import html2canvas from 'html2canvas';
 
 import { toast } from '../utils/toast';
+import { safeStorage } from '../utils/safeStorage';
 // ==========================================
 // 數字動畫 Hook (CountUp)
 // ==========================================
@@ -174,7 +175,7 @@ const FundTimeMachine = () => {
       // 關閉提示
       if (showTripleClickHint) {
         setShowTripleClickHint(false);
-        localStorage.setItem(HINT_STORAGE_KEY, 'true');
+        safeStorage.set(HINT_STORAGE_KEY, 'true');
       }
     }
   };
@@ -193,7 +194,7 @@ const FundTimeMachine = () => {
 
   // 首次進入頁面顯示提示
   useEffect(() => {
-    const hasSeenHint = localStorage.getItem(HINT_STORAGE_KEY);
+    const hasSeenHint = safeStorage.get(HINT_STORAGE_KEY);
     if (!hasSeenHint) {
       const timer = setTimeout(() => {
         /* auto-popup disabled (brand-safe): use triple-click gesture instead */
@@ -205,7 +206,7 @@ const FundTimeMachine = () => {
   // 關閉提示並記錄已看過
   const dismissHint = () => {
     setShowTripleClickHint(false);
-    localStorage.setItem(HINT_STORAGE_KEY, 'true');
+    safeStorage.set(HINT_STORAGE_KEY, 'true');
   };
 
   // 複製到剪貼簿

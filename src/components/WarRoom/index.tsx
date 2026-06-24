@@ -25,6 +25,7 @@ import ToolsTab from './ToolsTab';
 const ShareTab = lazy(() => import('./ShareTab'));
 import { AddClientModal, EditClientModal, FeedbackModal, EditProfileModal, ChangePasswordModal } from './modals';
 
+import { safeStorage } from '../../utils/safeStorage';
 // Tab 定義
 const TABS: { id: WarRoomTab; label: string; icon: React.FC<any> }[] = [
   { id: 'overview', label: '總覽', icon: LayoutDashboard },
@@ -77,7 +78,7 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
   // ===== Pin 連結提醒橫幅（提醒一次：未連 Pin 才顯示、可關） =====
   const [pinConnected, setPinConnected] = useState<boolean | null>(null);
   const [pinBannerDismissed, setPinBannerDismissed] = useState(() => {
-    try { return localStorage.getItem('pinBannerDismissed') === '1'; } catch { return false; }
+    try { return safeStorage.get('pinBannerDismissed') === '1'; } catch { return false; }
   });
   useEffect(() => {
     if (!user?.uid) return;
@@ -142,7 +143,7 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
         setNotifications(items);
       }
     });
-    const readIds = localStorage.getItem('readNotificationIds');
+    const readIds = safeStorage.get('readNotificationIds');
     if (readIds) setReadNotificationIds(JSON.parse(readIds));
     return () => unsub();
   }, []);
@@ -178,13 +179,13 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
   const markNotifRead = (id: string) => {
     const ids = [...readNotificationIds, id];
     setReadNotificationIds(ids);
-    localStorage.setItem('readNotificationIds', JSON.stringify(ids));
+    safeStorage.set('readNotificationIds', JSON.stringify(ids));
   };
 
   const markAllRead = () => {
     const ids = [...new Set([...readNotificationIds, ...displayedNotifs.map(n => n.id)])];
     setReadNotificationIds(ids);
-    localStorage.setItem('readNotificationIds', JSON.stringify(ids));
+    safeStorage.set('readNotificationIds', JSON.stringify(ids));
   };
 
   const handleToolSelect = (toolId: string) => {
@@ -363,7 +364,7 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
               className="shrink-0 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium px-3 py-1.5 transition-colors"
             >立即連結</button>
             <button
-              onClick={() => { try { localStorage.setItem('pinBannerDismissed', '1'); } catch { /* ignore */ } setPinBannerDismissed(true); }}
+              onClick={() => { try { safeStorage.set('pinBannerDismissed', '1'); } catch { /* ignore */ } setPinBannerDismissed(true); }}
               className="shrink-0 text-slate-400 hover:text-slate-200 transition-colors"
               aria-label="關閉提醒"
             ><X size={16} /></button>

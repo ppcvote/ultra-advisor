@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
+import { safeStorage } from '../utils/safeStorage';
 type Theme = 'dark' | 'light';
 
 interface ThemeContextType {
@@ -16,7 +17,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // 從 localStorage 讀取，預設為 dark
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = safeStorage.get(STORAGE_KEY);
       if (saved === 'light' || saved === 'dark') {
         return saved;
       }
@@ -34,12 +35,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       root.classList.remove('dark');
     }
 
-    localStorage.setItem(STORAGE_KEY, theme);
+    safeStorage.set(STORAGE_KEY, theme);
   }, [theme]);
 
   // 初始化時立即設定 class（避免閃爍）
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = safeStorage.get(STORAGE_KEY);
     if (saved === 'dark' || !saved) {
       document.documentElement.classList.add('dark');
     }

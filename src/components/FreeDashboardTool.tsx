@@ -28,6 +28,7 @@ import { LaborPensionTool } from './LaborPensionTool';
 import { BigSmallReservoirTool } from './BigSmallReservoirTool';
 import { TaxPlannerTool } from './TaxPlannerTool';
 
+import { safeStorage } from '../utils/safeStorage';
 // 工具定義表
 const TOOL_REGISTRY = [
   { id: 'golden_safe', name: '黃金保險箱', component: GoldenSafeVault, dataKey: 'goldenSafeData', color: 'bg-amber-500' },
@@ -96,7 +97,7 @@ const FreeDashboardTool: React.FC<FreeDashboardProps> = ({ allData, setAllData, 
 
   // 載入已儲存的 Layout 和筆記
   useEffect(() => {
-    const saved = localStorage.getItem('free_dashboard_layout');
+    const saved = safeStorage.get('free_dashboard_layout');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -116,7 +117,7 @@ const FreeDashboardTool: React.FC<FreeDashboardProps> = ({ allData, setAllData, 
   // 儲存 Layout 和筆記
   const saveLayout = useCallback(() => {
     const data = { layout, tools: addedTools, notes };
-    localStorage.setItem('free_dashboard_layout', JSON.stringify(data));
+    safeStorage.set('free_dashboard_layout', JSON.stringify(data));
     if (onSaveLayout) onSaveLayout(layout);
   }, [layout, addedTools, notes, onSaveLayout]);
 

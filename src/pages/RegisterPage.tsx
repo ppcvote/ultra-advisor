@@ -11,6 +11,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
 
 import { toast } from '../utils/toast';
+import { safeStorage } from '../utils/safeStorage';
 interface RegisterPageProps {
   onSuccess?: () => void;
   onBack?: () => void;
@@ -252,8 +253,8 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
             formData.password
           );
           // 記住帳號（預設開啟）
-          localStorage.setItem('ua_saved_email', formData.email.trim().toLowerCase());
-          localStorage.setItem('ua_remember_me', 'true');
+          safeStorage.set('ua_saved_email', formData.email.trim().toLowerCase());
+          safeStorage.set('ua_remember_me', 'true');
           setAutoLoginDone(true);
         } catch (loginErr) {
           console.error('自動登入失敗:', loginErr);

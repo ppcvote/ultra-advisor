@@ -26,6 +26,7 @@ import {
 import { useMembership } from '../hooks/useMembership';
 import { ResponsiveContainer, ComposedChart, Area, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceArea } from 'recharts';
 
+import { safeStorage } from '../utils/safeStorage';
 // --- 輔助函式 ---
 
 const calculateMonthlyPayment = (principal: number, rate: number, years: number) => {
@@ -83,7 +84,7 @@ export const StudentLoanTool = ({ data, setData, userId }: any) => {
 
   // 首次進入頁面顯示提示
   useEffect(() => {
-    const hasSeenHint = localStorage.getItem(HINT_STORAGE_KEY);
+    const hasSeenHint = safeStorage.get(HINT_STORAGE_KEY);
     if (!hasSeenHint) {
       const timer = setTimeout(() => {
         /* auto-popup disabled (brand-safe): use triple-click gesture instead */
@@ -95,7 +96,7 @@ export const StudentLoanTool = ({ data, setData, userId }: any) => {
   // 關閉提示並記錄已看過
   const dismissHint = () => {
     setShowTripleClickHint(false);
-    localStorage.setItem(HINT_STORAGE_KEY, 'true');
+    safeStorage.set(HINT_STORAGE_KEY, 'true');
   };
 
   // 1. 資料處理與預設值

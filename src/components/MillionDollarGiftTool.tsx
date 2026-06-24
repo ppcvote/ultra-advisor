@@ -38,6 +38,7 @@ import {
   ReferenceLine
 } from 'recharts';
 
+import { safeStorage } from '../utils/safeStorage';
 // ============================================
 // Helper Functions (Utils)
 // ============================================
@@ -325,7 +326,7 @@ const MillionDollarGiftTool = ({ data, setData, userId }: any) => {
 
   // 首次進入頁面顯示提示
   useEffect(() => {
-    const hasSeenHint = localStorage.getItem(HINT_STORAGE_KEY);
+    const hasSeenHint = safeStorage.get(HINT_STORAGE_KEY);
     if (!hasSeenHint) {
       // 延遲 1 秒顯示，讓頁面先載入完成
       const timer = setTimeout(() => {
@@ -338,7 +339,7 @@ const MillionDollarGiftTool = ({ data, setData, userId }: any) => {
   // 關閉提示並記錄已看過
   const dismissHint = () => {
     setShowTripleClickHint(false);
-    localStorage.setItem(HINT_STORAGE_KEY, 'true');
+    safeStorage.set(HINT_STORAGE_KEY, 'true');
   };
 
   // 同步外部資料變化

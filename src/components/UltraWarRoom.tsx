@@ -59,6 +59,7 @@ import { db, storage } from '../firebase';
 // 🔔 推播通知 — 仍給 PushNotificationSection helper 用
 import { usePushNotifications } from '../hooks/usePushNotifications';
 
+import { safeStorage } from '../utils/safeStorage';
 // 🆕 Threads 社群助理
 // ThreadsAssistant 已移除，功能遷移至 MindThread.tw
 
@@ -3580,7 +3581,7 @@ const QuickCalculator = () => {
             onClick={(e) => {
               e.stopPropagation();
               // 儲存當前計算數據到 localStorage，讓完整版可以讀取
-              localStorage.setItem('ua_calculator_data', JSON.stringify({
+              safeStorage.set('ua_calculator_data', JSON.stringify({
                 mode,
                 mortgage: { amount: mortgageAmount, rate: mortgageRate, years: mortgageYears, method: mortgageMethod },
                 credit: { amount: creditAmount, rate: creditRate, years: creditYears },
