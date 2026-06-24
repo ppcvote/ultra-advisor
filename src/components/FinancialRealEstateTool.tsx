@@ -35,6 +35,7 @@ import { useMembership } from '../hooks/useMembership';
 import { useCheatSheetTrigger } from '../hooks/useCheatSheetTrigger';
 import { ResponsiveContainer, ComposedChart, Area, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceLine } from 'recharts';
 import DisclaimerFooter from './DisclaimerFooter';
+import ShareToCustomerButton from './ShareToCustomerButton';
 
 // ============================================================
 // 輔助函式
@@ -1307,6 +1308,64 @@ export const FinancialRealEstateTool = ({ data, setData, userId }: any) => {
           </div>
         </div>
       )}
+
+      {/* Sprint 9 A — 客戶端分享連結（與 Sprint 5 ShareButton 並列；本工具尚無 ShareButton，
+          先佔位讓未來補上時排版一致）。payload 對齊 FinancialRealEstatePayload schema。
+          chartDataNewLoan / chartDataRefinance / recommendationReasons 不入 payload —
+          renderer 端可由 inputs 重算（與 BigSmall 同模式，URL 瘦身）。
+          scenarios 由 monthlyNet 升維成 {totalWealth, netCashFlow}，沿用既有 totalWealthNewLoan
+          公式（loanAmount × 10000 + netCashFlow × 12 × loanTerm），不改工具計算引擎。 */}
+      <div className="flex flex-wrap justify-end gap-3 pt-1">
+        <ShareToCustomerButton
+          tool="financial_real_estate"
+          reportLabel="金融房產"
+          inputs={{
+            loanAmount,
+            loanTerm,
+            loanRate,
+            investReturnRate,
+            existingLoanBalance,
+            existingMonthlyPayment,
+            planMode,
+            configType,
+            clientAge,
+          }}
+          outputs={{
+            monthlyPayment: calculations.monthlyPayment,
+            monthlyIncome: calculations.monthlyIncome,
+            netCashFlow: calculations.netCashFlow,
+            isPositiveCashFlow: calculations.isPositiveCashFlow,
+            monthlyOutOfPocket: calculations.monthlyOutOfPocket,
+            totalOutOfPocket: calculations.totalOutOfPocket,
+            rateSpread: calculations.rateSpread,
+            breakEvenRate: calculations.breakEvenRate,
+            cashOutAmount: calculations.cashOutAmount,
+            monthlyIncomeFromCashOut: calculations.monthlyIncomeFromCashOut,
+            netNewMonthlyPayment: calculations.netNewMonthlyPayment,
+            monthlySavings: calculations.monthlySavings,
+            totalSavingsOverTerm: calculations.totalSavingsOverTerm,
+            cumulativeCashFlow: calculations.cumulativeCashFlow,
+            totalWealthNewLoan: calculations.totalWealthNewLoan,
+            totalWealthRefinance: calculations.totalWealthRefinance,
+            leverageRatio: calculations.leverageRatio,
+            recommendation: calculations.recommendation,
+            scenarios: {
+              low: {
+                netCashFlow: calculations.scenarios.low,
+                totalWealth: loanAmount * 10000 + calculations.scenarios.low * 12 * loanTerm,
+              },
+              mid: {
+                netCashFlow: calculations.scenarios.mid,
+                totalWealth: loanAmount * 10000 + calculations.scenarios.mid * 12 * loanTerm,
+              },
+              high: {
+                netCashFlow: calculations.scenarios.high,
+                totalWealth: loanAmount * 10000 + calculations.scenarios.high * 12 * loanTerm,
+              },
+            },
+          }}
+        />
+      </div>
 
       <DisclaimerFooter scope="calc" />
     </div>

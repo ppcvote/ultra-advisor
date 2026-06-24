@@ -1448,7 +1448,9 @@ const MillionDollarGiftTool = ({ data, setData, userId }: any) => {
         </div>
       )}
 
-      <DisclaimerFooter scope="tax" />
+      {/* Sprint 9: 此工具同時涉及贈與稅規劃 + 貸款投資報酬假設，
+          compliance critic 指出單一 scope 不足，改為 tax + investment 雙 scope。*/}
+      <DisclaimerFooter scope={['tax', 'investment']} />
     </div>
   );
 };

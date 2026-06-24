@@ -7,6 +7,7 @@ import { useMembership } from '../hooks/useMembership';
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import DisclaimerFooter from './DisclaimerFooter';
+import ShareToCustomerButton from './ShareToCustomerButton';
 
 // ============================================================
 // 格式化函式
@@ -986,6 +987,40 @@ export default function GoldenSafeVault({ data, setData, userId }: any) {
           </div>
         </div>
       )}
+
+      {/* Sprint 9 A — 客戶端分享連結（與 Sprint 5 ShareButton 並列；本工具尚無 ShareButton，
+          先佔位讓未來補上時排版一致）。payload 對齊 GoldenSafeVaultPayload schema。
+          why 三個 *After 在 share 時就地重算、不從 finalDisplayValue 拿：
+            finalDisplayValue / localLocked / activeDisaster 是顧問端互動的 transient
+            state，分享出去的 readonly 報告應永遠展示「四種狀態同框對比」，不能被當下
+            點到哪顆按鈕綁架（Sprint 7 PII lock down 原則 — payload 即真相，不夾帶
+            UI session 狀態）。 */}
+      <div className="flex flex-wrap justify-end gap-3 pt-1">
+        <ShareToCustomerButton
+          tool="golden_safe_vault"
+          reportLabel="黃金保險箱"
+          inputs={{
+            mode: safeData.mode,
+            amount: safeData.amount,
+            years: safeData.years,
+            rate: safeData.rate,
+            age: safeData.age,
+            annualIncome: safeData.annualIncome,
+            medicalLoss: safeData.medicalLoss,
+            marketLoss: safeData.marketLoss,
+            taxLoss: safeData.taxLoss,
+          }}
+          outputs={{
+            baseValue,
+            principal,
+            lockedValue: Math.round(baseValue * 0.9),
+            // medicalLoss / taxLoss 是固定金額（萬→元）；marketLoss 是百分比
+            medicalAfter: Math.max(0, baseValue - safeData.medicalLoss * 10000),
+            marketAfter: Math.round(baseValue * (1 - safeData.marketLoss / 100)),
+            taxAfter: Math.max(0, baseValue - safeData.taxLoss * 10000),
+          }}
+        />
+      </div>
 
       <DisclaimerFooter scope="insurance" />
     </div>

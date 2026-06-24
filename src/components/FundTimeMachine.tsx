@@ -28,6 +28,9 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tool
 import { fundDatabase, generateFundHistory, generateDCAHistory } from '../data/fundData';
 import html2canvas from 'html2canvas';
 import DisclaimerFooter from './DisclaimerFooter';
+// Sprint 9 A — 「產生客戶連結」按鈕。FundTimeMachine 沒有 Sprint 5 ShareButton（純試算工具、
+// 沒做摘要文案 → 故只接 ShareToCustomerButton 一支，不並列。放在 DisclaimerFooter 上方。
+import ShareToCustomerButton from './ShareToCustomerButton';
 
 import { toast } from '../utils/toast';
 
@@ -936,6 +939,40 @@ const FundTimeMachine = () => {
           </div>
         </div>
       )}
+
+      {/* Sprint 9 A — 客戶分享連結（readonly /r/fund-time-machine）
+          - payload 只挑展示用的 inputs / outputs，data[] 整條 series 不放（URL bytes 太貴、
+            renderer 端會用同樣 inputs 重新跑 generateFundHistory / generateDCAHistory）
+          - fundType 從 isGrowth 反推（boolean → 'growth'|'income'）讓 renderer 不用再 import 基金 dataset
+          - cumulativeDividends / avgMonthlyDividend：growth 型沒配息，但 schema 要求 number → 0 fallback
+          - inceptionDate 是 display-only 字串（顯示「自 2010-01-01 起 X 年回測」），不用做日期 parse */}
+      <div className="flex justify-end pt-2">
+        <ShareToCustomerButton
+          tool="fund_time_machine"
+          reportLabel="基金時光機"
+          inputs={{
+            mode,
+            selectedFund,
+            amount,
+            monthlyAmount,
+          }}
+          outputs={{
+            fundId: fundInfo.id,
+            fundName: fundInfo.name,
+            fundType: isGrowth ? 'growth' : 'income',
+            inceptionDate: fundInfo.inceptionDate,
+            years,
+            totalPrincipal,
+            totalReturn: finalResult.totalReturn ?? 0,
+            cumulativeDividends: finalResult.cumulativeDividends ?? 0,
+            totalReturnRate,
+            cagr,
+            growthMultiplier,
+            maxDrawdown,
+            avgMonthlyDividend,
+          }}
+        />
+      </div>
 
       <DisclaimerFooter scope="investment" />
     </div>

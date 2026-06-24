@@ -35,7 +35,16 @@ export type CustomerReportTool =
   | 'labor_pension'
   | 'big_small_reservoir'
   | 'tax_planner'
-  | 'million_gift';
+  | 'million_gift'
+  // Sprint 9 A — extending the union to 10 tools. New entries below use the
+  // same snake_case convention; URL-facing slugs (kebab-case) are in the
+  // SLUG_TO_TOOL / TOOL_TO_SLUG mirror just below.
+  | 'fund_time_machine'
+  | 'student_loan'
+  | 'car_replacement'
+  | 'super_active_saving'
+  | 'financial_real_estate'
+  | 'golden_safe_vault';
 
 // URL slug ↔ internal tool id. Slug uses kebab-case for friendlier URLs.
 // Keep the map tiny + explicit — never accept arbitrary strings from the URL.
@@ -44,6 +53,13 @@ const SLUG_TO_TOOL: Record<string, CustomerReportTool> = {
   'big-small-reservoir': 'big_small_reservoir',
   'tax-planner': 'tax_planner',
   'million-gift': 'million_gift',
+  // Sprint 9 A
+  'fund-time-machine': 'fund_time_machine',
+  'student-loan': 'student_loan',
+  'car-replacement': 'car_replacement',
+  'super-active-saving': 'super_active_saving',
+  'financial-real-estate': 'financial_real_estate',
+  'golden-safe-vault': 'golden_safe_vault',
 };
 
 const TOOL_TO_SLUG: Record<CustomerReportTool, string> = {
@@ -51,6 +67,13 @@ const TOOL_TO_SLUG: Record<CustomerReportTool, string> = {
   big_small_reservoir: 'big-small-reservoir',
   tax_planner: 'tax-planner',
   million_gift: 'million-gift',
+  // Sprint 9 A
+  fund_time_machine: 'fund-time-machine',
+  student_loan: 'student-loan',
+  car_replacement: 'car-replacement',
+  super_active_saving: 'super-active-saving',
+  financial_real_estate: 'financial-real-estate',
+  golden_safe_vault: 'golden-safe-vault',
 };
 
 export function slugToTool(slug: string): CustomerReportTool | null {
@@ -205,14 +228,223 @@ export interface MillionGiftPayload {
   };
 }
 
+// ---------- Sprint 9 A — 6 new tool payloads ----------
+
+// Fund Time Machine (基金時光機).
+//   - Bimodal: lump-sum (one shot) vs DCA (monthly drip). The amount field
+//     used depends on `mode` — renderer reads both, but the unused one is
+//     simply ignored. We carry the fund id + name so renderer can label
+//     without re-importing the fund dataset.
+//   - `fundType` discriminates growth-style (totalReturn the headline) vs
+//     income-style (cumulativeDividends the headline). The renderer picks
+//     the hero metric off this flag instead of branching on fundId.
+export interface FundTimeMachinePayload {
+  inputs: {
+    mode: 'lump' | 'dca';
+    selectedFund: string;     // fund id e.g. 'USDEQ3490'
+    amount: number;           // 萬 — lump mode
+    monthlyAmount: number;    // 元 — dca mode
+  };
+  outputs: {
+    fundId: string;
+    fundName: string;
+    fundType: 'growth' | 'income';
+    inceptionDate: string;    // ISO date — display-only, never parsed for math
+    years: number;
+    totalPrincipal: number;
+    totalReturn: number;
+    cumulativeDividends: number;
+    totalReturnRate: number;
+    cagr: number;
+    growthMultiplier: number;
+    maxDrawdown: number;
+    avgMonthlyDividend: number;
+  };
+}
+
+// Student Loan (學貸活化).
+//   - loanRate is 政府方案固定 1.775% — not user-editable, so it's NOT in
+//     inputs. Encoding a constant just wastes link bytes.
+//   - 4 phase boundaries (study / grace / interest-only / amortizing) are
+//     carried as year integers so the renderer can draw a 4-bar chart
+//     without re-running the simulator.
+export interface StudentLoanPayload {
+  inputs: {
+    loanAmount: number;          // 萬
+    investReturnRate: number;
+    semesters: number;
+    gracePeriod: number;
+    interestOnlyPeriod: number;
+    isQualified: boolean;
+  };
+  outputs: {
+    finalAsset: number;          // 萬
+    coverageRatio: number;
+    monthlyInterest: number;
+    monthlyPMT: number;
+    studyYears: number;
+    graceEndYear: number;
+    interestOnlyEndYear: number;
+    repaymentEndYear: number;
+    totalDuration: number;
+  };
+}
+
+// Car Replacement (5 年換車專案).
+//   - 3 cycles modelled in source — we encode the whole array because the
+//     renderer's bar chart needs all three side-by-side. Each cycle entry
+//     is small (8 numbers) so total payload still fits in budget.
+export interface CarReplacementCycle {
+  cycle: number;
+  carBudget: number;
+  investedCapital: number;
+  monthlyPay: number;
+  monthlyIncome: number;
+  netPay: number;
+  residualValue: number;
+  remainingLoan: number;
+  netCashBack: number;
+  totalAssetEnd: number;
+}
+
+export interface CarReplacementPayload {
+  inputs: {
+    carPrice: number;          // 萬 — cycle 1
+    investReturnRate: number;
+    loanRate: number;
+    loanTerm: number;
+    residualRate: number;      // %
+    cycleYears: number;
+    carPrice2: number;
+    carPrice3: number;
+  };
+  outputs: {
+    cycles: CarReplacementCycle[];   // length = 3
+    totalProjectYears: number;
+    lastCarResidual: number;
+  };
+}
+
+// Super Active Saving (超積極存錢法).
+//   - totalYears is fixed at 40 in the source tool — kept out of inputs
+//     for the same reason as loanRate above.
+//   - Comparing 消極 (passive, full 40 yrs DCA) vs 積極 (active, save then
+//     compound) → two parallel final assets. Renderer draws both growth
+//     curves by re-running deterministic compounding from inputs.
+export interface SuperActiveSavingPayload {
+  inputs: {
+    monthlySaving: number;     // 元
+    investReturnRate: number;
+    activeYears: number;
+  };
+  outputs: {
+    finalActiveAsset: number;
+    finalPassiveAsset: number;
+    activeWan: number;
+    passiveWan: number;
+    totalPrincipalActive: number;
+    totalPrincipalPassive: number;
+    savedPrincipal: number;
+    monthlyPassiveIncome: number;
+    assetRatio: number;
+  };
+}
+
+// Financial Real Estate (金融房產專案).
+//   - Two plan modes (newLoan / refinance) share most of the calc surface.
+//     We flatten everything `calculations` returns into one shape — fields
+//     that don't apply to a given mode are still computed (deterministic +
+//     cheap) so the encoded payload is mode-agnostic. Renderer reads
+//     `inputs.planMode` to decide which metrics to surface.
+//   - 3-scenario sensitivity {low, mid, high} carries pre-computed total-
+//     wealth numbers so the renderer can show a "what if return is X%"
+//     band without re-running 20+ years of amortization in the browser.
+export interface FinancialRealEstateScenario {
+  totalWealth: number;
+  netCashFlow: number;
+}
+
+export interface FinancialRealEstatePayload {
+  inputs: {
+    loanAmount: number;          // 萬
+    loanTerm: number;
+    loanRate: number;
+    investReturnRate: number;
+    existingLoanBalance: number; // 萬
+    existingMonthlyPayment: number; // 元
+    planMode: 'none' | 'newLoan' | 'refinance';
+    configType: string;
+    clientAge: number;
+  };
+  outputs: {
+    monthlyPayment: number;
+    monthlyIncome: number;
+    netCashFlow: number;
+    isPositiveCashFlow: boolean;
+    monthlyOutOfPocket: number;
+    totalOutOfPocket: number;
+    rateSpread: number;
+    breakEvenRate: number;
+    cashOutAmount: number;
+    monthlyIncomeFromCashOut: number;
+    netNewMonthlyPayment: number;
+    monthlySavings: number;
+    totalSavingsOverTerm: number;
+    cumulativeCashFlow: number;
+    totalWealthNewLoan: number;
+    totalWealthRefinance: number;
+    leverageRatio: number;
+    recommendation: string;
+    scenarios: {
+      low: FinancialRealEstateScenario;
+      mid: FinancialRealEstateScenario;
+      high: FinancialRealEstateScenario;
+    };
+  };
+}
+
+// Golden Safe Vault (黃金保險箱).
+//   - "Lock-in" value = baseValue × 0.9 (insurance 配置守住 90% — the 10%
+//     drop is the deliberate hero contrast). All 4 erosion scenarios
+//     (medical / market / tax) are absolute 元 numbers so the renderer
+//     can draw a 5-bar comparison directly.
+//   - `mode` flips meaning of `amount` (time mode: 投入金額萬 ; asset mode:
+//     現有資產萬). Renderer surfaces the right label off this flag.
+export interface GoldenSafeVaultPayload {
+  inputs: {
+    mode: 'time' | 'asset';
+    amount: number;            // 萬 — meaning depends on mode (see above)
+    years: number;
+    rate: number;
+    age: number;
+    annualIncome: number;      // 萬
+    medicalLoss: number;       // 萬
+    marketLoss: number;        // % drop
+    taxLoss: number;           // 萬
+  };
+  outputs: {
+    baseValue: number;         // 元
+    principal: number;         // 元
+    lockedValue: number;       // 元 — baseValue * 0.9
+    medicalAfter: number;
+    marketAfter: number;
+    taxAfter: number;
+  };
+}
+
 // Advisor snippet — what the customer sees as "who sent me this".
-// Intentionally NO email / phone / LINE id: those create harassment surface
-// area if the link is forwarded. The advisor's own contact channel is the
-// LINE message they're already in.
+// Sprint 9 F: contactLine added. Unlike client PII, the advisor's LINE OA
+// id is intentionally public-facing — it's their business identifier. The
+// feedback widget on CustomerReportPage opens a LINE deep-link prefilled
+// with the tool name; without contactLine the widget falls back to a
+// "請直接回覆 LINE 訊息給顧問" static toast.
+// Still NO advisor email / phone here: LINE OA id is the one channel they
+// publish, anything else stays inside the existing message thread.
 export interface AdvisorSnippet {
   name: string;
   licenses?: string; // e.g. "IARFC, 人身保險業務員"
   companyName?: string;
+  contactLine?: string; // LINE Official Account id, e.g. '@ginrolladvisor'
 }
 
 // Discriminated-union payload. The `tool` tag narrows inputs/outputs so a
@@ -227,7 +459,16 @@ export type CustomerReportPayload =
   | ({ tool: 'labor_pension' } & LaborPensionPayload & PayloadBase)
   | ({ tool: 'big_small_reservoir' } & BigSmallReservoirPayload & PayloadBase)
   | ({ tool: 'tax_planner' } & TaxPlannerPayload & PayloadBase)
-  | ({ tool: 'million_gift' } & MillionGiftPayload & PayloadBase);
+  | ({ tool: 'million_gift' } & MillionGiftPayload & PayloadBase)
+  // Sprint 9 A — 6 new branches. `v: 1` stays the same: the schema framework
+  // (encode/decode, base64-url, advisor block, generatedAt) is unchanged.
+  // Bumping v would invalidate every link already sent in Sprints 7-8.
+  | ({ tool: 'fund_time_machine' } & FundTimeMachinePayload & PayloadBase)
+  | ({ tool: 'student_loan' } & StudentLoanPayload & PayloadBase)
+  | ({ tool: 'car_replacement' } & CarReplacementPayload & PayloadBase)
+  | ({ tool: 'super_active_saving' } & SuperActiveSavingPayload & PayloadBase)
+  | ({ tool: 'financial_real_estate' } & FinancialRealEstatePayload & PayloadBase)
+  | ({ tool: 'golden_safe_vault' } & GoldenSafeVaultPayload & PayloadBase);
 
 // btoa/atob only handle latin1, so we round-trip through UTF-8 first.
 // (Advisor names + license labels are Chinese — would explode otherwise.)

@@ -172,7 +172,20 @@ async function getAdvisorProfile(uid: string): Promise<AdvisorSnippet> {
         ? data.companyName.trim()
         : undefined;
 
-    return { name, licenses, companyName };
+    // Sprint 9 F: contactLine — LINE Official Account ID for the feedback widget
+    // on CustomerReportPage. Sanitized to ^@?[a-zA-Z0-9_.-]{2,20}$ (LINE OA
+    // rules) so we never open a deep-link with a phone/email/URL by mistake.
+    // The encoded payload base64 doesn't currently get re-checked on decode
+    // (codec is pure), so the sanitize happens once here at the publish edge.
+    let contactLine: string | undefined;
+    if (typeof data.contactLine === 'string') {
+      const raw = data.contactLine.trim();
+      if (raw && /^@?[a-zA-Z0-9_.-]{2,20}$/.test(raw)) {
+        contactLine = raw;
+      }
+    }
+
+    return { name, licenses, companyName, contactLine };
   } catch {
     // silent — 沒抓到就 anonymous，不要阻斷分享流程
     return { name: ANON_ADVISOR_NAME };

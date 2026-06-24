@@ -1382,7 +1382,9 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
         </div>
       )}
 
-      <DisclaimerFooter scope="tax" />
+      {/* Sprint 9: 此工具同時涉及遺贈稅規劃 + 保險商品（房貸壽險／保單規劃），
+          compliance critic 指出單一 scope 不足，改為 estate + insurance 雙 scope。*/}
+      <DisclaimerFooter scope={['estate', 'insurance']} />
     </div>
   );
 };

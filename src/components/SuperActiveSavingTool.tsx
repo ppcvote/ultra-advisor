@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, ComposedChart, Area, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ReferenceArea } from 'recharts';
 import DisclaimerFooter from './DisclaimerFooter';
+import ShareToCustomerButton from './ShareToCustomerButton';
 
 export const SuperActiveSavingTool = ({ data, setData }: any) => {
   const safeData = {
@@ -428,6 +429,33 @@ export const SuperActiveSavingTool = ({ data, setData }: any) => {
               ))}
            </div>
         </div>
+      </div>
+
+      {/* Sprint 9 A — 客戶端分享連結（與 Sprint 5 ShareButton 並列；本工具尚無 ShareButton，
+          先佔位讓未來補上時排版一致）。payload 對齊 SuperActiveSavingPayload schema —
+          不傳 fullChartData（40-year array 重算成本低、URL 瘦身）。
+          assetRatio 在元件內無變數、用 finalPassive=0 防 NaN（活用 ratio 1）。 */}
+      <div className="flex flex-wrap justify-end gap-3 pt-1">
+        <ShareToCustomerButton
+          tool="super_active_saving"
+          reportLabel="超積極存錢"
+          inputs={{
+            monthlySaving,
+            investReturnRate,
+            activeYears,
+          }}
+          outputs={{
+            finalActiveAsset,
+            finalPassiveAsset,
+            activeWan,
+            passiveWan,
+            totalPrincipalActive,
+            totalPrincipalPassive,
+            savedPrincipal,
+            monthlyPassiveIncome,
+            assetRatio: finalPassiveAsset > 0 ? finalActiveAsset / finalPassiveAsset : 1,
+          }}
+        />
       </div>
 
       <DisclaimerFooter scope="investment" />

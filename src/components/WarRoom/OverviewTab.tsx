@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import {
   BookOpen, ExternalLink, RefreshCw, Share2, TrendingUp,
   Crown, Users, Wrench, ArrowRight, Newspaper, Zap, Mic, PencilRuler, Target,
-  Cake, Clock, FileEdit
+  Cake, Clock, FileEdit, Settings
 } from 'lucide-react';
 import MissionCard from '../MissionCard';
 import { useMissions } from '../../hooks/useMissions';
@@ -17,6 +17,14 @@ import { ALL_TOOLS } from '../../constants/tools';
 // Sprint 8 H: 「今日重點」agenda — 每天打開 UA 第一眼看到「該打開誰的檔案」
 // pure helper，nowEpochMs 由 caller runtime 取（對齊 customerReport.ts 鐵則）
 import { buildAgenda, type AgendaItem } from '../../lib/clientAgenda';
+// Sprint 9 D: 顧問可個別關閉某類 trigger（生日 / stale / 資料不足）
+// 走 useSyncExternalStore — 切換立刻 re-render、不靠 useEffect rehydrate
+import {
+  getAgendaPrefs,
+  setAgendaPref,
+  subscribeAgendaPrefs,
+  type AgendaPrefs,
+} from '../../lib/agendaPrefs';
 import type { ProfileData, WarRoomTab } from './types';
 
 interface OverviewTabProps {
@@ -49,20 +57,44 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   const todayBg = todayBackground;
   const isNewUser = clientCount === 0;
 
-  // ===== Sprint 8 H: 「今日重點」agenda =====
+  // ===== Sprint 8 H + Sprint 9 D: 「今日重點」agenda =====
   // 鐵則：nowEpochMs 必須 runtime 取（在 useMemo callback 內、不是 module top）
   // 對齊 customerReport.ts pure codec / Sprint 7 timestamp 鐵則。
-  // 客戶列表變動就重算（useMemo deps = clients），不另設 setInterval。
+  // 客戶列表變動或 prefs 變動就重算（useMemo deps = [clients, agendaPrefs]），不另設 setInterval。
+  // useSyncExternalStore：prefs 在 module-level store、跨元件即時同步、無需 prop drilling。
+  const agendaPrefs: AgendaPrefs = useSyncExternalStore(
+    subscribeAgendaPrefs,
+    getAgendaPrefs,
+    getAgendaPrefs, // server snapshot — SSR-safe（safeStorage 內部已 SSR-guarded）
+  );
+
   const agenda: AgendaItem[] = useMemo(() => {
     if (!clients || clients.length === 0) return [];
-    return buildAgenda(clients, Date.now());
-  }, [clients]);
+    return buildAgenda(clients, Date.now(), { prefs: agendaPrefs });
+  }, [clients, agendaPrefs]);
 
   // 點 agenda item → 跳客戶詳情。沿用 ClientsTab 的 onSelectClient 模式（callback，非 URL routing）。
   const handleAgendaClick = (item: AgendaItem) => {
     const target = clients?.find(c => c.id === item.clientId);
     if (target && onSelectClient) onSelectClient(target);
   };
+
+  // ===== Sprint 9 D: agenda 偏好齒輪 popover =====
+  // click-outside dismissal — 沿用 mousedown listener 模式（比 click 早觸發、避免 button click 衝突）
+  const [showPrefsPopover, setShowPrefsPopover] = useState(false);
+  const prefsPopoverRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showPrefsPopover) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (prefsPopoverRef.current && !prefsPopoverRef.current.contains(e.target as Node)) {
+        setShowPrefsPopover(false);
+      }
+    };
+    // mousedown 比 click 早觸發、避免 popover 內按鈕點擊先被 outside listener 關掉
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showPrefsPopover]);
 
   // Onboarding missions list — drives the 8-step "快速上手" panel for new users.
   // Hook auto-fetches on auth; we only consume `missions` + `loading` here.
@@ -157,6 +189,55 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
               <span className="text-[10px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full">
                 {agenda.length}
               </span>
+              {/* Sprint 9 D: 齒輪 — 顧問可關掉某類 trigger（嘮叨感 critic fix）
+                  ml-auto 推到 flex 末端；popover 走 absolute、z-20 蓋住下方按鈕列 */}
+              <div className="relative ml-auto" ref={prefsPopoverRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowPrefsPopover(v => !v)}
+                  aria-label="調整今日重點顯示"
+                  aria-expanded={showPrefsPopover}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-amber-300 hover:bg-amber-500/10 transition-colors"
+                >
+                  <Settings size={14} />
+                </button>
+                {showPrefsPopover && (
+                  <div
+                    className="absolute top-full right-0 mt-1 w-56 z-20
+                               bg-slate-900 border border-slate-700 rounded-xl shadow-xl
+                               p-2 space-y-0.5"
+                  >
+                    <div className="px-2 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      顯示 trigger
+                    </div>
+                    {([
+                      { key: 'showBirthday',   label: '本週生日',   icon: <Cake size={12} className="text-pink-400" /> },
+                      { key: 'showStale',      label: '久未追蹤',   icon: <Clock size={12} className="text-blue-400" /> },
+                      { key: 'showIncomplete', label: '資料不足',   icon: <FileEdit size={12} className="text-emerald-400" /> },
+                    ] as const).map(row => (
+                      <label
+                        key={row.key}
+                        className="flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer
+                                   hover:bg-slate-800/60 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={agendaPrefs[row.key]}
+                          onChange={(e) => setAgendaPref(row.key, e.target.checked)}
+                          className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800
+                                     text-amber-500 focus:ring-1 focus:ring-amber-500/40
+                                     focus:ring-offset-0 cursor-pointer"
+                        />
+                        <span className="shrink-0">{row.icon}</span>
+                        <span className="text-xs text-slate-200">{row.label}</span>
+                      </label>
+                    ))}
+                    <div className="px-2 pt-1 pb-0.5 text-[10px] text-slate-600">
+                      全部關閉 → 隱藏整個區塊
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <p className="text-xs text-slate-400 mb-3">這些客戶今天值得花 5 分鐘</p>
 

@@ -27,6 +27,9 @@ import { useMembership } from '../hooks/useMembership';
 import { useCheatSheetTrigger } from '../hooks/useCheatSheetTrigger';
 import { ResponsiveContainer, ComposedChart, Area, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceArea } from 'recharts';
 import DisclaimerFooter from './DisclaimerFooter';
+// Sprint 9 A — 「產生客戶連結」按鈕。StudentLoan 也沒有 Sprint 5 ShareButton（同樣是純試算工具），
+// 故只接 ShareToCustomerButton 一支，放在 DisclaimerFooter 上方。
+import ShareToCustomerButton from './ShareToCustomerButton';
 
 // --- 輔助函式 ---
 
@@ -882,6 +885,38 @@ export const StudentLoanTool = ({ data, setData, userId }: any) => {
           </div>
         </div>
       )}
+
+      {/* Sprint 9 A — 客戶分享連結（readonly /r/student-loan）
+          - loanRate 1.775% 是政府方案固定值、不在 inputs（schema 也跳過）→ encode 端不傳
+          - currentFinalAsset 是「萬」單位、schema finalAsset 也是萬 → 直傳
+          - chartData[] 整條不放、renderer 重跑 simulation（4-phase 確定性算）
+          - coverageRatio 罕見邊界（repaymentData 為 null 或 outflow=0）→ source code 已 fallback 0/999
+          - studyYears / graceEndYear 等 phase 數值 schema 都要、source 已算好 → 直傳 */}
+      <div className="flex justify-end pt-2">
+        <ShareToCustomerButton
+          tool="student_loan"
+          reportLabel="學貸活化"
+          inputs={{
+            loanAmount,
+            investReturnRate,
+            semesters,
+            gracePeriod,
+            interestOnlyPeriod,
+            isQualified,
+          }}
+          outputs={{
+            finalAsset: currentFinalAsset ?? 0,
+            coverageRatio: coverageRatio ?? 0,
+            monthlyInterest: monthlyInterest ?? 0,
+            monthlyPMT: monthlyPMT ?? 0,
+            studyYears,
+            graceEndYear,
+            interestOnlyEndYear,
+            repaymentEndYear,
+            totalDuration,
+          }}
+        />
+      </div>
 
       <DisclaimerFooter scope="calc" />
     </div>

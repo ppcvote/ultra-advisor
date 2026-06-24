@@ -1,5 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Calendar, Gift, Landmark, ShieldCheck, Umbrella, Waves } from 'lucide-react';
+import {
+  AlertCircle,
+  Building2,
+  Calendar,
+  Car,
+  Gift,
+  GraduationCap,
+  Landmark,
+  LineChart as LineChartIcon,
+  MessageCircle,
+  Rocket,
+  ShieldCheck,
+  Umbrella,
+  Waves,
+} from 'lucide-react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -7,6 +21,7 @@ import {
   ComposedChart,
   Area,
   Line,
+  LineChart,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -16,6 +31,7 @@ import {
   Cell,
 } from 'recharts';
 import DisclaimerFooter from '../components/DisclaimerFooter';
+import { getDisplayName } from '../components/ShareToCustomerButton';
 import {
   CustomerReportPayload,
   decodeCustomerReport,
@@ -40,6 +56,36 @@ type ViewState =
   | { kind: 'invalid' }
   | { kind: 'unsupported'; rawSlug: string }
   | { kind: 'ok'; payload: CustomerReportPayload };
+
+// Tool slug → 中文 label. Shared by the og:title useEffect AND the
+// FeedbackBar prefilled message. Single source of truth — adding a new tool
+// later requires updating exactly this one map.
+// (Sprint 9 A extended to 10 tools.)
+const TOOL_LABELS: Record<CustomerReportPayload['tool'], string> = {
+  labor_pension: '退休缺口分析',
+  big_small_reservoir: '大小水庫專案',
+  tax_planner: '稅務傳承規劃',
+  million_gift: '百萬禮物計畫',
+  fund_time_machine: '基金時光機',
+  student_loan: '學貸活化專案',
+  car_replacement: '5 年換車專案',
+  super_active_saving: '超積極存錢法',
+  financial_real_estate: '金融房產專案',
+  golden_safe_vault: '黃金保險箱',
+};
+
+// Sprint 9 F: sanitize contactLine before opening a LINE URL.
+// 顧問可能在 Firestore users/{uid}.contactLine 塞奇怪的東西 (phone / URL / email)。
+// 嚴格 regex 只放行 @xxx 或純 alnum/_-/. (LINE OA ID 規範) — 其他丟掉。
+// 長度上限 20：LINE OA ID 規範 4-18 字元、留 buffer 給 @ prefix。
+function sanitizeContactLine(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  // @ prefix 可選；id 主體只接受 alphanumeric / underscore / hyphen / period
+  if (!/^@?[a-zA-Z0-9_.-]{2,20}$/.test(trimmed)) return undefined;
+  return trimmed;
+}
 
 const formatNT = (n: number) => `$${n.toLocaleString()}`;
 
@@ -66,11 +112,15 @@ const formatGeneratedAt = (epochMs: number): string => {
 // (redundant — context makes it obvious whose contact card this is).
 const AdvisorBar: React.FC<{ payload: CustomerReportPayload }> = ({ payload }) => {
   const { advisor, generatedAt } = payload;
+  // 為什麼這裡再 sanitize 一次：Sprint 7 / 8 之前產生的舊 link 沒走 sanitize、
+  // payload.advisor.name 可能殘留電話/email/LINE id；
+  // decode 端跑一次 fallback 防 leak（critic security #2）
+  const safeName = advisor.name ? getDisplayName(advisor.name) : '—';
   const certLine = [advisor.companyName, advisor.licenses].filter(Boolean).join(' · ');
   return (
     <div className="bg-slate-900/70 border border-slate-700/60 rounded-xl px-4 py-2.5 flex items-center gap-3">
       <div className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-slate-100 font-bold truncate text-sm">{advisor.name || '—'}</span>
+        <span className="text-slate-100 font-bold truncate text-sm">{safeName}</span>
         {certLine && (
           <span className="text-[11px] text-slate-400 truncate">{certLine}</span>
         )}
@@ -753,6 +803,929 @@ const MillionGiftView: React.FC<{ payload: PayloadOf<'million_gift'> }> = ({ pay
   );
 };
 
+// ---------------------------------------------------------------------------
+// Sprint 9 A — 6 new renderers (fund time machine / student loan /
+// car replacement / super active saving / financial real estate /
+// golden safe vault).
+//
+// Same gap-first pattern as Sprint 8 renderers:
+//   1. Hero card (key metric, tool-specific colour)
+//   2. Chart card (recharts, ~280-300px fixed height)
+//   3. Assumptions grid (muted bg-slate-50 — sunk below hero)
+//   4. Secondary stats (2-col supportive numbers)
+//
+// 紅線詞合規 (金管會保險業務員管理規則 §15 / 證券投資顧問規則):
+//   - NO「保證」「絕對」「淨獲利」「節稅金額」「預期報酬」
+//   - 涉投資的 3 個 view (fund / student / super-active / fin-real) hero 內
+//     塞 italic 小字「※ 此為情境模擬、非保證收益」(Sprint 8 MillionGift pattern)
+//   - 涉保險的 1 個 view (golden-safe-vault) 用「上鎖後資產」中性詞、不講「保本」
+//
+// 不直接 import 6 個工具元件本身 — 它們各帶 800+ 行 + Firebase 依賴，
+// 客戶頁 lazy chunk 鐵則禁止 (Sprint 7 教訓)。每個 renderer 從 payload
+// 重新繪圖、避開原工具的 advisor-side UI (chips / share button / etc).
+// ---------------------------------------------------------------------------
+
+const FundTimeMachineView: React.FC<{ payload: PayloadOf<'fund_time_machine'> }> = ({ payload }) => {
+  const { inputs, outputs } = payload;
+  const isGrowth = outputs.fundType === 'growth';
+
+  // 重算成長曲線（理由同 BigSmallReservoirView）：URL 預算 ≤ 2KB、20+ 年逐月點
+  // 塞進 payload 會爆；given totalPrincipal + totalReturn + years 直接做線性近似。
+  // 完整 NAV 重建需要 fund history（在 advisor-side 是 data/fundData.ts），客戶頁
+  // 不該 import 那份 ~MB 級數據。簡化線：本金線（直線）vs 總資產線（CAGR 複利曲線）。
+  const chartData = useMemo(() => {
+    const yearsTotal = Math.max(1, outputs.years);
+    const principal = outputs.totalPrincipal;
+    const final = principal + outputs.totalReturn; // totalReturn 是「相對本金的增值絕對額」(growth) 或同 (income)
+    // 用 CAGR 重建年度資產：principal * (1 + cagr/100)^year
+    // cagr 已 .toFixed 過、會有微小漂移但客戶看的是趨勢、不是逐分錢
+    const r = outputs.cagr / 100;
+    const arr: Array<{ year: number; 本金: number; 總資產: number }> = [];
+    for (let y = 0; y <= yearsTotal; y++) {
+      const totalAtY =
+        inputs.mode === 'lump'
+          ? principal * Math.pow(1 + r, y)
+          : // DCA：本金線性累積、總資產用 future value of annuity 近似
+            principal * (y / yearsTotal);
+      const totalAsset =
+        inputs.mode === 'lump'
+          ? Math.round(principal * Math.pow(1 + r, y))
+          : // 簡化 — y=0 起 principal=0、y=yearsTotal 對齊 final
+            Math.round((final * y) / yearsTotal);
+      arr.push({
+        year: y,
+        本金: Math.round(totalAtY < principal ? totalAtY : principal),
+        總資產: totalAsset,
+      });
+    }
+    // 確保最後一點與 outputs 對齊（消除 toFixed 漂移）
+    if (arr.length > 0) {
+      arr[arr.length - 1] = { year: yearsTotal, 本金: principal, 總資產: final };
+    }
+    return arr;
+  }, [inputs.mode, outputs.years, outputs.totalPrincipal, outputs.totalReturn, outputs.cagr]);
+
+  // Hero metric 分支：growth → 總資產，income → 累積配息
+  const heroValue = isGrowth ? outputs.totalPrincipal + outputs.totalReturn : outputs.cumulativeDividends;
+  const heroLabel = isGrowth ? `${outputs.years} 年後總資產` : `${outputs.years} 年累積配息`;
+
+  const accent = isGrowth
+    ? { from: 'from-sky-50', to: 'to-blue-50', border: 'border-sky-200', chip: 'text-sky-700', heading: 'text-sky-800', value: 'text-sky-600', muted: 'text-sky-600/80', stroke: '#0ea5e9' }
+    : { from: 'from-emerald-50', to: 'to-teal-50', border: 'border-emerald-200', chip: 'text-emerald-700', heading: 'text-emerald-800', value: 'text-emerald-600', muted: 'text-emerald-600/80', stroke: '#10b981' };
+
+  return (
+    <div className="space-y-5">
+      <div className={`bg-gradient-to-br ${accent.from} ${accent.to} ${accent.border} border rounded-2xl p-6 text-center relative overflow-hidden`}>
+        <div className="absolute top-2 right-3 opacity-10 pointer-events-none">
+          <LineChartIcon size={80} />
+        </div>
+        <div className="relative">
+          <div className={`text-xs font-bold ${accent.chip} tracking-wider uppercase mb-1`}>Fund Time Machine</div>
+          <div className={`text-sm font-bold ${accent.heading} mb-1`}>{heroLabel}</div>
+          <div className={`text-5xl md:text-6xl font-black ${accent.value} font-mono leading-none`}>
+            {formatNT(heroValue)}
+          </div>
+          <div className={`text-[11px] ${accent.muted} mt-3`}>
+            {outputs.fundName} · {isGrowth ? `年化 ${outputs.cagr.toFixed(1)}%` : `平均月配息 ${formatNT(Math.round(outputs.avgMonthlyDividend))}`}
+          </div>
+          {/* 投資類紅線詞 inline disclaimer */}
+          <div className="text-[10px] mt-2 text-slate-500 italic">
+            ※ 此為基於歷史回測之情境模擬，非保證收益，過去績效不代表未來表現。
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">資產成長曲線</h3>
+        <div style={{ width: '100%', height: 280 }}>
+          <ResponsiveContainer>
+            <LineChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#64748b' }} unit="年" />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                tickFormatter={(v) => `${Math.round(v / 10000)}萬`}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                formatter={(value: number) => formatNT(value)}
+                labelFormatter={(label) => `第 ${label} 年`}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Line type="monotone" dataKey="本金" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+              <Line type="monotone" dataKey="總資產" stroke={accent.stroke} strokeWidth={3} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">試算假設</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div>
+            <div className="text-xs text-slate-500">基金類型</div>
+            <div className="font-bold text-slate-800">{isGrowth ? '⚡ 成長型' : '💰 配息型'}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">投入方式</div>
+            <div className="font-bold text-slate-800">{inputs.mode === 'lump' ? '單筆投入' : '定期定額'}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">{inputs.mode === 'lump' ? '投入金額' : '月扣金額'}</div>
+            <div className="font-bold text-slate-800">
+              {inputs.mode === 'lump' ? `${inputs.amount} 萬` : formatNT(inputs.monthlyAmount)}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">回測年數</div>
+            <div className="font-bold text-slate-800">{outputs.years} 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">成立日</div>
+            <div className="font-bold text-slate-800">{outputs.inceptionDate}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">累積本金</div>
+            <div className="font-bold text-slate-800">{formatNT(outputs.totalPrincipal)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">年化 (CAGR)</div>
+            <div className="font-bold text-slate-800">{outputs.cagr.toFixed(1)}%</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">歷史最大回撤</div>
+            <div className="font-bold text-slate-800">-{outputs.maxDrawdown.toFixed(1)}%</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-slate-50 rounded-xl p-4">
+          <div className="text-xs text-slate-500 mb-1">資產倍數</div>
+          <div className="text-xl font-bold text-slate-800 font-mono">{outputs.growthMultiplier.toFixed(2)}×</div>
+        </div>
+        <div className="bg-slate-50 rounded-xl p-4">
+          <div className="text-xs text-slate-500 mb-1">累積報酬率</div>
+          <div className={`text-xl font-bold font-mono ${outputs.totalReturnRate >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {outputs.totalReturnRate >= 0 ? '+' : ''}{outputs.totalReturnRate.toFixed(1)}%
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const StudentLoanView: React.FC<{ payload: PayloadOf<'student_loan'> }> = ({ payload }) => {
+  const { inputs, outputs } = payload;
+
+  // 4 phase: 在學/寬限/只繳息/本息攤還。bar chart 顯示各期月付金 (元)
+  // 期滿淨資產 (萬) 在 hero、避免 axis 混單位
+  const chartData = useMemo(() => {
+    return [
+      { phase: '在學', 月付金: 0, 期長: outputs.studyYears },
+      { phase: '寬限', 月付金: 0, 期長: Math.max(0, outputs.graceEndYear - outputs.studyYears) },
+      { phase: '只繳息', 月付金: Math.round(outputs.monthlyInterest), 期長: Math.max(0, outputs.interestOnlyEndYear - outputs.graceEndYear) },
+      { phase: '本息攤還', 月付金: Math.round(outputs.monthlyPMT), 期長: Math.max(0, outputs.repaymentEndYear - outputs.interestOnlyEndYear) },
+    ];
+  }, [outputs.studyYears, outputs.graceEndYear, outputs.interestOnlyEndYear, outputs.repaymentEndYear, outputs.monthlyInterest, outputs.monthlyPMT]);
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-gradient-to-br from-emerald-50 to-sky-50 border border-emerald-200 rounded-2xl p-6 text-center relative overflow-hidden">
+        <div className="absolute top-2 right-3 opacity-10 pointer-events-none">
+          <GraduationCap size={80} />
+        </div>
+        <div className="relative">
+          <div className="text-xs font-bold text-emerald-700 tracking-wider uppercase mb-1">Student Loan Plan</div>
+          <div className="text-sm font-bold text-emerald-800 mb-1">{outputs.totalDuration} 年後期滿淨資產</div>
+          <div className="text-5xl md:text-6xl font-black text-emerald-600 font-mono leading-none">
+            {formatWan(outputs.finalAsset)}
+          </div>
+          <div className="text-[11px] text-emerald-600/80 mt-3">
+            學貸覆蓋率 <span className="font-bold underline">{(outputs.coverageRatio * 100).toFixed(0)}%</span>
+            {' '}· 利率 1.775% 政府方案
+          </div>
+          <div className="text-[10px] mt-2 text-slate-500 italic">
+            ※ 此為基於使用者假設參數之情境模擬，非保證收益，實際結果可能因市場波動而異。
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">4 段期間月付金</h3>
+        <div style={{ width: '100%', height: 280 }}>
+          <ResponsiveContainer>
+            <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="phase" tick={{ fontSize: 12, fill: '#475569' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} unit="元" axisLine={false} tickLine={false} />
+              <Tooltip
+                cursor={{ fill: 'transparent' }}
+                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                formatter={(value: number) => formatNT(value)}
+              />
+              <Bar dataKey="月付金" fill="#10b981" radius={[6, 6, 0, 0]} barSize={60} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">試算假設</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div>
+            <div className="text-xs text-slate-500">貸款金額</div>
+            <div className="font-bold text-slate-800">{inputs.loanAmount} 萬</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">投資報酬率</div>
+            <div className="font-bold text-slate-800">{inputs.investReturnRate}% / 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">就學期</div>
+            <div className="font-bold text-slate-800">{inputs.semesters} 學期</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">寬限期</div>
+            <div className="font-bold text-slate-800">{inputs.gracePeriod} 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">只繳息期</div>
+            <div className="font-bold text-slate-800">{inputs.interestOnlyPeriod} 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">弱勢身分</div>
+            <div className="font-bold text-slate-800">{inputs.isQualified ? '是 (免息)' : '一般'}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">學貸利率</div>
+            <div className="font-bold text-slate-800">1.775%</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">總期長</div>
+            <div className="font-bold text-slate-800">{outputs.totalDuration} 年</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-slate-50 rounded-xl p-4">
+          <div className="text-xs text-slate-500 mb-1">只繳息期月付</div>
+          <div className="text-lg font-bold text-slate-800 font-mono">{formatNT(Math.round(outputs.monthlyInterest))}</div>
+        </div>
+        <div className="bg-slate-50 rounded-xl p-4">
+          <div className="text-xs text-slate-500 mb-1">攤還期月付</div>
+          <div className="text-lg font-bold text-slate-800 font-mono">{formatNT(Math.round(outputs.monthlyPMT))}</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CarReplacementView: React.FC<{ payload: PayloadOf<'car_replacement'> }> = ({ payload }) => {
+  const { inputs, outputs } = payload;
+
+  // 3 cycle 期末資產 + 實質月付折線。Cycle index 從 1 起、x 軸用「第 N 次換車」
+  const chartData = useMemo(() => {
+    return outputs.cycles.map((c) => ({
+      cycle: `第${c.cycle}次`,
+      期末資產: c.totalAssetEnd,
+      實質月付: Math.round(c.netPay),
+    }));
+  }, [outputs.cycles]);
+
+  const lastCycle = outputs.cycles[outputs.cycles.length - 1];
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-6 text-center relative overflow-hidden">
+        <div className="absolute top-2 right-3 opacity-10 pointer-events-none">
+          <Car size={80} />
+        </div>
+        <div className="relative">
+          <div className="text-xs font-bold text-orange-700 tracking-wider uppercase mb-1">Car Cycle Plan</div>
+          <div className="text-sm font-bold text-orange-800 mb-1">{outputs.totalProjectYears} 年後資產</div>
+          <div className="text-5xl md:text-6xl font-black text-orange-600 font-mono leading-none">
+            {formatWan(lastCycle?.totalAssetEnd ?? 0)}
+          </div>
+          <div className="text-[11px] text-orange-600/80 mt-3">
+            最後一台車殘值 <span className="font-bold underline">{formatWan(outputs.lastCarResidual)}</span>
+            {' '}· 共 3 次換車循環
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">三循環資產推進</h3>
+        <div style={{ width: '100%', height: 280 }}>
+          <ResponsiveContainer>
+            <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="cycle" tick={{ fontSize: 12, fill: '#475569' }} />
+              <YAxis
+                yAxisId="left"
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                unit="萬"
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                unit="元"
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                cursor={{ fill: 'transparent' }}
+                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                formatter={(value: number, name: string) =>
+                  name === '期末資產' ? formatWan(value) : formatNT(value)
+                }
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar yAxisId="left" dataKey="期末資產" fill="#f97316" radius={[6, 6, 0, 0]} barSize={50} />
+              <Line yAxisId="right" type="monotone" dataKey="實質月付" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 4 }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">試算假設</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div>
+            <div className="text-xs text-slate-500">首台車價</div>
+            <div className="font-bold text-slate-800">{inputs.carPrice} 萬</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">第二台</div>
+            <div className="font-bold text-slate-800">{inputs.carPrice2} 萬</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">第三台</div>
+            <div className="font-bold text-slate-800">{inputs.carPrice3} 萬</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">換車周期</div>
+            <div className="font-bold text-slate-800">{inputs.cycleYears} 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">投資報酬率</div>
+            <div className="font-bold text-slate-800">{inputs.investReturnRate}% / 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">貸款利率</div>
+            <div className="font-bold text-slate-800">{inputs.loanRate}% / 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">貸款年期</div>
+            <div className="font-bold text-slate-800">{inputs.loanTerm} 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">殘值率</div>
+            <div className="font-bold text-slate-800">{inputs.residualRate}%</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        {outputs.cycles.map((c) => (
+          <div key={c.cycle} className="bg-slate-50 rounded-xl p-4">
+            <div className="text-xs text-slate-500 mb-1">第{c.cycle}台月付</div>
+            <div className="text-lg font-bold text-slate-800 font-mono">{formatNT(Math.round(c.monthlyPay))}</div>
+            <div className="text-[10px] text-slate-400 mt-1">投資月領 {formatNT(Math.round(c.monthlyIncome))}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const SuperActiveSavingView: React.FC<{ payload: PayloadOf<'super_active_saving'> }> = ({ payload }) => {
+  const { inputs, outputs } = payload;
+
+  // 重算 40-year 對比曲線（active / passive 兩條 line）。
+  // 簡化：active = 前 N 年存錢、後 40-N 年只複利不投入；passive = 整 40 年 DCA
+  const chartData = useMemo(() => {
+    const TOTAL = 40;
+    const r = inputs.investReturnRate / 100 / 12;
+    const monthly = inputs.monthlySaving;
+    const active = inputs.activeYears;
+
+    const arr: Array<{ year: number; 積極組: number; 消極組: number }> = [];
+    let activeAsset = 0;
+    let passiveAsset = 0;
+    for (let y = 0; y <= TOTAL; y++) {
+      // year-end snapshot
+      arr.push({
+        year: y,
+        積極組: Math.round(activeAsset),
+        消極組: Math.round(passiveAsset),
+      });
+      // 下一年的累積：12 期 future value of annuity
+      for (let m = 0; m < 12; m++) {
+        const activeMonthly = y < active ? monthly : 0; // 積極組：active 年後停扣只複利
+        activeAsset = activeAsset * (1 + r) + activeMonthly;
+        passiveAsset = passiveAsset * (1 + r) + monthly; // 消極組：每月都扣
+      }
+    }
+    return arr;
+  }, [inputs.monthlySaving, inputs.investReturnRate, inputs.activeYears]);
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-200 rounded-2xl p-6 text-center relative overflow-hidden">
+        <div className="absolute top-2 right-3 opacity-10 pointer-events-none">
+          <Rocket size={80} />
+        </div>
+        <div className="relative">
+          <div className="text-xs font-bold text-violet-700 tracking-wider uppercase mb-1">Super Active Saving</div>
+          <div className="text-sm font-bold text-violet-800 mb-1">期滿被動月收入</div>
+          <div className="text-5xl md:text-6xl font-black text-violet-600 font-mono leading-none">
+            {formatNT(Math.round(outputs.monthlyPassiveIncome))}
+          </div>
+          <div className="text-[11px] text-violet-600/80 mt-3">
+            {40 - inputs.activeYears} 年複利自由 · 積極組期末資產 <span className="font-bold underline">{formatWan(outputs.activeWan)}</span>
+          </div>
+          <div className="text-[10px] mt-2 text-slate-500 italic">
+            ※ 此為基於使用者假設參數之情境模擬，非保證收益，實際結果可能因市場波動而異。
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">40 年資產成長對比</h3>
+        <div style={{ width: '100%', height: 280 }}>
+          <ResponsiveContainer>
+            <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#64748b' }} unit="年" />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                tickFormatter={(v) => `${Math.round(v / 10000)}萬`}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                formatter={(value: number) => formatNT(value)}
+                labelFormatter={(label) => `第 ${label} 年`}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <ReferenceLine
+                x={inputs.activeYears}
+                stroke="#8b5cf6"
+                strokeDasharray="3 3"
+                label={{ position: 'top', value: '停扣', fill: '#8b5cf6', fontSize: 11 }}
+              />
+              <Line type="monotone" dataKey="積極組" stroke="#8b5cf6" strokeWidth={3} dot={false} />
+              <Line type="monotone" dataKey="消極組" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">試算假設</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div>
+            <div className="text-xs text-slate-500">月扣金額</div>
+            <div className="font-bold text-slate-800">{formatNT(inputs.monthlySaving)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">積極期</div>
+            <div className="font-bold text-slate-800">{inputs.activeYears} 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">複利期</div>
+            <div className="font-bold text-slate-800">{40 - inputs.activeYears} 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">投資報酬率</div>
+            <div className="font-bold text-slate-800">{inputs.investReturnRate}% / 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">積極組本金</div>
+            <div className="font-bold text-slate-800">{formatWan(outputs.totalPrincipalActive / 10000)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">消極組本金</div>
+            <div className="font-bold text-slate-800">{formatWan(outputs.totalPrincipalPassive / 10000)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">本金省下</div>
+            <div className="font-bold text-slate-800">{formatWan(outputs.savedPrincipal / 10000)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">總期長</div>
+            <div className="font-bold text-slate-800">40 年</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-slate-50 rounded-xl p-4">
+          <div className="text-xs text-slate-500 mb-1">積極組期末資產</div>
+          <div className="text-lg font-bold text-violet-700 font-mono">{formatWan(outputs.activeWan)}</div>
+        </div>
+        <div className="bg-slate-50 rounded-xl p-4">
+          <div className="text-xs text-slate-500 mb-1">消極組期末資產</div>
+          <div className="text-lg font-bold text-slate-700 font-mono">{formatWan(outputs.passiveWan)}</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const FinancialRealEstateView: React.FC<{ payload: PayloadOf<'financial_real_estate'> }> = ({ payload }) => {
+  const { inputs, outputs } = payload;
+
+  // 3 scenarios (low/mid/high) 總財富 bar chart
+  const chartData = useMemo(() => {
+    return [
+      { scenario: '保守', 總財富: outputs.scenarios.low.totalWealth, 月現金流: outputs.scenarios.low.netCashFlow, fill: '#94a3b8' },
+      { scenario: '中性', 總財富: outputs.scenarios.mid.totalWealth, 月現金流: outputs.scenarios.mid.netCashFlow, fill: '#f59e0b' },
+      { scenario: '樂觀', 總財富: outputs.scenarios.high.totalWealth, 月現金流: outputs.scenarios.high.netCashFlow, fill: '#10b981' },
+    ];
+  }, [outputs.scenarios]);
+
+  const cashFlowPositive = outputs.isPositiveCashFlow;
+
+  return (
+    <div className="space-y-5">
+      <div className={`${cashFlowPositive ? 'bg-gradient-to-br from-amber-50 to-emerald-50 border-amber-200' : 'bg-gradient-to-br from-amber-50 to-sky-50 border-amber-200'} border rounded-2xl p-6 text-center relative overflow-hidden`}>
+        <div className="absolute top-2 right-3 opacity-10 pointer-events-none">
+          <Building2 size={80} />
+        </div>
+        <div className="relative">
+          <div className="text-xs font-bold text-amber-700 tracking-wider uppercase mb-1">Financial Real Estate</div>
+          <div className="text-sm font-bold text-amber-800 mb-1">每月淨現金流</div>
+          <div className={`text-5xl md:text-6xl font-black font-mono leading-none ${cashFlowPositive ? 'text-emerald-600' : 'text-sky-600'}`}>
+            {cashFlowPositive ? '+' : ''}{formatNT(Math.round(outputs.netCashFlow))}
+          </div>
+          <div className="text-[11px] text-amber-600/80 mt-3">
+            {cashFlowPositive ? '正現金流' : '需補貼'} · 利差{' '}
+            <span className="font-bold underline">{outputs.rateSpread.toFixed(2)}%</span>
+            {' '}· 槓桿 <span className="font-bold underline">{outputs.leverageRatio.toFixed(1)}x</span>
+          </div>
+          <div className="text-[10px] mt-2 text-slate-500 italic">
+            ※ 此為基於使用者假設參數之情境模擬，非保證收益，實際結果可能因市場波動而異。
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">三種報酬情境之總財富</h3>
+        <div style={{ width: '100%', height: 280 }}>
+          <ResponsiveContainer>
+            <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="scenario" tick={{ fontSize: 12, fill: '#475569' }} />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                tickFormatter={(v) => `${Math.round(v / 10000)}萬`}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                cursor={{ fill: 'transparent' }}
+                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                formatter={(value: number) => formatNT(value)}
+              />
+              <Bar dataKey="總財富" barSize={60} radius={[6, 6, 0, 0]}>
+                {chartData.map((entry, idx) => (
+                  <Cell key={idx} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">試算假設</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div>
+            <div className="text-xs text-slate-500">方案類型</div>
+            <div className="font-bold text-slate-800">
+              {inputs.planMode === 'newLoan' ? '新增貸款' : inputs.planMode === 'refinance' ? '增貸轉投' : '單純試算'}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">貸款金額</div>
+            <div className="font-bold text-slate-800">{inputs.loanAmount} 萬</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">貸款年期</div>
+            <div className="font-bold text-slate-800">{inputs.loanTerm} 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">貸款利率</div>
+            <div className="font-bold text-slate-800">{inputs.loanRate}% / 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">投資報酬率</div>
+            <div className="font-bold text-slate-800">{inputs.investReturnRate}% / 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">既有貸款餘額</div>
+            <div className="font-bold text-slate-800">{inputs.existingLoanBalance} 萬</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">既有月付</div>
+            <div className="font-bold text-slate-800">{formatNT(inputs.existingMonthlyPayment)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">損益平衡率</div>
+            <div className="font-bold text-slate-800">{outputs.breakEvenRate.toFixed(2)}%</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-slate-50 rounded-xl p-4">
+          <div className="text-xs text-slate-500 mb-1">月貸款支出</div>
+          <div className="text-lg font-bold text-slate-800 font-mono">{formatNT(Math.round(outputs.monthlyPayment))}</div>
+        </div>
+        <div className="bg-slate-50 rounded-xl p-4">
+          <div className="text-xs text-slate-500 mb-1">月投資收入</div>
+          <div className="text-lg font-bold text-emerald-700 font-mono">{formatNT(Math.round(outputs.monthlyIncome))}</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const GoldenSafeVaultView: React.FC<{ payload: PayloadOf<'golden_safe_vault'> }> = ({ payload }) => {
+  const { inputs, outputs } = payload;
+
+  // 5-bar 壓力測試對比：原始預估 → 重大傷病後 → 市場崩盤後 → 稅務後 → 上鎖後
+  const chartData = useMemo(() => {
+    return [
+      { scenario: '預估總資產', 資產: outputs.baseValue, fill: '#f59e0b' },
+      { scenario: '重大傷病後', 資產: outputs.medicalAfter, fill: '#fb923c' },
+      { scenario: '市場崩盤後', 資產: outputs.marketAfter, fill: '#f87171' },
+      { scenario: '稅務後', 資產: outputs.taxAfter, fill: '#fbbf24' },
+      { scenario: '上鎖後', 資產: outputs.lockedValue, fill: '#eab308' },
+    ];
+  }, [outputs.baseValue, outputs.medicalAfter, outputs.marketAfter, outputs.taxAfter, outputs.lockedValue]);
+
+  const lockProtection = outputs.baseValue > 0
+    ? ((outputs.lockedValue - Math.min(outputs.medicalAfter, outputs.marketAfter, outputs.taxAfter)) / outputs.baseValue) * 100
+    : 0;
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-2xl p-6 text-center relative overflow-hidden">
+        <div className="absolute top-2 right-3 opacity-10 pointer-events-none">
+          <ShieldCheck size={80} />
+        </div>
+        <div className="relative">
+          <div className="text-xs font-bold text-amber-700 tracking-wider uppercase mb-1">Golden Safe Vault</div>
+          <div className="text-sm font-bold text-amber-800 mb-1">預估總資產 → 上鎖後資產</div>
+          <div className="text-3xl md:text-4xl font-black font-mono leading-tight">
+            <span className="text-slate-500">{formatNT(outputs.baseValue)}</span>
+            <span className="text-amber-700 mx-2">→</span>
+            <span className="text-amber-600">{formatNT(outputs.lockedValue)}</span>
+          </div>
+          <div className="text-[11px] text-amber-600/80 mt-3">
+            上鎖後保留 <span className="font-bold underline">90%</span> 預估總資產
+            {lockProtection > 0 && (
+              <>
+                {' '}· 較最壞情境多保留{' '}
+                <span className="font-bold underline">{lockProtection.toFixed(0)}%</span>
+              </>
+            )}
+          </div>
+          {/* 為什麼這條 inline 不能省：金管會保險業務員管理規則 §15 禁宣稱保障比例 —
+              「90%」是工具示意比例（鎖定 10% 試算成本），非任何保險商品實際保障條件 */}
+          <div className="text-[10px] mt-2 text-amber-700/70 italic">
+            ※ 此 90% 為工具示意比例（鎖定 10% 試算成本），非任何商品實際保障條件，實際應依商品條款為準。
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">五情境壓力測試</h3>
+        <div style={{ width: '100%', height: 280 }}>
+          <ResponsiveContainer>
+            <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="scenario" tick={{ fontSize: 10, fill: '#475569' }} interval={0} />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                tickFormatter={(v) => `${Math.round(v / 10000)}萬`}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                cursor={{ fill: 'transparent' }}
+                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                formatter={(value: number) => formatNT(value)}
+              />
+              <Bar dataKey="資產" barSize={40} radius={[6, 6, 0, 0]}>
+                {chartData.map((entry, idx) => (
+                  <Cell key={idx} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">試算假設</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div>
+            <div className="text-xs text-slate-500">模式</div>
+            <div className="font-bold text-slate-800">{inputs.mode === 'time' ? '時間累積' : '現有資產'}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">{inputs.mode === 'time' ? '投入金額' : '現有資產'}</div>
+            <div className="font-bold text-slate-800">{inputs.amount} 萬</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">期間</div>
+            <div className="font-bold text-slate-800">{inputs.years} 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">投資報酬率</div>
+            <div className="font-bold text-slate-800">{inputs.rate}% / 年</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">年齡</div>
+            <div className="font-bold text-slate-800">{inputs.age} 歲</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">年收入</div>
+            <div className="font-bold text-slate-800">{inputs.annualIncome} 萬</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">假設醫療支出</div>
+            <div className="font-bold text-slate-800">{inputs.medicalLoss} 萬</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500">假設市場跌幅</div>
+            <div className="font-bold text-slate-800">{inputs.marketLoss}%</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-slate-50 rounded-xl p-4">
+          <div className="text-xs text-slate-500 mb-1">投入本金</div>
+          <div className="text-lg font-bold text-slate-800 font-mono">{formatNT(outputs.principal)}</div>
+        </div>
+        <div className="bg-slate-50 rounded-xl p-4">
+          <div className="text-xs text-slate-500 mb-1">上鎖差額</div>
+          <div className="text-lg font-bold text-amber-700 font-mono">
+            -{formatNT(outputs.baseValue - outputs.lockedValue)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Sprint 9 F — Customer Feedback Widget (LINE deep-link).
+//
+// 3 emoji buttons → open LINE chat with prefilled message.
+//   - 顧問若有 contactLine: 開 https://line.me/R/ti/p/<contactLine>?text=<msg>
+//   - 顧問沒設 contactLine: 按鈕仍顯示但 onClick 改成 toast「請直接回覆 LINE
+//     訊息給顧問」、避免顯示「無法反饋」這種讓客戶覺得 dead-end 的 UX
+//   - sessionStorage 防重複提交：每連結每 session 只送一次（避免客戶亂連發
+//     騷擾顧問、也避免按 3 次跳 3 個 LINE 視窗）
+//
+// 為什麼 LINE 而非 Firestore write：F 任務鐵則「不改 firestore.rules」、
+// 多寫一條 collection 還要再進 critic、所以 LINE 是 lowest-friction path。
+//
+// PII: 預設訊息 prefill 只有「工具名 + 反饋類型」，沒有客戶任何個資。
+// 連結本身的 base64 payload 客戶看完也不會被夾進 LINE 訊息 — 因為 LINE 訊息
+// 是另一條對話 channel、URL 不會自動 attach。
+// ---------------------------------------------------------------------------
+
+type FeedbackKind = 'understood' | 'know_more' | 'book_meeting';
+
+interface FeedbackOption {
+  kind: FeedbackKind;
+  emoji: string;
+  label: string;
+  action: string; // 動詞片語，組進 prefilled message
+}
+
+const FEEDBACK_OPTIONS: FeedbackOption[] = [
+  { kind: 'understood', emoji: '📖', label: '看得懂', action: '謝謝，我看完了' },
+  { kind: 'know_more', emoji: '💬', label: '想了解更多', action: '我想進一步了解' },
+  { kind: 'book_meeting', emoji: '📅', label: '想預約諮詢', action: '想預約諮詢，請聯絡我' },
+];
+
+const CustomerFeedbackCard: React.FC<{
+  reportLabel: string;
+  contactLine?: string;
+  // session 用 URL pathname 當 key — 不含 query string 的 payload base64，
+  // 避免每次 share 同樣的工具給不同客戶都被同一個顧問端的 session 卡住。
+  // (顧問也不太可能在同一個 session 看自己給多個客戶的連結，但小心一點)
+  sessionKey: string;
+}> = ({ reportLabel, contactLine, sessionKey }) => {
+  // null → 未送，非 null → 已送的 kind（按鈕顯示「已反饋」）
+  const [sent, setSent] = useState<FeedbackKind | null>(() => {
+    try {
+      if (typeof sessionStorage === 'undefined') return null;
+      const v = sessionStorage.getItem(`ua_fb_${sessionKey}`);
+      return v && ['understood', 'know_more', 'book_meeting'].includes(v) ? (v as FeedbackKind) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleClick = (opt: FeedbackOption) => {
+    if (sent) return;
+    const prefilled = `【${reportLabel}】${opt.action}`;
+
+    if (contactLine) {
+      // LINE OA deep link：用 oaMessage endpoint（canonical 規格、可帶 prefilled）
+      // 之前用 `line.me/R/ti/p/~xxx` 是錯的（~ 是舊 lin.ee 短網址 prefix、不是 OA ID prefix）
+      // → critic security #1 / engineering #6: 所有 contactLine 設了的 click 在 LINE
+      //   in-app browser 都 404、F widget 整套失效
+      // 正確：https://line.me/R/oaMessage/<oaId>/?<msg>
+      // oaId 接受帶 @ 或不帶 @（LINE 兩種都認），統一去掉 @ 後 encode
+      const oaId = contactLine.replace(/^@/, '');
+      const lineUrl = `https://line.me/R/oaMessage/${encodeURIComponent('@' + oaId)}/?${encodeURIComponent(prefilled)}`;
+      // window.open 返 null 代表被 popup-block（不 throw），fallback alert
+      const w = window.open(lineUrl, '_blank', 'noopener,noreferrer');
+      if (!w) {
+        try { alert('已準備好訊息，請手動開啟 LINE 給顧問：\n\n' + prefilled); } catch { /* ignore */ }
+      }
+    } else {
+      // 沒設 contactLine fallback：用 alert 而非 toast，因為客戶頁沒 toast provider
+      // (toast util 在 advisor 端 App 才 mount、CustomerReportPage 是獨立路由)
+      try {
+        alert('請直接回覆 LINE 訊息給顧問\n\n' + prefilled);
+      } catch { /* ignore */ }
+    }
+
+    // 不論 LINE 開成功與否都 mark sent — 避免客戶連按 3 次跳 3 視窗
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(`ua_fb_${sessionKey}`, opt.kind);
+      }
+    } catch { /* sessionStorage 不可用 → state 仍會更新、但下次 reload 會重置 */ }
+    setSent(opt.kind);
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <MessageCircle size={18} className="text-blue-600" />
+        <h3 className="text-sm font-bold text-slate-700">看完了？告訴顧問你的想法</h3>
+      </div>
+      <p className="text-xs text-slate-500 mb-2">
+        點一下對應按鈕，會自動開啟 LINE 並帶入訊息草稿，您只需確認後送出。
+      </p>
+      {/* 個資法 §19 招攬意向同意條款 — Sprint 9 critic：按下按鈕後送出 = 招攬同意證據 */}
+      <p className="text-[10px] text-slate-400 mb-4 leading-snug">
+        ※ 按下按鈕後將透過 LINE 聯絡您的顧問，視同您同意顧問就此次諮詢與您進一步聯繫。
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        {FEEDBACK_OPTIONS.map((opt) => {
+          const isThisSent = sent === opt.kind;
+          const otherSent = sent !== null && !isThisSent;
+          return (
+            <button
+              key={opt.kind}
+              type="button"
+              onClick={() => handleClick(opt)}
+              disabled={sent !== null}
+              className={`px-3 py-3 rounded-xl border text-center transition-all ${
+                isThisSent
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                  : otherSent
+                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:shadow-sm active:scale-[0.98]'
+              }`}
+            >
+              <div className="text-2xl mb-1">{opt.emoji}</div>
+              <div className="text-xs font-bold">
+                {isThisSent ? '✓ 已反饋' : opt.label}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      {!contactLine && (
+        <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
+          ※ 顧問尚未設定 LINE 官方帳號 ID — 按下後會顯示訊息範本，請直接回覆顧問的 LINE 訊息。
+        </p>
+      )}
+    </div>
+  );
+};
+
 const InvalidView: React.FC = () => (
   <div className="min-h-[60vh] flex items-center justify-center px-5">
     <div className="max-w-sm w-full text-center bg-slate-900/60 border border-slate-700/60 rounded-2xl p-8">
@@ -860,16 +1833,8 @@ const CustomerReportPage: React.FC<CustomerReportPageProps> = ({ pathname, searc
     // Title — also used by browsers as fallback social title
     const prevTitle = document.title;
 
-    // Tool → display name. Map covers all 4 Sprint 8 tools so adding a new
-    // tool later only requires extending the discriminated union; this map
-    // already routes it. Unknown tool falls back to a generic label rather
-    // than crashing or leaking payload internals.
-    const TOOL_LABELS: Record<string, string> = {
-      labor_pension: '退休缺口分析',
-      big_small_reservoir: '大小水庫專案',
-      tax_planner: '稅務傳承規劃',
-      million_gift: '百萬禮物計畫',
-    };
+    // Tool → display name. Lifted to module-level TOOL_LABELS so the
+    // FeedbackBar can reuse the exact same map (DRY — don't drift labels).
     const toolLabel = view.kind === 'ok'
       ? (TOOL_LABELS[view.payload.tool] ?? 'Ultra Advisor 試算')
       : 'Ultra Advisor';
@@ -999,6 +1964,22 @@ const CustomerReportPage: React.FC<CustomerReportPageProps> = ({ pathname, searc
         {payload.tool === 'big_small_reservoir' && <BigSmallReservoirView payload={payload} />}
         {payload.tool === 'tax_planner' && <TaxPlannerView payload={payload} />}
         {payload.tool === 'million_gift' && <MillionGiftView payload={payload} />}
+        {/* Sprint 9 A — 6 new renderers */}
+        {payload.tool === 'fund_time_machine' && <FundTimeMachineView payload={payload} />}
+        {payload.tool === 'student_loan' && <StudentLoanView payload={payload} />}
+        {payload.tool === 'car_replacement' && <CarReplacementView payload={payload} />}
+        {payload.tool === 'super_active_saving' && <SuperActiveSavingView payload={payload} />}
+        {payload.tool === 'financial_real_estate' && <FinancialRealEstateView payload={payload} />}
+        {payload.tool === 'golden_safe_vault' && <GoldenSafeVaultView payload={payload} />}
+
+        {/* Sprint 9 F: feedback widget — opens LINE chat with顧問。
+            放在既有 ShieldCheck CTA card 上方 (per task spec)。sessionKey 用
+            pathname (without payload base64) — 同顧問多份連結還是各自獨立 session */}
+        <CustomerFeedbackCard
+          reportLabel={TOOL_LABELS[payload.tool] ?? '試算結果'}
+          contactLine={sanitizeContactLine(payload.advisor.contactLine)}
+          sessionKey={`${payload.tool}_${payload.generatedAt}`}
+        />
 
         <div className="bg-slate-900 rounded-2xl p-5 md:p-6 text-center">
           <ShieldCheck className="mx-auto mb-2 text-emerald-400" size={28} />
@@ -1016,14 +1997,29 @@ const CustomerReportPage: React.FC<CustomerReportPageProps> = ({ pathname, searc
               // Per-tool legal scope — keeps the disclaimer specific without
               // each renderer rolling its own copy. calc fallback covers any
               // future tool added before this map updates.
+              // Sprint 9: tax_planner and million_gift now multi-scope to
+              // address compliance-critic gap (estate+insurance / tax+investment).
               payload.tool === 'labor_pension'
                 ? 'calc'
                 : payload.tool === 'big_small_reservoir'
                 ? 'investment'
                 : payload.tool === 'tax_planner'
-                ? 'estate'
+                ? (['estate', 'insurance'] as const)
                 : payload.tool === 'million_gift'
+                ? (['tax', 'investment'] as const)
+                : // Sprint 9 A — 6 new tools' scope mapping
+                payload.tool === 'fund_time_machine'
                 ? 'investment'
+                : payload.tool === 'student_loan'
+                ? (['investment', 'calc'] as const)
+                : payload.tool === 'car_replacement'
+                ? 'investment'
+                : payload.tool === 'super_active_saving'
+                ? 'investment'
+                : payload.tool === 'financial_real_estate'
+                ? 'investment'
+                : payload.tool === 'golden_safe_vault'
+                ? (['insurance', 'investment'] as const)
                 : 'calc'
             }
           />

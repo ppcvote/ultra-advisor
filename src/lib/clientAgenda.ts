@@ -19,6 +19,9 @@
  */
 
 import { countClientProfileFields } from '../types/clientProfile';
+// Sprint 9 D: 顧問可個別關閉某類 trigger（覺得被嘮叨 / 不適合他 review 週期）
+// buildAgenda 預設不過濾、prefs 為 optional → 向後相容既有 caller
+import type { AgendaPrefs } from './agendaPrefs';
 
 export interface Client {
   id: string;
@@ -171,12 +174,19 @@ export function getIncompleteProfiles(clients: Client[]): AgendaItem[] {
 export function buildAgenda(
   clients: Client[],
   nowEpochMs: number,
-  opts?: { perKindLimit?: number }
+  opts?: { perKindLimit?: number; prefs?: AgendaPrefs }
 ): AgendaItem[] {
   const perKindLimit = opts?.perKindLimit ?? 3;
-  const birthdays = getBirthdayThisWeek(clients, nowEpochMs).slice(0, perKindLimit);
-  const stale = getStaleClients(clients, nowEpochMs).slice(0, perKindLimit);
-  const incomplete = getIncompleteProfiles(clients).slice(0, perKindLimit);
+  // Sprint 9 D: prefs 為 optional、未傳 = 三類全顯示（向後相容 Sprint 8 既有 caller）
+  // 在 helper 呼叫前先 short-circuit、避免 buildAgenda 浪費算 birthday-this-week 再丟掉
+  const prefs = opts?.prefs;
+  const showBirthday = prefs?.showBirthday !== false;
+  const showStale = prefs?.showStale !== false;
+  const showIncomplete = prefs?.showIncomplete !== false;
+
+  const birthdays = showBirthday ? getBirthdayThisWeek(clients, nowEpochMs).slice(0, perKindLimit) : [];
+  const stale = showStale ? getStaleClients(clients, nowEpochMs).slice(0, perKindLimit) : [];
+  const incomplete = showIncomplete ? getIncompleteProfiles(clients).slice(0, perKindLimit) : [];
 
   // dedupe by clientId — priority order 決定誰勝出
   const seen = new Set<string>();

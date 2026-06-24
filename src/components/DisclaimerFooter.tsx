@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Info, X } from 'lucide-react';
 
 // Disclaimer footer used by the 14 calculator tools.
@@ -6,11 +6,16 @@ import { Info, X } from 'lucide-react';
 // We keep one universal sentence + an optional scope-specific extra so each
 // tool isn't tempted to roll its own wording (consistency > brevity here,
 // because legal text drifts otherwise).
+//
+// Sprint 9: scope now accepts an array for multi-domain tools (e.g. TaxPlanner
+// is estate + insurance, MillionGift is tax + investment). String form remains
+// fully backward-compatible — all existing 14 callers continue working unchanged.
 
 export type DisclaimerScope = 'calc' | 'insurance' | 'tax' | 'investment' | 'estate';
 
 interface DisclaimerFooterProps {
-  scope?: DisclaimerScope;
+  // Single scope (legacy) or array (Sprint 9+). Array order = render order.
+  scope?: DisclaimerScope | DisclaimerScope[];
   closable?: boolean;
   className?: string;
   // Static badge — bump when the underlying data sources are reviewed.
@@ -35,9 +40,27 @@ const DisclaimerFooter: React.FC<DisclaimerFooterProps> = ({
   dataAsOf = '2026-06',
 }) => {
   const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
 
-  const extra = scope !== 'calc' ? SCOPE_EXTRA[scope] : null;
+  // Normalize scope to array, drop 'calc' (no extra line), dedupe while
+  // preserving caller-supplied order (= legal review order). Memoized so the
+  // array identity stays stable across re-renders (irrelevant for paint but
+  // keeps useMemo deps predictable if downstream ever consumes it).
+  const extras = useMemo(() => {
+    const arr = Array.isArray(scope) ? scope : [scope];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const s of arr) {
+      if (s === 'calc') continue;
+      const txt = SCOPE_EXTRA[s as Exclude<DisclaimerScope, 'calc'>];
+      if (txt && !seen.has(txt)) {
+        seen.add(txt);
+        out.push(txt);
+      }
+    }
+    return out;
+  }, [scope]);
+
+  if (dismissed) return null;
 
   return (
     <div
@@ -52,7 +75,14 @@ const DisclaimerFooter: React.FC<DisclaimerFooterProps> = ({
             <span className="font-medium text-slate-300">免責聲明：</span>
             {BASE_TEXT}
           </p>
-          {extra && <p className="mt-1.5">{extra}</p>}
+          {extras.map((text, i) => (
+            // Multi-scope: first extra line uses mt-1.5 to match legacy
+            // single-scope spacing; subsequent lines use mt-2 so the eye can
+            // separate distinct legal domains (e.g. estate vs insurance).
+            <p key={i} className={i === 0 ? 'mt-1.5' : 'mt-2'}>
+              {text}
+            </p>
+          ))}
           <div className="mt-2 flex items-center flex-wrap gap-2">
             <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-[10px] text-slate-400 font-mono">
               資料更新至 {dataAsOf}

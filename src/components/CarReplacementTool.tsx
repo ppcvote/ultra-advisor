@@ -17,6 +17,9 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, ComposedChart, Bar, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Area } from 'recharts';
 import DisclaimerFooter from './DisclaimerFooter';
+// Sprint 9 A — 「產生客戶連結」按鈕。Car 工具沒有 Sprint 5 ShareButton（同樣純試算），
+// 故只接 ShareToCustomerButton 一支，放在 DisclaimerFooter 上方。
+import ShareToCustomerButton from './ShareToCustomerButton';
 
 // --- 內建計算函式 ---
 const calculateMonthlyPayment = (principal: number, rate: number, years: number) => {
@@ -514,6 +517,33 @@ export const CarReplacementTool = ({ data, setData }: any) => {
               ))}
            </div>
         </div>
+      </div>
+
+      {/* Sprint 9 A — 客戶分享連結（readonly /r/car-replacement）
+          - cycles[] 整段帶過去（3 個 entry × 10 欄位、~30 numbers）— renderer 端要畫 3-cycle 對比 bar
+            不重算才能保證顧問端 vs 客戶端數字 1:1（cycle 內已 Math.round、序列化穩定）
+          - lastCarResidual 在 source 是 number（cycles[2].carBudget * residualRate% * 0.5）
+            schema 預期 number → Math.round 防 float drift */}
+      <div className="flex justify-end pt-2">
+        <ShareToCustomerButton
+          tool="car_replacement"
+          reportLabel="五年換車"
+          inputs={{
+            carPrice,
+            investReturnRate,
+            loanRate,
+            loanTerm,
+            residualRate,
+            cycleYears,
+            carPrice2,
+            carPrice3,
+          }}
+          outputs={{
+            cycles,
+            totalProjectYears,
+            lastCarResidual: Math.round(lastCarResidual ?? 0),
+          }}
+        />
       </div>
 
       <DisclaimerFooter scope="calc" />
