@@ -7,10 +7,13 @@
     "rollup": "npm:@rollup/wasm-node"
   },
   "scripts": {
+    "predev": "node scripts/prerender-today-quote.cjs",
     "dev": "vite",
-    "build": "node scripts/generate-sitemap.js && vite build",
+    "build": "node scripts/prerender-today-quote.cjs && node scripts/generate-sitemap.js && vite build",
     "build:sitemap": "node scripts/generate-sitemap.js",
     "preview": "vite preview",
+    "test": "node --experimental-strip-types --test src/utils/finance.test.ts",
+    "test:finance": "node --experimental-strip-types --test src/utils/finance.test.ts",
     "remotion:studio": "remotion studio src/remotion/Root.tsx",
     "remotion:render": "remotion render src/remotion/Root.tsx FinancialCalculator out/calculator.mp4",
     "remotion:render:vertical": "remotion render src/remotion/Root.tsx FinancialCalculatorVertical out/calculator-vertical.mp4",

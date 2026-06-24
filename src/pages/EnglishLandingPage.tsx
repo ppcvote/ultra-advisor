@@ -65,7 +65,7 @@ const EnglishLandingPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           </h1>
 
           <p className="text-slate-400 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-            18 interactive financial tools driven by Google Gemini AI.
+            15 interactive financial tools driven by Google Gemini AI.
             From mortgage analysis to insurance gap detection — automated, visual, instant.
           </p>
 
@@ -83,7 +83,7 @@ const EnglishLandingPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-6 max-w-lg mx-auto mt-16">
             {[
-              { value: '18', label: 'AI Tools' },
+              { value: '15', label: 'AI Tools' },
               { value: '60+', label: 'Knowledge Articles' },
               { value: '5', label: 'Gemini AI Integrations' },
             ].map((s) => (
@@ -192,7 +192,7 @@ const EnglishLandingPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
             {[
               { step: '01', icon: FileText, label: 'Input', title: 'AI Data Capture', desc: 'Upload documents or enter financial data. AI automatically recognizes and structures the information.', color: 'emerald', gradient: 'from-emerald-500 to-teal-500' },
-              { step: '02', icon: BarChart3, label: 'Analyze', title: 'Smart Visualization', desc: '18 AI tools compute, generate interactive charts, and identify gaps in real-time.', color: 'blue', gradient: 'from-blue-500 to-indigo-500' },
+              { step: '02', icon: BarChart3, label: 'Analyze', title: 'Smart Visualization', desc: '15 AI tools compute, generate interactive charts, and identify gaps in real-time.', color: 'blue', gradient: 'from-blue-500 to-indigo-500' },
               { step: '03', icon: FileBarChart, label: 'Output', title: 'Auto-Generated Reports', desc: 'One-click PDF reports with visual charts, data summaries, and AI recommendations.', color: 'purple', gradient: 'from-purple-500 to-pink-500' },
             ].map((s) => (
               <div key={s.step} className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-8 text-center relative group">

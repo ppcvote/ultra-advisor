@@ -2,12 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   PanelLeftClose, PanelLeft,
-  FileBarChart, Sparkles
+  FileBarChart, Sparkles,
+  User, Briefcase
 } from 'lucide-react';
 import { TOOL_CATEGORIES, Tool, ToolCategory } from '../constants/tools';
 import { MembershipInfo, canAccessTool } from '../utils/membership';
 import NavItem from './NavItem';
 import SaveStatusIndicator, { SaveStatus } from './SaveStatusIndicator';
+import { useViewMode } from '../hooks/useViewMode';
 
 import { safeStorage } from '../utils/safeStorage';
 // Ultra Advisor LOGO 元件（使用正確的 SVG LOGO）
@@ -236,9 +238,10 @@ const PlannerSidebar: React.FC<PlannerSidebarProps> = ({
       </nav>
 
       {/* ============================================ */}
-      {/* Footer 區塊 - 生成報表按鈕 */}
+      {/* Footer 區塊 - 視角切換 + 生成報表 */}
       {/* ============================================ */}
-      <div className="p-4 border-t border-slate-800 shrink-0">
+      <div className="p-4 border-t border-slate-800 shrink-0 space-y-3">
+        <ViewModeToggle isCollapsed={isCollapsed} />
         <button
           onClick={onGenerateReport}
           className={`
@@ -350,6 +353,51 @@ const CategorySection: React.FC<CategorySectionProps> = ({
         })}
       </div>
     </div>
+  );
+};
+
+// ==========================================
+// 視角切換 — 客戶 / 顧問
+// 設計：刻意低調，hover 才浮起；客戶模式下三連點完全 no-op
+// ==========================================
+const ViewModeToggle: React.FC<{ isCollapsed: boolean }> = ({ isCollapsed }) => {
+  const { isAdvisor, toggle } = useViewMode();
+  const label = isAdvisor ? '顧問' : '客戶';
+  const Icon = isAdvisor ? Briefcase : User;
+
+  if (isCollapsed) {
+    return (
+      <button
+        onClick={toggle}
+        className={`
+          w-full p-2 rounded-lg transition-all flex justify-center
+          text-slate-500 hover:text-white hover:bg-slate-800
+          ${isAdvisor ? 'text-amber-400/80' : ''}
+        `}
+        title={`目前：${label}視角（點擊切換）`}
+      >
+        <Icon size={16} />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={toggle}
+      className={`
+        w-full flex items-center justify-between gap-2 px-3 py-2
+        rounded-lg text-xs transition-all
+        text-slate-500 hover:text-slate-200 hover:bg-slate-800/60
+        ${isAdvisor ? 'text-amber-400/70 hover:text-amber-300' : ''}
+      `}
+      title="切換客戶／顧問視角"
+    >
+      <span className="flex items-center gap-2">
+        <Icon size={14} />
+        <span>{label}視角</span>
+      </span>
+      <span className="text-[10px] opacity-60">{isAdvisor ? 'ON' : 'OFF'}</span>
+    </button>
   );
 };
 

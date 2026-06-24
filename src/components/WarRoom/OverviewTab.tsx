@@ -7,7 +7,9 @@ import {
 // 🔧 PERF: 只 import 輕量 metadata（id/slug/title/excerpt/publishDate），不拉 content 全文
 // 原本 index.ts ~900KB raw → 改用 metadata.ts ~57KB raw（content 改 BlogPage 動態 import）
 import { blogMetadata as blogArticles } from '../../data/blog/metadata';
-import { getTodayQuote, getTodayBackground, formatDateChinese } from '../../data/dailyQuotes';
+// PERF: 不要 import 整包 365 筆 dailyQuotes — 改用 build-time prerender 的「今天那筆」
+import { todayQuote, todayBackground } from '../../data/_today-quote.generated';
+import { formatDateChinese } from '../../utils/dateFormat';
 import { ALL_TOOLS } from '../../constants/tools';
 import type { ProfileData, WarRoomTab } from './types';
 
@@ -33,8 +35,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   user, profileData, membership, clientCount, onSwitchTab, onAddClient
 }) => {
   const [marketReport, setMarketReport] = useState<any>(null);
-  const todayQuote = getTodayQuote();
-  const todayBg = getTodayBackground();
+  const todayBg = todayBackground;
   const isNewUser = clientCount === 0;
 
   useEffect(() => {
@@ -190,7 +191,6 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
             <p className="text-white font-bold text-sm leading-relaxed line-clamp-2 mt-2 drop-shadow-lg">
               「{todayQuote.text}」
             </p>
-            <p className="text-white/40 text-[11px] mt-1.5">— {todayQuote.author}</p>
           </div>
           <div className="shrink-0 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center
                          opacity-0 group-hover:opacity-100 transition-all">

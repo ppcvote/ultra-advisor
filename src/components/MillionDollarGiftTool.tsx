@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Wallet,
   Calculator,
@@ -22,8 +22,7 @@ import {
   Crown
 } from 'lucide-react';
 import { useMembership } from '../hooks/useMembership';
-import { doc, updateDoc, increment } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { useCheatSheetTrigger } from '../hooks/useCheatSheetTrigger';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -38,7 +37,6 @@ import {
   ReferenceLine
 } from 'recharts';
 
-import { safeStorage } from '../utils/safeStorage';
 // ============================================
 // Helper Functions (Utils)
 // ============================================
@@ -275,72 +273,11 @@ const MillionDollarGiftTool = ({ data, setData, userId }: any) => {
   const [tempC3Rate, setTempC3Rate] = useState<string | number>(c3Rate);
   const [tempLoanTerm, setTempLoanTerm] = useState<string | number>(loanTerm);
 
-  // --- 業務小抄狀態 ---
-  const [showCheatSheet, setShowCheatSheet] = useState(false);
-  const [clickCount, setClickCount] = useState(0);
-  const clickTimer = useRef<NodeJS.Timeout | null>(null);
-
-  // --- 首次進入提示狀態 ---
-  const [showTripleClickHint, setShowTripleClickHint] = useState(false);
-  const HINT_STORAGE_KEY = 'ua_gift_cheatsheet_hint_seen';
-
-  // 追蹤業務小抄使用次數
-  const trackCheatSheetUsage = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        cheatSheetUsageCount: increment(1)
-      });
-      console.log('CheatSheet usage tracked');
-    } catch (error) {
-      console.error('Failed to track cheat sheet usage:', error);
-    }
-  };
-
-  // 三連點觸發函式
-  const handleSecretClick = () => {
-    setClickCount(prev => prev + 1);
-    if (clickTimer.current) clearTimeout(clickTimer.current);
-    clickTimer.current = setTimeout(() => setClickCount(0), 800);
-    if (clickCount >= 2) {
-      setShowCheatSheet(true);
-      trackCheatSheetUsage(); // 追蹤使用次數
-      setClickCount(0);
-    }
-  };
-
-  // ESC 鍵關閉
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowCheatSheet(false);
-        setShowTripleClickHint(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // 首次進入頁面顯示提示
-  useEffect(() => {
-    const hasSeenHint = safeStorage.get(HINT_STORAGE_KEY);
-    if (!hasSeenHint) {
-      // 延遲 1 秒顯示，讓頁面先載入完成
-      const timer = setTimeout(() => {
-        /* auto-popup disabled (brand-safe): use triple-click gesture instead */
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  // 關閉提示並記錄已看過
-  const dismissHint = () => {
-    setShowTripleClickHint(false);
-    safeStorage.set(HINT_STORAGE_KEY, 'true');
-  };
+  const {
+    clickHandler: handleSecretClick,
+    isOpen: showCheatSheet,
+    close: closeCheatSheet,
+  } = useCheatSheetTrigger();
 
   // 同步外部資料變化
   useEffect(() => { setTempLoanAmount(loanAmount); }, [loanAmount]);
@@ -683,33 +620,12 @@ const MillionDollarGiftTool = ({ data, setData, userId }: any) => {
                 <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase backdrop-blur-sm">
                   Asset Accumulation
                 </span>
-                {/* 三連點觸發點 */}
-                <div className="relative">
-                  <span
-                    onClick={handleSecretClick}
-                    className="bg-yellow-400/20 text-yellow-100 px-3 py-1 rounded-full text-xs font-bold tracking-wider backdrop-blur-sm border border-yellow-400/30 cursor-default select-none"
-                  >
-                    循環理財・資產倍增
-                  </span>
-                  {/* 首次進入提示氣泡 - 顯示在右側 */}
-                  {showTripleClickHint && (
-                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 animate-pulse">
-                      <div className="relative bg-slate-900 text-white px-4 py-2 rounded-lg shadow-xl whitespace-nowrap">
-                        <div className="absolute top-1/2 -left-2 -translate-y-1/2 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-slate-900" />
-                        <p className="text-sm font-bold flex items-center gap-2">
-                          <span className="text-yellow-400">💡</span>
-                          點三下可開啟業務小抄
-                        </p>
-                        <button
-                          onClick={dismissHint}
-                          className="absolute -top-1 -right-1 w-5 h-5 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center text-xs"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <span
+                  onClick={handleSecretClick}
+                  className="bg-yellow-400/20 text-yellow-100 px-3 py-1 rounded-full text-xs font-bold tracking-wider backdrop-blur-sm border border-yellow-400/30 cursor-default select-none"
+                >
+                  循環理財・資產倍增
+                </span>
               </div>
               <h1 className="text-3xl md:text-4xl font-extrabold mb-2 tracking-tight flex items-center gap-3">
                 百萬禮物專案
@@ -1342,7 +1258,7 @@ const MillionDollarGiftTool = ({ data, setData, userId }: any) => {
           {/* 背景遮罩 */}
           <div
             className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-            onClick={() => setShowCheatSheet(false)}
+            onClick={closeCheatSheet}
           />
 
           {/* 側邊面板 */}
@@ -1356,7 +1272,7 @@ const MillionDollarGiftTool = ({ data, setData, userId }: any) => {
                 </h3>
                 <p className="text-xs text-slate-400">按 ESC 關閉</p>
               </div>
-              <button onClick={() => setShowCheatSheet(false)} className="p-2 hover:bg-slate-700 rounded-lg">
+              <button onClick={closeCheatSheet} className="p-2 hover:bg-slate-700 rounded-lg">
                 <X size={20}/>
               </button>
             </div>

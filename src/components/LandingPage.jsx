@@ -15,7 +15,10 @@ import {
 import { useTheme } from '../context/ThemeContext';
 // 🔧 PERF: 改用輕量 metadata，不要拉全部 blog content 進主 bundle
 import { blogMetadata as blogArticles } from '../data/blog/metadata';
-import { getTodayQuote, getTodayBackground, formatDateChinese } from '../data/dailyQuotes';
+// PERF: 不要 import 整包 365 筆 dailyQuotes (99.81KB / 39.60KB gz)
+// build 時 prerender 今天那筆到 _today-quote.generated.ts, runtime 只拉一筆
+import { todayQuote, todayBackground } from '../data/_today-quote.generated';
+import { formatDateChinese } from '../utils/dateFormat';
 
 // ==========================================
 // 🎬 Scroll Reveal Component
@@ -435,7 +438,7 @@ const CustomerJourneySection = () => {
       label: '成交',
       icon: FileBarChart,
       title: '用報表促成決定',
-      desc: '分析完直接產出 PDF 報告，帶品牌 Logo，客戶帶回去跟家人討論也覺得專業',
+      desc: '分析完直接產出 PDF 報告，封面帶你的姓名、證照、聯絡方式，客戶帶回去跟家人討論也覺得專業',
       example: '「客戶說：這報告比其他業務給的好太多了」',
       color: 'purple',
       gradient: 'from-purple-500 to-pink-500',
@@ -526,10 +529,10 @@ const AITechSection = () => {
     },
     {
       icon: TrendingUp,
-      title: '社群貼文自動產',
-      subtitle: 'AI 內容引擎',
-      desc: '不知道社群發什麼？AI 自動幫你生成理財知識貼文，一鍵發布到 Threads、IG，天天有內容不斷更。',
-      scenario: '每天花 5 分鐘 → 社群天天有新貼文',
+      title: '每天有限動素材可發',
+      subtitle: '每日金句 + 風景圖',
+      desc: '不知道社群發什麼？打開 App 就有今天的限動素材（金句 + 精美背景圖），一鍵下載分享到 IG / LINE / Threads。',
+      scenario: '每天花 10 秒 → 社群天天有專業內容',
       color: 'amber',
       link: null,
     },
@@ -636,13 +639,13 @@ const AutoReportSection = () => (
               </span>
             </h2>
             <p className="text-slate-500 text-lg mt-6 leading-relaxed">
-              面談完直接產出 PDF 報告，帶有你的品牌 Logo。
+              面談完直接產出 PDF 報告，封面帶你的姓名、證照、聯絡方式。
               客戶拿回去跟另一半討論時，不會說「有個業務找我」，而是「有個專業的顧問幫我分析了」。
             </p>
 
             <div className="mt-8 space-y-4">
               {[
-                { icon: FileBarChart, text: "PDF 報告一鍵匯出 — 帶有你的品牌 Logo", color: "purple" },
+                { icon: FileBarChart, text: "PDF 一鍵匯出 — 個人化封面（顧問姓名 / 證照 / 聯絡方式）", color: "purple" },
                 { icon: HeartPulse, text: "保障缺口圖表 — 客戶一看就知道哪裡要補", color: "rose" },
                 { icon: Target, text: "自動調整內容 — 不同客戶、不同報告", color: "blue" },
               ].map((item, i) => (
@@ -946,7 +949,7 @@ const OptimizedHeroSection = ({ onFreeTrial, onWatchDemo, hasVideo }) => {
           <span className="inline-flex items-center gap-2 px-5 py-2 bg-blue-500/10 border border-blue-500/20
                            rounded-full text-blue-400 text-xs font-black uppercase tracking-[0.3em]">
             <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-            超過 500 位顧問正在使用
+            2026 上線初期 · 持照顧問實戰打磨
           </span>
         </div>
 
@@ -981,7 +984,7 @@ const OptimizedHeroSection = ({ onFreeTrial, onWatchDemo, hasVideo }) => {
         <div className="grid md:grid-cols-3 gap-4 max-w-3xl mx-auto hero-reveal-line"
              style={{animationDelay: '0.95s'}}>
           {[
-            { icon: BarChart3, text: "視覺化工具任你用", end: 18, suffix: " 種", color: "blue" },
+            { icon: BarChart3, text: "視覺化工具任你用", end: 15, suffix: " 種", color: "blue" },
             { icon: Clock, text: "原本 3 小時的提案準備", end: 15, suffix: " 分鐘搞定", color: "amber" },
             { icon: FileBarChart, text: "篇專業文章免費用", end: 60, suffix: "+", color: "emerald" }
           ].map((item, i) => (
@@ -1008,7 +1011,7 @@ const OptimizedHeroSection = ({ onFreeTrial, onWatchDemo, hasVideo }) => {
                      transition-all duration-500 hover:-translate-y-1.5 flex items-center gap-3"
             strength={0.35}>
             <Sparkles className="group-hover:rotate-12 transition-transform duration-300" size={24} />
-            免費試用 18 種工具
+            免費試用 15 種工具
             <ArrowRight className="group-hover:translate-x-1.5 transition-transform duration-300" size={20} />
           </MagneticButton>
 
@@ -1030,7 +1033,7 @@ const OptimizedHeroSection = ({ onFreeTrial, onWatchDemo, hasVideo }) => {
 
         {/* Trust line — Line 6 */}
         <p className="text-slate-600 text-sm hero-reveal-line font-medium tracking-wider" style={{animationDelay: '1.35s'}}>
-          ✓ 不需信用卡 &nbsp;&nbsp; ✓ 完整功能 &nbsp;&nbsp; ✓ 隨時取消
+          ✓ 4 個工具免費永久使用 &nbsp;&nbsp; ✓ 不綁約 &nbsp;&nbsp; ✓ 隨時取消
         </p>
 
         {/* Watch demo */}
@@ -1055,133 +1058,52 @@ const OptimizedHeroSection = ({ onFreeTrial, onWatchDemo, hasVideo }) => {
 };
 
 // ==========================================
-// 📊 即時統計組件（從 Firestore 讀取）
+// 📊 上線初期實情條（誠實版，沒有偽隨機）
+// 之前用 client-side random 模擬在線人數/累計試算 → 全砍掉
+// 現在只放「2026 上線初期、4 工具免費」的事實
 // ==========================================
 const LiveStatsBar = () => {
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalCalculations: 0,
-    onlineNow: 0,
-    isLoading: true
-  });
-
-  // 根據時間段計算合理的在線人數基準
-  const getBaseOnlineCount = () => {
-    const hour = new Date().getHours();
-    // 深夜 (0-6): 12-25 人
-    if (hour >= 0 && hour < 6) return Math.floor(Math.random() * 14) + 12;
-    // 早上 (6-9): 20-40 人
-    if (hour >= 6 && hour < 9) return Math.floor(Math.random() * 21) + 20;
-    // 上午 (9-12): 35-60 人
-    if (hour >= 9 && hour < 12) return Math.floor(Math.random() * 26) + 35;
-    // 中午 (12-14): 40-70 人
-    if (hour >= 12 && hour < 14) return Math.floor(Math.random() * 31) + 40;
-    // 下午 (14-18): 45-80 人
-    if (hour >= 14 && hour < 18) return Math.floor(Math.random() * 36) + 45;
-    // 晚間 (18-21): 50-90 人（高峰）
-    if (hour >= 18 && hour < 21) return Math.floor(Math.random() * 41) + 50;
-    // 深夜前 (21-24): 30-55 人
-    return Math.floor(Math.random() * 26) + 30;
-  };
-
-  useEffect(() => {
-    const loadStats = async () => {
-      const baseOnline = getBaseOnlineCount();
-      try {
-        // 嘗試從 Firestore 讀取統計數據
-        const statsDoc = await getDoc(doc(db, 'siteContent', 'stats'));
-
-        if (statsDoc.exists()) {
-          const data = statsDoc.data();
-          setStats({
-            totalUsers: data.totalUsers || 0,
-            totalCalculations: data.totalCalculations || 0,
-            onlineNow: baseOnline, // 永遠使用時間基準值，不用 Firestore 的值
-            isLoading: false
-          });
-        } else {
-          // 使用預設值
-          setStats({
-            totalUsers: 500,
-            totalCalculations: 30000,
-            onlineNow: baseOnline,
-            isLoading: false
-          });
-        }
-      } catch (error) {
-        console.log('統計數據載入失敗，使用預設值:', error);
-        setStats({
-          totalUsers: 500,
-          totalCalculations: 30000,
-          onlineNow: baseOnline,
-          isLoading: false
-        });
-      }
-    };
-
-    loadStats();
-
-    // 每 30 秒微調在線人數（±3 範圍內波動）
-    const timer = setInterval(() => {
-      setStats(prev => {
-        const change = Math.floor(Math.random() * 7) - 3; // -3 ~ +3
-        const baseMin = getBaseOnlineCount() - 10;
-        const newCount = Math.max(baseMin, prev.onlineNow + change);
-        return { ...prev, onlineNow: newCount };
-      });
-    }, 30000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  if (stats.isLoading) return null;
-
   return (
     <Reveal>
       <div className="bg-[#030712]/80 backdrop-blur-xl border-y border-white/[0.04] py-5">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="flex flex-wrap justify-center items-center gap-6 md:gap-12 text-sm">
-            {/* 在線人數 */}
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-                <div className="absolute inset-0 w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
-              </div>
-              <span className="text-slate-500">
-                目前 <span className="text-emerald-400 font-bold">{stats.onlineNow}</span> 人在線
-              </span>
-            </div>
-
-            <div className="w-px h-4 bg-white/10 hidden md:block" />
-
-            {/* 註冊用戶 */}
+          <div className="flex flex-wrap justify-center items-center gap-6 md:gap-10 text-sm">
             <div className="flex items-center gap-2 text-slate-500">
-              <Users size={16} className="text-blue-400" />
-              <span>
-                <span className="text-white font-bold">{stats.totalUsers}+</span> 位用戶使用中
-              </span>
+              <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+              <span className="text-emerald-400 font-bold uppercase tracking-wider text-xs">2026 上線初期</span>
             </div>
 
             <div className="w-px h-4 bg-white/10 hidden md:block" />
 
-            {/* 累計試算 */}
             <div className="flex items-center gap-2 text-slate-500">
-              <BarChart3 size={16} className="text-amber-400" />
+              <Sparkles size={16} className="text-amber-400" />
               <span>
-                累計 <span className="text-white font-bold">{stats.totalCalculations.toLocaleString()}+</span> 次試算
+                <span className="text-white font-bold">15</span> 種視覺化工具
+                <span className="text-slate-600">（含 4 種永久免費）</span>
               </span>
             </div>
 
             <div className="w-px h-4 bg-white/10 hidden md:block" />
 
-            {/* 今日新增（動態） */}
-            <div className="hidden md:flex items-center gap-2 text-slate-500">
-              <TrendingUp size={16} className="text-purple-400" />
+            <div className="flex items-center gap-2 text-slate-500">
+              <FileText size={16} className="text-blue-400" />
               <span>
-                今日 <span className="text-white font-bold">+{Math.floor(Math.random() * 40) + 15}</span> 次使用
+                <span className="text-white font-bold">60+</span> 篇持照顧問審閱文章
+              </span>
+            </div>
+
+            <div className="w-px h-4 bg-white/10 hidden md:block" />
+
+            <div className="flex items-center gap-2 text-slate-500">
+              <Award size={16} className="text-purple-400" />
+              <span>
+                10 年 IARFC 顧問實戰打造
               </span>
             </div>
           </div>
+          <p className="text-center text-slate-700 text-[10px] mt-3 tracking-wider">
+            ※ 上線初期不灌水。實際使用人數隨成長透明公布。
+          </p>
         </div>
       </div>
     </Reveal>
@@ -1371,11 +1293,10 @@ const CompactProductShowcase = () => {
       title: '幫客戶傳承財富',
       icon: Landmark,
       color: 'purple',
-      count: 3,
+      count: 2,
       tools: [
         '稅務傳承試算 — 遺產稅、贈與稅怎麼省最多',
         '流動性缺口分析 — 資產夠不夠繳遺產稅',
-        '長照準備金 — 長期照護要花多少錢',
       ],
     },
     {
@@ -1386,14 +1307,14 @@ const CompactProductShowcase = () => {
       tools: [
         '戰情室儀表板 — 台股、美股、匯率一次看',
         '基金時光機 — 回測基金過去績效',
-        '通膨影響試算 — 30年後的100萬只值多少',
+        '收支流視覺化 — 一張圖看懂客戶每月錢流向',
         '黃金保險箱 — 用圖表解釋保險觀念',
       ],
     },
   ];
 
   return (
-    <section id="products" aria-label="18 種視覺化銷售工具" className="py-32 bg-[#030712] relative overflow-hidden">
+    <section id="products" aria-label="15 種視覺化銷售工具" className="py-32 bg-[#030712] relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 glow-divider" />
       <div className="absolute top-[20%] right-[10%] w-[500px] h-[500px] bg-blue-600/[0.04] rounded-full blur-[180px] pointer-events-none" />
 
@@ -1403,7 +1324,7 @@ const CompactProductShowcase = () => {
             <span className="px-4 py-1.5 bg-blue-500/10 border border-blue-500/20
                            text-blue-400 text-xs font-black uppercase tracking-[0.4em]
                            rounded-full">
-              銷售利器 — 18 種工具
+              銷售利器 — 15 種工具
             </span>
             <h2 data-speakable="true" className="text-4xl md:text-5xl font-black text-white mt-8 tracking-[-0.02em]">
               打開圖表，
@@ -1495,7 +1416,7 @@ const CompactProductShowcase = () => {
                              hover:shadow-[0_0_60px_rgba(59,130,246,0.6),0_0_120px_rgba(59,130,246,0.25)]
                              transition-all duration-500 hover:-translate-y-1.5 inline-flex items-center gap-3">
               <Sparkles size={24} />
-              免費試用全部 18 種工具
+              免費試用全部 15 種工具
               <ArrowRight size={20} />
             </button>
           </div>
@@ -1524,12 +1445,13 @@ const RealSocialProof = () => {
             Social Proof
           </span>
           <h2 className="text-4xl md:text-6xl font-black text-white mt-8 tracking-[-0.02em]">
-            百位專業用戶信賴的 AI 平台
+            10 年顧問實戰，打磨出來的工具
           </h2>
           <p className="text-slate-500 text-lg mt-6 max-w-2xl mx-auto leading-relaxed">
-            每一個功能都來自第一線用戶的實戰回饋。目前已有 <strong className="text-blue-400">500+ 位用戶</strong> 使用，
-            累計產出 <strong className="text-amber-400">30,000+ 份</strong> 視覺化報表，
-            平均每月節省 <strong className="text-emerald-400">15 小時</strong> 試算時間。
+            創辦人 Min Yi 是 <strong className="text-blue-400">10 年 IARFC 持照財務顧問</strong>，
+            每個工具都是他自己面談、客戶提案、報表產出時用到的東西。
+            <br className="hidden md:block" />
+            不是工程師想像出來的功能，而是顧問每天會打開的工具。
           </p>
         </div>
         </Reveal>
@@ -1537,25 +1459,28 @@ const RealSocialProof = () => {
         <div className="grid md:grid-cols-3 gap-6 mb-20">
           {[
             {
-              label: "使用者",
-              value: "500+",
-              desc: "專業理財用戶",
-              icon: Users,
-              color: "blue"
-            },
-            {
-              label: "報表產出",
-              value: "30,000+",
-              desc: "視覺化分析報表",
+              label: "視覺化工具",
+              value: "15",
+              desc: "創富 + 守富 + 傳富全分類",
               icon: BarChart3,
-              color: "amber"
+              color: "blue",
+              countEnd: 15
             },
             {
-              label: "平均節省",
-              value: "15 hrs",
-              desc: "每月試算準備時間",
-              icon: Clock,
-              color: "emerald"
+              label: "持照顧問審閱文章",
+              value: "60+",
+              desc: "可直接轉發給客戶看",
+              icon: FileText,
+              color: "amber",
+              countEnd: 60
+            },
+            {
+              label: "金句素材",
+              value: "366",
+              desc: "每天一句，一年不重複",
+              icon: Sparkles,
+              color: "emerald",
+              countEnd: 366
             }
           ].map((stat, i) => (
             <Reveal key={i} delay={i * 120}>
@@ -1567,9 +1492,7 @@ const RealSocialProof = () => {
                 <stat.icon className={`text-${stat.color}-400`} size={28} />
               </div>
               <div className={`text-5xl font-black text-${stat.color}-400 mb-3 font-mono tracking-tight`}>
-                {stat.value === '500+' && <CountUp end={500} suffix="+" duration={2500} />}
-                {stat.value === '30,000+' && <CountUp end={30000} suffix="+" duration={3000} />}
-                {stat.value === '15 hrs' && <><CountUp end={15} duration={2000} /> hrs</>}
+                <CountUp end={stat.countEnd} suffix={stat.value.includes('+') ? '+' : ''} duration={2200} />
               </div>
               <div className="text-white font-bold text-lg mb-2">{stat.label}</div>
               <p className="text-slate-600 text-sm">{stat.desc}</p>
@@ -1860,8 +1783,7 @@ const KnowledgeBasePreview = () => {
 // 💡 每日財商限時動態展示區塊
 // ==========================================
 const DailyFinancialStoryPreview = () => {
-  const todayQuote = getTodayQuote();
-  const todayBg = getTodayBackground();
+  const todayBg = todayBackground;
   const todayDate = formatDateChinese();
 
   return (
@@ -1896,7 +1818,7 @@ const DailyFinancialStoryPreview = () => {
 
             <div className="mt-8 space-y-4">
               {[
-                { icon: Sparkles, text: "200+ 句精選金句，每天自動換新，永遠不重複", color: "purple" },
+                { icon: Sparkles, text: "366 句精選金句，一年每天一句不重複", color: "purple" },
                 { icon: Smartphone, text: "精美風景圖 + 金句排版，直接當限時動態發", color: "blue" },
                 { icon: Globe, text: "一鍵下載，分享到 LINE、IG、FB、Threads", color: "emerald" },
               ].map((item, i) => (
@@ -2305,7 +2227,7 @@ export function LandingPage({ onStart, onSignup, onHome }) {
         {/* ==================== 實際產品畫面（先看到長什麼樣）==================== */}
         <ProductScreenshotCarousel />
 
-        {/* ==================== 銷售：18 種視覺化工具 ==================== */}
+        {/* ==================== 銷售：15 種視覺化工具 ==================== */}
         <CompactProductShowcase />
 
         {/* ==================== AI 幫你省時間 ==================== */}
@@ -2344,6 +2266,68 @@ export function LandingPage({ onStart, onSignup, onHome }) {
 
         <RealSocialProof />
 
+        {/* ==================== 進階會員額外福利 ==================== */}
+        <section aria-label="進階會員額外福利" className="py-24 bg-[#030712] relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 glow-divider" />
+          <div className="absolute top-[20%] left-[10%] w-[400px] h-[400px] bg-amber-500/[0.04] rounded-full blur-[150px] pointer-events-none" />
+
+          <div className="max-w-6xl mx-auto px-6 relative">
+            <Reveal>
+              <div className="text-center mb-12">
+                <span className="px-4 py-1.5 bg-amber-500/10 border border-amber-500/20
+                               text-amber-400 text-xs font-black uppercase tracking-[0.4em]
+                               rounded-full">
+                  Member Perks
+                </span>
+                <h2 className="text-3xl md:text-5xl font-black text-white mt-6 tracking-[-0.02em]">
+                  進階會員額外福利
+                </h2>
+                <p className="text-slate-500 mt-4 max-w-2xl mx-auto">
+                  除了 15 種工具，付費會員還有兩個被低估的小機制
+                </p>
+              </div>
+            </Reveal>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <Reveal delay={80}>
+                <div className="glass-card rounded-2xl p-8 group hover:border-amber-500/20 transition-all">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20
+                                   flex items-center justify-center flex-shrink-0">
+                      <Gift size={22} className="text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-black text-lg mb-2">點數系統 + 連續登入</h3>
+                      <p className="text-slate-400 text-sm leading-relaxed">
+                        每天登入 +1 點，連續登入有額外加成；使用工具、分享報表都會累積點數。
+                        累積到一定額度可解鎖隱藏模板與專屬功能。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </Reveal>
+
+              <Reveal delay={160}>
+                <div className="glass-card rounded-2xl p-8 group hover:border-purple-500/20 transition-all">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20
+                                   flex items-center justify-center flex-shrink-0">
+                      <Users size={22} className="text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-black text-lg mb-2">Referral Engine（推薦機制）</h3>
+                      <p className="text-slate-400 text-sm leading-relaxed">
+                        系統內建推薦連結 + 追蹤面板，介紹同業註冊後可換取點數、訂閱折扣、或聯名工作坊名額。
+                        不是空話，後台真的可以看到誰是你推薦來的。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </Reveal>
+            </div>
+          </div>
+        </section>
+
         {/* ==================== 真人見證 ==================== */}
         <TestimonialsSection />
 
@@ -2370,36 +2354,36 @@ export function LandingPage({ onStart, onSignup, onHome }) {
             <div className="space-y-4">
               {[
                 {
-                  q: "免費試用需要綁定信用卡嗎？",
-                  a: "不需要！註冊後即可免費試用 7 天完整功能，不需要提供任何付款資訊。試用期結束後，系統會自動轉為免費版，不會自動扣款。"
+                  q: "註冊需要綁定信用卡嗎？",
+                  a: "不需要。註冊後即可使用 4 個永久免費工具（自由組合戰情室、黃金保險箱、市場數據戰情、基金時光機），不需要任何付款資訊。其餘 11 個進階工具為付費會員專屬。"
                 },
                 {
                   q: "資料安全嗎？會不會被外洩？",
-                  a: "我們使用 Google Firebase 雲端服務，所有資料皆經過加密傳輸與儲存，符合金融等級的資安標準。您的資料只有您自己可以存取。"
+                  a: "資料儲存於 Google Cloud / Firebase，傳輸過程使用 TLS 加密，靜態資料由 Google 預設加密儲存。我們不主動分享您的資料給第三方，您的試算內容只有您自己可以存取。"
                 },
                 {
                   q: "可以在多個裝置上使用嗎？",
-                  a: "可以！同一帳號最多可在 2 個裝置上同時登入使用，資料會自動同步。手機、平板、電腦都能使用。"
+                  a: "可以。同一帳號最多綁定 2 個裝置同時登入。若登入第 3 個裝置，會自動踢掉最早登入的那一台（避免帳號共用）。手機、平板、電腦都能使用，資料雲端同步。"
                 },
                 {
                   q: "訂閱後可以隨時取消嗎？",
-                  a: "當然可以！我們採用不綁約制，您可以隨時取消訂閱。取消後，您仍可使用至訂閱期結束，不會額外收費。"
+                  a: "可以。我們不綁約，您可以隨時於後台取消訂閱。取消後仍可使用至付費週期結束，不會額外收費。"
                 },
                 {
                   q: "傲創計算機是免費的嗎？",
-                  a: "是的！傲創計算機是完全免費的公開工具，不需要註冊就可以使用。任何人都可以免費使用。"
+                  a: "是。傲創計算機是完全免費的公開工具，不需要註冊就可以使用，任何人都可以打開使用。"
                 },
                 {
                   q: "如何升級為付費會員？",
-                  a: "您可以透過系統內的「升級」按鈕，或直接聯繫我們的 LINE 官方帳號進行付費。我們支援多種付款方式。"
+                  a: "可透過系統內的「升級」按鈕線上付款，或直接聯繫 LINE 官方帳號 @ultraadvisor。"
                 },
                 {
-                  q: "有提供教育訓練嗎？",
-                  a: "有的！我們提供 LINE 社群即時問答、操作教學影片，以及定期的線上工作坊。付費會員還可享有 1 對 1 技術支援。"
+                  q: "有客服或技術支援嗎？",
+                  a: "有。您可以透過 Email（support@ultra-advisor.tw）或 LINE 官方帳號（@ultraadvisor）聯繫我們。團隊回覆時間為週一至週五，通常 24 小時內回覆。"
                 },
                 {
                   q: "工具的數據來源是什麼？",
-                  a: "我們的市場數據來自公開的政府統計資料（如主計處、衛福部、勞動部等），並會定期更新以確保資料的準確性。"
+                  a: "市場數據來自公開的政府統計資料（如主計處、衛福部、勞動部、央行等），並定期更新。所有試算公式由 10 年 IARFC 持照顧問實戰打造、可公開檢視。"
                 }
               ].map((item, i) => (
                 <Reveal key={i} delay={i * 60}>
@@ -2461,7 +2445,7 @@ export function LandingPage({ onStart, onSignup, onHome }) {
               </span>
             </h2>
             <p className="text-slate-500 text-xl mb-12">
-              500+ 位保險業務已經在用，免費試用 7 天，不需信用卡
+              4 個工具永久免費，註冊不需信用卡，付費方案不綁約
             </p>
             <MagneticButton
               onClick={handleFreeTrial}
@@ -2476,7 +2460,7 @@ export function LandingPage({ onStart, onSignup, onHome }) {
               <ArrowRight size={24} />
             </MagneticButton>
             <p className="text-slate-600 text-sm mt-6 tracking-wider">
-              ✓ 7 天免費 &nbsp;&nbsp; ✓ 不需信用卡 &nbsp;&nbsp; ✓ 隨時可取消
+              ✓ 4 工具永久免費 &nbsp;&nbsp; ✓ 不需信用卡 &nbsp;&nbsp; ✓ 不綁約、隨時取消
             </p>
           </div>
           </Reveal>
@@ -2529,11 +2513,12 @@ export function LandingPage({ onStart, onSignup, onHome }) {
               <h4 className="text-white font-black text-sm uppercase tracking-wider mb-6">產品功能</h4>
               <ul className="space-y-3">
                 {[
-                  { name: '傲創計算機', href: '/calculator', highlight: true },
+                  { name: '傲創計算機（含收支流視覺化）', href: '/calculator', highlight: true },
                   { name: '創富工具', href: '/#products' },
                   { name: '守富工具', href: '/#products' },
                   { name: '傳富工具', href: '/#products' },
-                  { name: '戰情室數據', href: '/#products' },
+                  { name: 'Ultra 白板（即時協作）', href: '/whiteboard' },
+                  { name: '預約 1:1 試算', href: '/booking' },
                 ].map((item, i) => (
                   <li key={i}>
                     <a
@@ -2563,7 +2548,8 @@ export function LandingPage({ onStart, onSignup, onHome }) {
               <ul className="space-y-3">
                 {[
                   { name: '知識庫', href: '/blog', highlight: true },
-                  { name: '成功案例', href: '/#testimonials' },
+                  { name: '研究報告（AI Trust Thesis）', href: '/research' },
+                  { name: '傲創聯盟（顧問合作）', href: '/alliance' },
                   { name: '常見問題', href: '/#faq' },
                   { name: '聯絡客服', href: LINE_OFFICIAL_ACCOUNT, external: true },
                   { name: 'Ultra Lab（技術服務）', href: 'https://ultralab.tw/', external: true },

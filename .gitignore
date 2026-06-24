@@ -1,6 +1,9 @@
 ﻿node_modules/
 dist/
 *.tsbuildinfo
+
+# build-time prerendered 今日金句 (scripts/prerender-today-quote.cjs)
+src/data/_today-quote.generated.ts
 .env
 .env.local
 .env.*.local

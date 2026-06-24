@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   GraduationCap,
   Clock,
@@ -24,9 +24,9 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useMembership } from '../hooks/useMembership';
+import { useCheatSheetTrigger } from '../hooks/useCheatSheetTrigger';
 import { ResponsiveContainer, ComposedChart, Area, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceArea } from 'recharts';
 
-import { safeStorage } from '../utils/safeStorage';
 // --- 輔助函式 ---
 
 const calculateMonthlyPayment = (principal: number, rate: number, years: number) => {
@@ -50,54 +50,11 @@ export const StudentLoanTool = ({ data, setData, userId }: any) => {
   const { tier } = useMembership(userId || null);
   const isPaidMember = tier === 'founder' || tier === 'paid';
 
-  // --- 隱藏小抄狀態 ---
-  const [showCheatSheet, setShowCheatSheet] = useState(false);
-  const [clickCount, setClickCount] = useState(0);
-  const clickTimer = useRef<NodeJS.Timeout | null>(null);
-
-  // --- 首次進入提示狀態 ---
-  const [showTripleClickHint, setShowTripleClickHint] = useState(false);
-  const HINT_STORAGE_KEY = 'ua_student_loan_cheatsheet_hint_seen';
-
-  // 三連點觸發函式
-  const handleSecretClick = () => {
-    setClickCount(prev => prev + 1);
-    if (clickTimer.current) clearTimeout(clickTimer.current);
-    clickTimer.current = setTimeout(() => setClickCount(0), 800);
-    if (clickCount >= 2) {
-      setShowCheatSheet(true);
-      setClickCount(0);
-    }
-  };
-
-  // ESC 鍵關閉
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowCheatSheet(false);
-        setShowTripleClickHint(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // 首次進入頁面顯示提示
-  useEffect(() => {
-    const hasSeenHint = safeStorage.get(HINT_STORAGE_KEY);
-    if (!hasSeenHint) {
-      const timer = setTimeout(() => {
-        /* auto-popup disabled (brand-safe): use triple-click gesture instead */
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  // 關閉提示並記錄已看過
-  const dismissHint = () => {
-    setShowTripleClickHint(false);
-    safeStorage.set(HINT_STORAGE_KEY, 'true');
-  };
+  const {
+    clickHandler: handleSecretClick,
+    isOpen: showCheatSheet,
+    close: closeCheatSheet,
+  } = useCheatSheetTrigger({ track: false });
 
   // 1. 資料處理與預設值
   const safeData = {
@@ -331,33 +288,12 @@ export const StudentLoanTool = ({ data, setData, userId }: any) => {
             <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase backdrop-blur-sm">
               Financial Strategy
             </span>
-            {/* 🔥 這個標籤是秘密觸發點 + 首次提示 */}
-            <div className="relative">
-              <span
-                onClick={handleSecretClick}
-                className="bg-green-400/20 text-green-100 px-3 py-1 rounded-full text-xs font-bold tracking-wider backdrop-blur-sm border border-green-400/30 cursor-default select-none"
-              >
-                2025 新制對應
-              </span>
-              {/* 首次進入提示氣泡 - 顯示在右側 */}
-              {showTripleClickHint && (
-                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 animate-pulse">
-                  <div className="relative bg-slate-900 text-white px-4 py-2 rounded-lg shadow-xl whitespace-nowrap">
-                    <div className="absolute top-1/2 -left-2 -translate-y-1/2 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-slate-900" />
-                    <p className="text-sm font-bold flex items-center gap-2">
-                      <span className="text-yellow-400">💡</span>
-                      點三下可開啟業務小抄
-                    </p>
-                    <button
-                      onClick={dismissHint}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center text-xs"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <span
+              onClick={handleSecretClick}
+              className="bg-green-400/20 text-green-100 px-3 py-1 rounded-full text-xs font-bold tracking-wider backdrop-blur-sm border border-green-400/30 cursor-default select-none"
+            >
+              2025 新制對應
+            </span>
           </div>
           <h1 className="text-3xl md:text-4xl font-extrabold mb-2 tracking-tight flex items-center gap-3">
             學貸活化專案
@@ -807,7 +743,7 @@ export const StudentLoanTool = ({ data, setData, userId }: any) => {
           {/* 背景遮罩 */}
           <div
             className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-            onClick={() => setShowCheatSheet(false)}
+            onClick={closeCheatSheet}
           />
 
           {/* 側邊面板 */}
@@ -821,7 +757,7 @@ export const StudentLoanTool = ({ data, setData, userId }: any) => {
                 </h3>
                 <p className="text-xs text-slate-400">按 ESC 關閉</p>
               </div>
-              <button onClick={() => setShowCheatSheet(false)} className="p-2 hover:bg-slate-700 rounded-lg">
+              <button onClick={closeCheatSheet} className="p-2 hover:bg-slate-700 rounded-lg">
                 <X size={20}/>
               </button>
             </div>

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useCheatSheetTrigger } from '../hooks/useCheatSheetTrigger';
 import {
   History,
   TrendingUp,
@@ -28,7 +29,7 @@ import { fundDatabase, generateFundHistory, generateDCAHistory } from '../data/f
 import html2canvas from 'html2canvas';
 
 import { toast } from '../utils/toast';
-import { safeStorage } from '../utils/safeStorage';
+
 // ==========================================
 // 數字動畫 Hook (CountUp)
 // ==========================================
@@ -152,62 +153,12 @@ const FundTimeMachine = () => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  // ==========================================
-  // 業務小抄狀態（三連點觸發）
-  // ==========================================
-  const [showCheatsheet, setShowCheatsheet] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
-  const [clickCount, setClickCount] = useState(0);
-  const clickTimer = useRef<NodeJS.Timeout | null>(null);
-
-  // 首次進入提示狀態
-  const HINT_STORAGE_KEY = 'ua_fund_time_machine_cheatsheet_hint_seen';
-  const [showTripleClickHint, setShowTripleClickHint] = useState(false);
-
-  // 三連點觸發函式
-  const handleSecretClick = () => {
-    setClickCount(prev => prev + 1);
-    if (clickTimer.current) clearTimeout(clickTimer.current);
-    clickTimer.current = setTimeout(() => setClickCount(0), 800);
-    if (clickCount >= 2) {
-      setShowCheatsheet(true);
-      setClickCount(0);
-      // 關閉提示
-      if (showTripleClickHint) {
-        setShowTripleClickHint(false);
-        safeStorage.set(HINT_STORAGE_KEY, 'true');
-      }
-    }
-  };
-
-  // ESC 鍵關閉
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowCheatsheet(false);
-        setShowTripleClickHint(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // 首次進入頁面顯示提示
-  useEffect(() => {
-    const hasSeenHint = safeStorage.get(HINT_STORAGE_KEY);
-    if (!hasSeenHint) {
-      const timer = setTimeout(() => {
-        /* auto-popup disabled (brand-safe): use triple-click gesture instead */
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  // 關閉提示並記錄已看過
-  const dismissHint = () => {
-    setShowTripleClickHint(false);
-    safeStorage.set(HINT_STORAGE_KEY, 'true');
-  };
+  const {
+    clickHandler: handleSecretClick,
+    isOpen: showCheatsheet,
+    close: closeCheatsheet,
+  } = useCheatSheetTrigger({ track: false });
 
   // 複製到剪貼簿
   const copyToClipboard = (text: string, id: string) => {
@@ -336,33 +287,12 @@ const FundTimeMachine = () => {
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded tracking-wider border uppercase ${isGrowth ? 'bg-blue-500/20 text-blue-200 border-blue-400/30' : 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30'}`}>
                  {isGrowth ? 'Capital Growth' : 'Income & Stability'}
               </span>
-              {/* 🔥 業務小抄秘密觸發點 */}
-              <div className="relative">
-                <span
-                  onClick={handleSecretClick}
-                  className="bg-amber-400/20 text-amber-200 px-3 py-1 rounded-full text-[10px] font-bold border border-amber-400/30 cursor-default select-none hover:bg-amber-400/30 transition-colors"
-                >
-                  時間 × 複利
-                </span>
-                {/* 首次進入提示氣泡 */}
-                {showTripleClickHint && (
-                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 animate-pulse">
-                    <div className="relative bg-slate-900 text-white px-4 py-2 rounded-lg shadow-xl whitespace-nowrap border border-amber-500/50">
-                      <div className="absolute top-1/2 -left-2 -translate-y-1/2 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-slate-900" />
-                      <p className="text-sm font-bold flex items-center gap-2">
-                        <span className="text-yellow-400">💡</span>
-                        點三下可開啟業務小抄
-                      </p>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); dismissHint(); }}
-                        className="absolute -top-2 -right-2 w-5 h-5 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center text-xs border border-slate-500"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <span
+                onClick={handleSecretClick}
+                className="bg-amber-400/20 text-amber-200 px-3 py-1 rounded-full text-[10px] font-bold border border-amber-400/30 cursor-default select-none hover:bg-amber-400/30 transition-colors"
+              >
+                時間 × 複利
+              </span>
            </div>
            <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-2 flex items-center gap-3">
              <LineChartIcon className={theme.iconColor} size={36}/>
@@ -859,7 +789,7 @@ const FundTimeMachine = () => {
           {/* 背景遮罩 */}
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setShowCheatsheet(false)}
+            onClick={closeCheatsheet}
           />
 
           {/* 側邊面板 */}
@@ -877,7 +807,7 @@ const FundTimeMachine = () => {
                 </p>
               </div>
               <button
-                onClick={() => setShowCheatsheet(false)}
+                onClick={closeCheatsheet}
                 className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
               >
                 <X size={20} />

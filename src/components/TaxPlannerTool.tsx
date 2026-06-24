@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Landmark,
   Calculator,
@@ -27,8 +27,7 @@ import {
   Crown
 } from 'lucide-react';
 import { useMembership } from '../hooks/useMembership';
-import { doc, updateDoc, increment } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { useCheatSheetTrigger } from '../hooks/useCheatSheetTrigger';
 import { 
   ResponsiveContainer, 
   RadarChart, 
@@ -44,7 +43,6 @@ import {
   LabelList
 } from 'recharts';
 
-import { safeStorage } from '../utils/safeStorage';
 // ============================================================
 // 輔助函式
 // ============================================================
@@ -88,65 +86,11 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
   const { membership } = useMembership(userId || null);
   const isPaidMember = membership?.isPaid || false;
 
-  // --- 隱藏小抄狀態 ---
-  const [showCheatSheet, setShowCheatSheet] = useState(false);
-  const [clickCount, setClickCount] = useState(0);
-  const clickTimer = useRef<NodeJS.Timeout | null>(null);
-
-  // --- 首次進入提示狀態 ---
-  const [showTripleClickHint, setShowTripleClickHint] = useState(false);
-  const HINT_STORAGE_KEY = 'ua_tax_cheatsheet_hint_seen';
-
-  // 追蹤業務小抄使用次數
-  const trackCheatSheetUsage = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, { cheatSheetUsageCount: increment(1) });
-    } catch (error) {
-      console.error('Failed to track cheat sheet usage:', error);
-    }
-  };
-
-  const handleSecretClick = () => {
-    setClickCount(prev => prev + 1);
-    if (clickTimer.current) clearTimeout(clickTimer.current);
-    clickTimer.current = setTimeout(() => setClickCount(0), 800);
-    if (clickCount >= 2) {
-      setShowCheatSheet(true);
-      trackCheatSheetUsage();
-      setClickCount(0);
-    }
-  };
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowCheatSheet(false);
-        setShowTripleClickHint(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // 首次進入頁面顯示提示
-  useEffect(() => {
-    const hasSeenHint = safeStorage.get(HINT_STORAGE_KEY);
-    if (!hasSeenHint) {
-      const timer = setTimeout(() => {
-        /* auto-popup disabled (brand-safe): use triple-click gesture instead */
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  // 關閉提示並記錄已看過
-  const dismissHint = () => {
-    setShowTripleClickHint(false);
-    safeStorage.set(HINT_STORAGE_KEY, 'true');
-  };
+  const {
+    clickHandler: handleSecretClick,
+    isOpen: showCheatSheet,
+    close: closeCheatSheet,
+  } = useCheatSheetTrigger();
 
   // --- 資料初始化 ---
   const safeData = {
@@ -500,33 +444,13 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
             <span className="bg-white/15 px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase">
               Estate Tax Planning
             </span>
-            <div className="relative">
-              <span
-                onClick={handleSecretClick}
-                className="bg-emerald-500/25 text-emerald-200 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 cursor-default select-none"
-              >
-                <CheckCircle2 size={12} />
-                {TAX_CONSTANTS.APPLICABLE_YEARS}年適用
-              </span>
-              {/* 首次進入提示氣泡 - 顯示在右側 */}
-              {showTripleClickHint && (
-                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 animate-pulse">
-                  <div className="relative bg-slate-900 text-white px-4 py-2 rounded-lg shadow-xl whitespace-nowrap">
-                    <div className="absolute top-1/2 -left-2 -translate-y-1/2 w-0 h-0 border-t-8 border-b-8 border-r-8 border-transparent border-r-slate-900" />
-                    <p className="text-sm font-bold flex items-center gap-2">
-                      <span className="text-yellow-400">💡</span>
-                      點三下可開啟業務小抄
-                    </p>
-                    <button
-                      onClick={dismissHint}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center text-xs"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <span
+              onClick={handleSecretClick}
+              className="bg-emerald-500/25 text-emerald-200 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 cursor-default select-none"
+            >
+              <CheckCircle2 size={12} />
+              {TAX_CONSTANTS.APPLICABLE_YEARS}年適用
+            </span>
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold mb-1 tracking-tight">
             稅務傳承專案
@@ -1231,7 +1155,7 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div
             className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-            onClick={() => setShowCheatSheet(false)}
+            onClick={closeCheatSheet}
           />
 
           <div className="relative w-full max-w-md bg-slate-900 text-white shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-300">
@@ -1243,7 +1167,7 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
                 </h3>
                 <p className="text-xs text-slate-400">按 ESC 關閉</p>
               </div>
-              <button onClick={() => setShowCheatSheet(false)} className="p-2 hover:bg-slate-700 rounded-lg">
+              <button onClick={closeCheatSheet} className="p-2 hover:bg-slate-700 rounded-lg">
                 <X size={20}/>
               </button>
             </div>
