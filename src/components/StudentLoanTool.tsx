@@ -195,9 +195,10 @@ export const StudentLoanTool = ({ data, setData, userId }: any) => {
                 yearLabel: `第${year}年`,
                 投資複利價值: Math.round(investmentValue / 10000),
                 淨資產: Math.round((investmentValue - remainingLoan) / 10000),
-                若直接繳掉: 0, // 對照組永遠是 0
-                monthlyOutflow: monthlyOutflow, // 記錄當下月付金供分析
-                investmentProfit: investmentProfit // 記錄當下月配息供分析
+                // 「若直接繳掉」對照線移除：原本固定 0 → 視覺上把策略放大數十倍，誤導性過強。
+                // 真正合理的對照需要假設「不活化情境的另一筆現金流動向」（產品決策待補）。
+                monthlyOutflow: monthlyOutflow,
+                investmentProfit: investmentProfit
             });
         }
       }
@@ -595,7 +596,6 @@ export const StudentLoanTool = ({ data, setData, userId }: any) => {
                 <Legend iconType="circle" />
                 
                 <Line type="monotone" name="活化專案淨資產" dataKey="淨資產" stroke="#0ea5e9" strokeWidth={3} />
-                <Line type="monotone" name="若直接繳掉" dataKey="若直接繳掉" stroke="#94a3b8" strokeWidth={2} dot={false} strokeDasharray="4 4" />
                 <Line type="monotone" name="投資複利總值" dataKey="投資複利價值" stroke="#10b981" strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>

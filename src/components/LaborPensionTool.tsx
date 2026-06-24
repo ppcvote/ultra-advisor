@@ -46,32 +46,47 @@ export const LaborPensionTool = ({ data, setData }: any) => {
 
       // [核心變更 1] 真實需求：考慮通膨後的未來終值 (FV)
       // FV = PV * (1 + r)^n
-      const futureDesiredIncome = Math.round(desiredMonthlyIncome * Math.pow(1 + inflationRate / 100, yearsToRetire));
+      const inflationMultiplier = Math.pow(1 + inflationRate / 100, yearsToRetire);
+      const futureDesiredIncome = Math.round(desiredMonthlyIncome * inflationMultiplier);
 
       // 1. 勞保年金 (Labor Insurance)
-      // 2024年最高投保薪資級距 45,800
-      const maxLaborInsSalary = 45800;
-      const laborInsBase = Math.min(Math.max(salary, 26400), maxLaborInsSalary);
+      // 上限／下限級距假設跟著通膨調整（歷史上 16 年 +52% ≈ 2.6% 年化，接近通膨）。
+      // 不調的話會：需求用未來幣值、保費基數用今天幣值 → 缺口被系統性高估。
+      const maxLaborInsSalary = Math.round(45800 * inflationMultiplier);
+      const minLaborInsSalary = Math.round(26400 * inflationMultiplier);
+      const projectedSalary = Math.round(salary * inflationMultiplier);
+      const laborInsBase = Math.min(Math.max(projectedSalary, minLaborInsSalary), maxLaborInsSalary);
       const rawLaborInsMonthly = Math.round(laborInsBase * laborInsYears * 0.0155);
       
       // [核心變更 2] 勞保打折模擬
       const laborInsMonthly = Math.round(rawLaborInsMonthly * (pensionDiscount / 100));
 
       // 2. 勞退新制 (Labor Pension)
-      // 勞退提撥工資上限目前為 150,000
-      const pensionBase = Math.min(salary, 150000);
+      // 勞退提撥工資上限：歷年隨基本工資調整，假設跟通膨成長。
+      const maxPensionBase = Math.round(150000 * inflationMultiplier);
+      // 提撥基數以「成長型年金」處理：起始用今天薪資、每月成長 g_m。
+      // 比「今天的薪資撐 35 年」更接近實況（薪資會通膨成長），
+      // 也比「直接套用未來薪資」少了天上掉錢的假設。
+      const startPensionBase = Math.min(salary, 150000);
       const contributionRate = 0.06 + (selfContribution ? 0.06 : 0);
-      const monthlyContribution = Math.round(pensionBase * contributionRate);
-      
-      const monthlyRate = pensionReturnRate / 100 / 12;
-      
-      const pensionFutureValue = monthlyContribution * ((Math.pow(1 + monthlyRate, monthsToInvest) - 1) / monthlyRate);
-      
-      // 假設退休後餘命 20 年 (240個月) 領完
-      const pensionMonthly = Math.round(pensionFutureValue / 240);
+      const startMonthlyContribution = Math.round(startPensionBase * contributionRate);
 
-      // 3. 自提節稅效益 (簡易估算，假設稅率 5%)
-      const annualTaxSaving = selfContribution ? Math.round(pensionBase * 0.06 * 12 * 0.05) : 0;
+      const monthlyRate = pensionReturnRate / 100 / 12;
+      const monthlyInflation = (inflationRate / 100) / 12;
+
+      // FV of growing annuity（成長型年金）— 若 r ≈ g 走 L'Hôpital 極限版本
+      const epsilon = 1e-9;
+      const pensionFutureValue = monthsToInvest === 0
+        ? 0
+        : (Math.abs(monthlyRate - monthlyInflation) < epsilon)
+          ? startMonthlyContribution * monthsToInvest * Math.pow(1 + monthlyRate, monthsToInvest - 1)
+          : startMonthlyContribution * (Math.pow(1 + monthlyRate, monthsToInvest) - Math.pow(1 + monthlyInflation, monthsToInvest)) / (monthlyRate - monthlyInflation);
+
+      // 假設退休後餘命 20 年 (240個月) 領完
+      const pensionMonthly = Math.min(maxPensionBase * 12, Math.round(pensionFutureValue / 240));
+
+      // 3. 自提節稅效益（每年現值估算，不通膨）
+      const annualTaxSaving = selfContribution ? Math.round(startPensionBase * 0.06 * 12 * 0.05) : 0;
 
       // 4. 缺口計算 (使用通膨後的真實需求來減)
       const totalPension = laborInsMonthly + pensionMonthly;

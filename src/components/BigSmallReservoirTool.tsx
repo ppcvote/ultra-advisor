@@ -291,7 +291,10 @@ export const BigSmallReservoirTool = ({ data, setData, userId }: any) => {
         
         if (effectiveYear > 0 && effectiveYear <= years) {
           const annualDividend = initialCapital * (actualDividend / 100);
-          smallReservoir = (smallReservoir + annualDividend) * (1 + actualReinvest / 100);
+          // 配息時序修正：原本「年初存入立即計息」(annuity due) 系統性高估約 8%。
+          // 改為「年末存入、舊有結餘先複利、新配息不參與當年複利」(ordinary annuity)，
+          // 對應實務（配息分散全年發放）的中位估計。
+          smallReservoir = smallReservoir * (1 + actualReinvest / 100) + annualDividend;
           totalDividendsSpent += annualDividend;
         } else if (effectiveYear > years) {
           smallReservoir = smallReservoir * (1 + actualReinvest / 100);

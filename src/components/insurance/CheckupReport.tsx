@@ -240,8 +240,12 @@ function extractBenefitItems(summary?: ClaimSummary, category?: ProductCategory,
     const amount = sumInsured || lumpSum?.criticalIllness;
     if (amount) {
       items.push({ key: 'criticalIllness', label: '重大疾病', value: formatAmount(amount), rawValue: amount });
-      const lightAmount = lumpSum?.criticalIllnessLight || Math.round(amount * 0.1);
-      items.push({ key: 'criticalIllnessLight', label: '輕度重疾', value: formatAmount(lightAmount), rawValue: lightAmount });
+      // 輕度重疾不再用「保額 × 10%」硬合成。實務上各家 0%-35% 不等，
+      // 硬寫 10% 在理賠時會被打臉。只在 AI/條款解析回傳明確金額時才顯示。
+      const lightAmount = lumpSum?.criticalIllnessLight;
+      if (lightAmount) {
+        items.push({ key: 'criticalIllnessLight', label: '輕度重疾', value: formatAmount(lightAmount), rawValue: lightAmount });
+      }
     }
   } else if (category === 'cancer') {
     const amount = sumInsured || lumpSum?.cancer;
@@ -1340,8 +1344,8 @@ export default function CheckupReport({ userId, clientId, onBack }: CheckupRepor
               }
               if (cat === 'critical' && (actualAmount || summary.lumpSum?.criticalIllness)) {
                 categorySummary[cat].push(`重疾 ${formatAmount(actualAmount || summary.lumpSum?.criticalIllness)}`);
-                // 輕度重疾通常是 10% 保額
-                const lightAmount = actualAmount ? Math.round(actualAmount * 0.1) : summary.lumpSum?.criticalIllnessLight;
+                // 輕度重疾各家差異大（0%-35%），不再用 10% 硬合成。
+                const lightAmount = summary.lumpSum?.criticalIllnessLight;
                 if (lightAmount) categorySummary[cat].push(`輕度 ${formatAmount(lightAmount)}`);
               }
               if (cat === 'cancer') {
@@ -1365,7 +1369,7 @@ export default function CheckupReport({ userId, clientId, onBack }: CheckupRepor
               if (cat === 'accident') categorySummary[cat].push(`意外身故 ${formatAmount(actualAmount)}`);
               if (cat === 'critical') {
                 categorySummary[cat].push(`重疾 ${formatAmount(actualAmount)}`);
-                categorySummary[cat].push(`輕度 ${formatAmount(Math.round(actualAmount * 0.1))}`);
+                // 輕度重疾各家差異大；無 AI 摘要時不再合成估計值。
               }
               if (cat === 'cancer') categorySummary[cat].push(`一次金 ${formatAmount(actualAmount)}`);
               if (cat === 'disability') categorySummary[cat].push(`完全失能 ${formatAmount(actualAmount)}`);

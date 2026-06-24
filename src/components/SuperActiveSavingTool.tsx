@@ -32,15 +32,20 @@ export const SuperActiveSavingTool = ({ data, setData }: any) => {
   const fullChartData = [];
   let pAcc = 0; // 消極累積 (勞力存錢)
   let aInv = 0; // 積極累積 (複利存錢)
-  
+
+  // 消極組固定 1.5% 銀行定存利率（合規與真實性）
+  // 原本固定 0% 偷換概念 — 把「不投資」等同「現金不長」，誤導性過強。
+  const passiveReturnRate = 1.5;
+
   for (let year = 1; year <= totalYears; year++) {
-      // 消極模式：每年乖乖存錢，存滿 40 年
-      pAcc += monthlySaving * 12;
-      
+      // 消極模式：每年存錢、放定存，存滿 totalYears
+      // 改為年末存入 (ordinary annuity) 對應實務（薪資逐月入）。
+      pAcc = pAcc * (1 + passiveReturnRate / 100) + monthlySaving * 12;
+
       // 積極模式：只存 activeYears 年，之後就讓錢自己滾
       if (year <= activeYears) {
-          // 奮鬥期：本金投入 + 獲利
-          aInv = (aInv + monthlySaving * 12) * (1 + investReturnRate / 100);
+          // 奮鬥期：年末投入，已有資金先複利、當年新投入不計入當年複利
+          aInv = aInv * (1 + investReturnRate / 100) + monthlySaving * 12;
       } else {
           // 躺平期 (Coasting)：不再投入本金，純靠複利
           aInv = aInv * (1 + investReturnRate / 100);
