@@ -491,6 +491,12 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
             label: '子女人數',
             setter: (v) => updateField('children', Number(v)),
           },
+          // Sprint 7: 第 4 個 chip — 扶養父母人數，commit 進 .parents（扣除額算式吃這個）
+          dependentParents: {
+            toolField: 'parents',
+            label: '扶養父母',
+            setter: (v) => updateField('parents', Number(v)),
+          },
         }}
       />
 

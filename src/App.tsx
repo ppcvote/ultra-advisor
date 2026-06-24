@@ -72,6 +72,9 @@ const EnglishLandingPage = lazy(() => import('./pages/EnglishLandingPage'));
 // Legal pages — lazy so 首頁 cold-start 不背負合規長文的 bundle 體積
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
+// Sprint 7 F: customer-facing share link target. Lazy so the public route
+// chunk stays isolated from the logged-in advisor bundle.
+const CustomerReportPage = lazy(() => import('./pages/CustomerReportPage'));
 
 // 🆕 主題切換
 import { ThemeProvider } from './context/ThemeContext';
@@ -194,6 +197,10 @@ export default function App() {
   const [isResearchRoute, setIsResearchRoute] = useState(() => window.location.pathname.startsWith('/research')); // 🆕 研究報告
   const [isPrivacyRoute, setIsPrivacyRoute] = useState(() => window.location.pathname === '/privacy'); // 個資法 §8 告知義務頁
   const [isTermsRoute, setIsTermsRoute] = useState(() => window.location.pathname === '/terms');       // 服務條款 / 消保法 §19 冷靜期
+  // Sprint 7 F: /r/<tool>?d=<base64> — customer-facing share link.
+  // Public (no auth), bypasses splash so the client opening from LINE doesn't
+  // see the advisor-side Ultra Advisor splash screen first.
+  const [isCustomerReportRoute, setIsCustomerReportRoute] = useState(() => window.location.pathname.startsWith('/r/'));
   const [clientLoading, setClientLoading] = useState(false); 
   const [currentClient, setCurrentClient] = useState<any>(null);
   // Sprint 6: mirror currentClient → store. Read-only bridge for tool chips.
@@ -423,7 +430,8 @@ export default function App() {
       setIsResearchRoute(path.startsWith('/research')); // 🆕 研究報告
       setIsPrivacyRoute(path === '/privacy');
       setIsTermsRoute(path === '/terms');
-      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); setIsPrivacyRoute(false); setIsTermsRoute(false); }
+      setIsCustomerReportRoute(path.startsWith('/r/')); // Sprint 7 F
+      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); setIsPrivacyRoute(false); setIsTermsRoute(false); setIsCustomerReportRoute(false); }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -445,6 +453,7 @@ export default function App() {
     else if (path === '/en') setIsEnglishRoute(true); // 🆕 英文版
     else if (path === '/privacy') setIsPrivacyRoute(true);
     else if (path === '/terms') setIsTermsRoute(true);
+    else if (path.startsWith('/r/')) setIsCustomerReportRoute(true); // Sprint 7 F
 
     // 🆕 SplashScreen 只在這個 session 第一次進入時顯示
     if (sessionStorage.getItem('splash_shown') !== 'true') {
@@ -790,6 +799,27 @@ export default function App() {
             window.location.reload();
           }}
         />
+      </Suspense>
+    );
+  }
+
+  // Sprint 7 F — customer-facing share link target.
+  // Public route: no auth, no splash. Bypasses login/firstRun/onboarding so
+  // a client opening the link from LINE sees the report in one screen.
+  // Placed before the `if (loading...)` guard and before the auth `if (!user)`
+  // gate intentionally.
+  if (isCustomerReportRoute || window.location.pathname.startsWith('/r/')) {
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-300 px-4">
+            <div className="w-10 h-10 border-4 border-slate-700 border-t-blue-400 rounded-full animate-spin mb-4" />
+            <div className="text-sm">載入試算結果...</div>
+            <div className="text-xs text-slate-500 mt-1">在 LINE 內首次開啟可能需要幾秒</div>
+          </div>
+        }
+      >
+        <CustomerReportPage />
       </Suspense>
     );
   }

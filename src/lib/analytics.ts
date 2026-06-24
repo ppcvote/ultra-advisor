@@ -20,6 +20,15 @@ export function initAnalytics(): void {
   if (initialized) return;
   initialized = true;
 
+  // 重要：/r/ 是公開的客戶報告 route，URL 含 ?d=<base64> 整個 payload
+  // (顧問名/證照/客戶月薪/退休年齡/缺口金額)。PostHog 預設 capture_pageview:true
+  // 會把整個 URL 上傳到 PostHog Cloud (US region)，等同把客戶試算資料 cross-border
+  // export 給第三方分析平台，違反個資法 §27 安全維護 + §21 跨境傳輸告知。
+  // 在這條 route 上 SDK 完全不 init。
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/r/')) {
+    return;
+  }
+
   const key = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
   const host =
     (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ||

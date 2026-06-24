@@ -64,10 +64,17 @@ export interface ClientProfile {
 
   /** 期望退休後月所得（NTD）。LaborPensionTool.desiredMonthlyIncome 對映。 */
   desiredMonthlyRetirementIncome?: number;
+
+  /**
+   * 扶養父母人數（一般 0-2）。TaxPlannerTool.parents 對映。
+   * Sprint 7 補：上一輪 modal schema 漏掉、導致 TaxPlannerTool 的「父母」chip 永遠不亮。
+   * 既有客戶讀到 undefined，徽章從 X/7 變 X/8，不會炸（countClientProfileFields 走 fallback）。
+   */
+  dependentParents?: number;
 }
 
 /**
- * 進階欄位 keys —— 用來算「資料完整度」徽章 X/7
+ * 進階欄位 keys —— 用來算「資料完整度」徽章 X/8
  * 順序代表 UI 上的呈現順序
  */
 export const CLIENT_PROFILE_FIELDS: readonly (keyof ClientProfile)[] = [
@@ -78,12 +85,13 @@ export const CLIENT_PROFILE_FIELDS: readonly (keyof ClientProfile)[] = [
   'retirementAge',
   'riskTolerance',
   'desiredMonthlyRetirementIncome',
+  'dependentParents',
 ] as const;
 
 export const CLIENT_PROFILE_TOTAL = CLIENT_PROFILE_FIELDS.length;
 
 /**
- * 計算 client doc 上的 profile 完整度（X/7）
+ * 計算 client doc 上的 profile 完整度（X/8）
  * undefined / null / '' / NaN 都視為「未填」
  * 0 視為「已填」（月收入填 0 也是合理，例如退休客戶）
  */

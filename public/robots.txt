@@ -16,6 +16,9 @@ Disallow: /liff/
 Disallow: /api/
 Disallow: /dashboard
 Disallow: /app
+# Sprint 7: 客戶端 readonly 試算連結含 base64 payload (顧問+客戶數據)
+# 不能讓搜尋引擎 indexed → 進 Google cache 可永久解碼
+Disallow: /r/
 
 # === Google ===
 User-agent: Googlebot

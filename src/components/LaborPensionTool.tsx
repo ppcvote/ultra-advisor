@@ -15,6 +15,7 @@ import {
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceLine } from 'recharts';
 import DisclaimerFooter from './DisclaimerFooter';
 import ShareButton from './ShareButton';
+import ShareToCustomerButton from './ShareToCustomerButton';
 import { auth } from '../firebase';
 import ClientDataPanel from './ClientDataPanel';
 
@@ -452,12 +453,40 @@ export const LaborPensionTool = ({ data, setData }: any) => {
              </div>
           </div>
 
-          {/* 分享給客戶 — 把缺口摘要傳給 LINE，不影響既有圖表流程 */}
-          <div className="flex justify-end">
+          {/* 分享給客戶：兩種選擇並列、用途不同：
+              - ShareButton（摘要）：text → LINE，客戶看到一句缺口數字（Sprint 5 既有）
+              - ShareToCustomerButton（連結）：產生 /r/labor-pension URL → 客戶 click 看完整 readonly 視覺
+              鐵則：annualTaxSaving / pensionReturnRate 不放進客戶 payload — viewer schema 不接、且節稅話術合規敏感（Sprint 5 已下架）
+          */}
+          <div className="flex flex-wrap justify-end gap-3">
             <ShareButton
               variant="full"
               title="退休缺口試算"
               text={`【退休缺口試算】${currentAge} → ${retireAge} 歲 / 理想月薪 $${desiredMonthlyIncome.toLocaleString()} — 通膨後每月缺口 $${calculations.gap.toLocaleString()}`}
+            />
+            <ShareToCustomerButton
+              tool="labor_pension"
+              reportLabel="退休缺口分析"
+              inputs={{
+                currentAge,
+                retireAge,
+                salary,
+                laborInsYears,
+                selfContribution,
+                desiredMonthlyIncome,
+                inflationRate,
+                pensionDiscount,
+              }}
+              outputs={{
+                futureDesiredIncome: calculations.futureDesiredIncome,
+                laborInsMonthly: calculations.laborInsMonthly,
+                pensionMonthly: calculations.pensionMonthly,
+                totalPension: calculations.totalPension,
+                gap: calculations.gap,
+                monthlySaveNow: calculations.monthlySaveNow,
+                monthlySaveLater: calculations.monthlySaveLater,
+                yearsToRetire: calculations.yearsToRetire,
+              }}
             />
           </div>
 

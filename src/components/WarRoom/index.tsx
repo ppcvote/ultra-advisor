@@ -25,26 +25,11 @@ import ToolsTab from './ToolsTab';
 const ShareTab = lazy(() => import('./ShareTab'));
 import { AddClientModal, EditClientModal, FeedbackModal, EditProfileModal, ChangePasswordModal } from './modals';
 import type { ClientProfile } from '../../types/clientProfile';
-import { CLIENT_PROFILE_FIELDS } from '../../types/clientProfile';
+// Sprint 7: 兩條建客戶 path（WarRoom + ClientManager）共用同一份 serialize / patch 邏輯
+// 避免 drift（一邊濾 NaN、另一邊忘記濾）
+import { serializeProfileForAdd, profilePatchForUpdate } from '../../lib/clientProfileAdapter';
 
 import { safeStorage } from '../../utils/safeStorage';
-
-/**
- * Firestore 不接受 undefined（addDoc / updateDoc 都會噴）。把 ClientProfile 的
- * undefined 欄位濾掉，只 spread 真的有值的；空字串視為「未填」一併濾掉，
- * 避免 select 切回「未填」時殘留空字串污染 doc。
- */
-function serializeProfile(profile: ClientProfile | undefined): Partial<ClientProfile> {
-  if (!profile) return {};
-  const out: Partial<ClientProfile> = {};
-  for (const key of CLIENT_PROFILE_FIELDS) {
-    const v = profile[key];
-    if (v === undefined || v === null || v === '') continue;
-    if (typeof v === 'number' && Number.isNaN(v)) continue;
-    (out as any)[key] = v;
-  }
-  return out;
-}
 // Tab 定義
 const TABS: { id: WarRoomTab; label: string; icon: React.FC<any> }[] = [
   { id: 'overview', label: '總覽', icon: LayoutDashboard },
@@ -183,30 +168,17 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
     await addDoc(collection(db, 'users', user.uid, 'clients'), {
       name, note,
       // Sprint 6: 新增 client 時把 profile 欄位 spread 進 doc（flat 結構保持 backward compat）
-      ...serializeProfile(profile),
+      ...serializeProfileForAdd(profile),
       createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
     });
   };
 
   const handleEditClient = async (clientId: string, name: string, note: string, profile?: ClientProfile) => {
     if (!user) return;
-    // 為了讓「把已填的欄位清空」也能持久化，這裡需要把 ClientProfile 沒填的欄位 explicit 設成 null
-    // （updateDoc 不支援 undefined；用 null 來表示刪除欄位的意圖）
     // 規格要求不能因為新欄位空白導致顯示「不完整」紅字 — countClientProfileFields 已把 null 視為未填
-    const profilePatch: Record<string, any> = {};
-    for (const key of CLIENT_PROFILE_FIELDS) {
-      const v = profile?.[key];
-      if (v === undefined || v === null || v === '') {
-        profilePatch[key] = null;
-      } else if (typeof v === 'number' && Number.isNaN(v)) {
-        profilePatch[key] = null;
-      } else {
-        profilePatch[key] = v;
-      }
-    }
     await updateDoc(doc(db, 'users', user.uid, 'clients', clientId), {
       name, note,
-      ...profilePatch,
+      ...profilePatchForUpdate(profile),
       updatedAt: Timestamp.now(),
     });
   };

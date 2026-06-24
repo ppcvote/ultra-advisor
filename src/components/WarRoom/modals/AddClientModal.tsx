@@ -187,16 +187,29 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose, onAdd 
                 </div>
               </div>
 
-              {/* 期望退休後月所得（獨立一行，數字較長） */}
-              <div className="pl-2">
-                <label className="text-xs text-slate-400 mb-1 block">期望退休後月所得（NTD）</label>
-                <input
-                  type="number" min={0} inputMode="numeric"
-                  value={profile.desiredMonthlyRetirementIncome ?? ''}
-                  onChange={e => setProfile(p => ({ ...p, desiredMonthlyRetirementIncome: parseNumOrUndef(e.target.value) }))}
-                  placeholder="例如 60000"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white focus:border-purple-500 outline-none"
-                />
+              {/* 期望退休後月所得 + 扶養父母人數 — 同一行 */}
+              <div className="grid grid-cols-2 gap-3 pl-2">
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">期望退休後月所得（NTD）</label>
+                  <input
+                    type="number" min={0} inputMode="numeric"
+                    value={profile.desiredMonthlyRetirementIncome ?? ''}
+                    onChange={e => setProfile(p => ({ ...p, desiredMonthlyRetirementIncome: parseNumOrUndef(e.target.value) }))}
+                    placeholder="例如 60000"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white focus:border-purple-500 outline-none"
+                  />
+                </div>
+                <div>
+                  {/* Sprint 7: 扶養父母人數 — TaxPlannerTool.parents 對映用，一般 0-2 */}
+                  <label className="text-xs text-slate-400 mb-1 block">扶養父母人數</label>
+                  <input
+                    type="number" min={0} max={2} inputMode="numeric"
+                    value={profile.dependentParents ?? ''}
+                    onChange={e => setProfile(p => ({ ...p, dependentParents: parseNumOrUndef(e.target.value) }))}
+                    placeholder="例如 1"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white focus:border-purple-500 outline-none"
+                  />
+                </div>
               </div>
             </div>
           )}

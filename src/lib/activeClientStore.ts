@@ -41,9 +41,8 @@ function normalizeClient(raw: any): ActiveClient {
       retirementAge: raw?.retirementAge,
       hasSpouse,
       childrenCount: raw?.childrenCount,
-      // modal schema 暫無 dependentParents — 之後在 ClientFormModal 補 input
-      // 再加一行對映即可，這裡先留 undefined
-      dependentParents: undefined,
+      // Sprint 7: modal 已補 input；既有客戶讀到 undefined，chip 自動隱藏（ClientDataPanel 行為）
+      dependentParents: raw?.dependentParents,
     },
   };
 }

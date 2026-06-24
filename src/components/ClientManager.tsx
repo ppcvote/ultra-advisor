@@ -1,12 +1,28 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   X, Plus, Search, Edit3, Trash2, Save, ChevronLeft, Users,
-  Loader2, Phone, Calendar, FileText, AlertTriangle
+  Loader2, Phone, Calendar, FileText, AlertTriangle, ChevronDown, ChevronRight, Info
 } from 'lucide-react';
 import { collection, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
 import { toast } from '../utils/toast';
+import {
+  ClientProfile,
+  FamilyStatus,
+  RiskTolerance,
+  FAMILY_STATUS_LABELS,
+  RISK_TOLERANCE_LABELS,
+  countClientProfileFields,
+  CLIENT_PROFILE_TOTAL,
+} from '../types/clientProfile';
+// Sprint 7: 與 WarRoom modal 共用同一份 serialize / patch 邏輯，避免兩條 path drift
+import {
+  profileFromClient,
+  serializeProfileForAdd,
+  profilePatchForUpdate,
+  parseNumOrUndef,
+} from '../lib/clientProfileAdapter';
 // ============================================================
 // 型別定義
 // ============================================================
@@ -20,6 +36,8 @@ interface Props {
 
 type ViewState = 'list' | 'detail' | 'add' | 'edit';
 
+// Sprint 7: form 拆成「basic」+「profile」兩塊。basic 是 ClientManager 原有的 4 個欄位、
+// profile 是 Sprint 6 新增的 7 個進階欄位（與 WarRoom AddClient/EditClient modal 同步）
 interface ClientFormData {
   name: string;
   phone: string;
@@ -33,6 +51,8 @@ const EMPTY_FORM: ClientFormData = {
   birthday: '',
   note: '',
 };
+
+const EMPTY_PROFILE: ClientProfile = {};
 
 // ============================================================
 // 保單階層視圖（要保人 > 被保人）
@@ -216,6 +236,10 @@ const ClientManager: React.FC<Props> = ({ isOpen, onClose, user, clients }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [formData, setFormData] = useState<ClientFormData>({ ...EMPTY_FORM });
+  // Sprint 7: 進階資料（與 WarRoom modal 對齊）— 與 basic form data 分開存
+  // 為什麼分開：basic 是 required-ish（name 必填），profile 全 optional，邏輯路徑不同
+  const [profile, setProfile] = useState<ClientProfile>(EMPTY_PROFILE);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -229,6 +253,8 @@ const ClientManager: React.FC<Props> = ({ isOpen, onClose, user, clients }) => {
       setSearchQuery('');
       setSelectedClient(null);
       setFormData({ ...EMPTY_FORM });
+      setProfile(EMPTY_PROFILE);
+      setAdvancedOpen(false);
       setDeleteConfirmId(null);
     }
   }, [isOpen]);
@@ -287,12 +313,15 @@ const ClientManager: React.FC<Props> = ({ isOpen, onClose, user, clients }) => {
     setSaving(true);
     try {
       if (view === 'edit' && selectedClient?.id) {
-        // 更新
+        // 更新：profilePatchForUpdate 會把未填欄位 explicit 設成 null，讓「清空已填」也能持久化
+        // phone/birthday 仍走原本「空字串 → 不寫入」邏輯（這兩個欄位沒有「清空後又想留 null 標記」需求）
+        const patch = profilePatchForUpdate(profile);
         await updateDoc(doc(db, `users/${user.uid}/clients`, selectedClient.id), {
           name: formData.name.trim(),
           phone: formData.phone.trim() || undefined,
           birthday: formData.birthday || undefined,
           note: formData.note.trim(),
+          ...patch,
           updatedAt: Timestamp.now(),
         });
         // 更新 selectedClient 以便返回 detail 時顯示最新資料
@@ -302,28 +331,32 @@ const ClientManager: React.FC<Props> = ({ isOpen, onClose, user, clients }) => {
           phone: formData.phone.trim(),
           birthday: formData.birthday,
           note: formData.note.trim(),
+          ...patch,
         });
         setView('detail');
       } else {
-        // 新增
+        // 新增：serializeProfileForAdd 把 undefined / NaN / '' 全濾掉
         await addDoc(collection(db, `users/${user.uid}/clients`), {
           name: formData.name.trim(),
           phone: formData.phone.trim() || undefined,
           birthday: formData.birthday || undefined,
           note: formData.note.trim(),
+          ...serializeProfileForAdd(profile),
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
         });
         setView('list');
       }
       setFormData({ ...EMPTY_FORM });
+      setProfile(EMPTY_PROFILE);
+      setAdvancedOpen(false);
     } catch (error) {
       console.error('[ClientManager] Save error:', error);
       toast.error('儲存失敗，請稍後再試');
     } finally {
       setSaving(false);
     }
-  }, [user?.uid, formData, view, selectedClient]);
+  }, [user?.uid, formData, profile, view, selectedClient]);
 
   const handleDeleteClient = useCallback(async (clientId: string) => {
     if (!user?.uid) return;
@@ -346,6 +379,10 @@ const ClientManager: React.FC<Props> = ({ isOpen, onClose, user, clients }) => {
       birthday: client.birthday || '',
       note: client.note || '',
     });
+    // Sprint 7: 載入已存的進階資料；已填過的客戶預設展開、未填過的維持收起
+    // 不打擾既有快速編輯體驗
+    setProfile(profileFromClient(client));
+    setAdvancedOpen(countClientProfileFields(client) > 0);
     setView('edit');
   };
 
@@ -447,6 +484,14 @@ const ClientManager: React.FC<Props> = ({ isOpen, onClose, user, clients }) => {
         ) : (
           filteredClients.map(client => {
             const count = policyCountMap[client.id] || 0;
+            // Sprint 7: 資料完整度徽章（X/7）— 與 ClientsTab 同邏輯
+            // 故意不把 0 染紅，避免「逼填」感；顏色階梯 0 淡灰 / 1-6 藍 / 7 翠綠
+            const filled = countClientProfileFields(client);
+            const completenessClass = filled === 0
+              ? 'bg-slate-800/60 text-slate-500 border border-slate-700/50'
+              : filled === CLIENT_PROFILE_TOTAL
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                : 'bg-blue-500/15 text-blue-400 border border-blue-500/30';
             return (
               <div
                 key={client.id}
@@ -461,13 +506,19 @@ const ClientManager: React.FC<Props> = ({ isOpen, onClose, user, clients }) => {
                       {(client.name || '?').charAt(0)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-white font-medium truncate">{client.name}</h3>
                         {count > 0 && (
                           <span className="text-[10px] bg-purple-600/30 text-purple-300 px-1.5 py-0.5 rounded-full font-medium shrink-0">
                             {count} 張保單
                           </span>
                         )}
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${completenessClass}`}
+                          title="客戶資料完整度 — 填越多、工具帶入越精準"
+                        >
+                          資料 {filled}/{CLIENT_PROFILE_TOTAL}
+                        </span>
                       </div>
                       {client.phone && (
                         <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
@@ -620,11 +671,15 @@ const ClientManager: React.FC<Props> = ({ isOpen, onClose, user, clients }) => {
   // ============================================================
   const renderFormView = () => {
     const isEdit = view === 'edit';
+    // 即時計數 — 顧問可以看到目前進階欄位填了幾項
+    const filled = countClientProfileFields(profile);
 
     return (
       <div className="flex flex-col h-full">
         <BackButton onClick={() => {
           setFormData({ ...EMPTY_FORM });
+          setProfile(EMPTY_PROFILE);
+          setAdvancedOpen(false);
           setView(isEdit ? 'detail' : 'list');
         }} />
 
@@ -635,7 +690,7 @@ const ClientManager: React.FC<Props> = ({ isOpen, onClose, user, clients }) => {
           {isEdit ? '修改客戶基本資料' : '填寫客戶基本資料'}
         </p>
 
-        <div className="space-y-4 flex-1">
+        <div className="space-y-4 flex-1 overflow-y-auto">
           {/* 姓名 */}
           <div>
             <label className="block text-sm text-slate-400 mb-1">
@@ -684,6 +739,135 @@ const ClientManager: React.FC<Props> = ({ isOpen, onClose, user, clients }) => {
               className="w-full bg-slate-950 border border-slate-700 rounded-xl py-3 px-4 text-white focus:border-emerald-500 outline-none placeholder:text-slate-600 resize-none"
             />
           </div>
+
+          {/* Sprint 7: 進階資料摺疊區 — 預設關起來，與 WarRoom modal 對齊
+              填了之後 14 工具的「使用此客戶資料」chip 可以一鍵帶入 */}
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen(o => !o)}
+            className="w-full flex items-center justify-between py-2 text-sm text-slate-300 hover:text-white transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              {advancedOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              <span className="font-bold">進階資料</span>
+              <span className="text-xs text-slate-500 font-normal">— 填了之後可一鍵帶入 14 工具試算</span>
+            </span>
+            {/* 即時計數 — 顏色階梯：0 淡灰（不催促）/ 1-6 藍（進度感）/ 7 翠綠（完成感） */}
+            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
+              filled === 0
+                ? 'bg-slate-800 text-slate-500'
+                : filled === CLIENT_PROFILE_TOTAL
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+            }`}>
+              {filled}/{CLIENT_PROFILE_TOTAL}
+            </span>
+          </button>
+
+          {advancedOpen && (
+            <div className="space-y-3 pl-2 border-l-2 border-slate-800">
+              <p className="text-[11px] text-slate-500 flex items-start gap-1 pl-2">
+                <Info size={11} className="mt-0.5 shrink-0" />
+                全部選填、空著也能存。填了之後工具會出現「使用 {formData.name || '客戶'} 的資料」chip。
+              </p>
+
+              {/* 年齡 + 月收入 */}
+              <div className="grid grid-cols-2 gap-3 pl-2">
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">年齡</label>
+                  <input
+                    type="number" min={0} max={120} inputMode="numeric"
+                    value={profile.age ?? ''}
+                    onChange={e => setProfile(p => ({ ...p, age: parseNumOrUndef(e.target.value) }))}
+                    placeholder="例如 45"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white focus:border-emerald-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">月收入（NTD）</label>
+                  <input
+                    type="number" min={0} inputMode="numeric"
+                    value={profile.monthlyIncome ?? ''}
+                    onChange={e => setProfile(p => ({ ...p, monthlyIncome: parseNumOrUndef(e.target.value) }))}
+                    placeholder="例如 80000"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white focus:border-emerald-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* 家庭狀況 + 子女人數 */}
+              <div className="grid grid-cols-2 gap-3 pl-2">
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">家庭狀況</label>
+                  <select
+                    value={profile.familyStatus ?? ''}
+                    onChange={e => setProfile(p => ({
+                      ...p,
+                      familyStatus: (e.target.value || undefined) as FamilyStatus | undefined,
+                    }))}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white focus:border-emerald-500 outline-none"
+                  >
+                    <option value="">未填</option>
+                    {(Object.keys(FAMILY_STATUS_LABELS) as FamilyStatus[]).map(k => (
+                      <option key={k} value={k}>{FAMILY_STATUS_LABELS[k]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">子女人數</label>
+                  <input
+                    type="number" min={0} max={20} inputMode="numeric"
+                    value={profile.childrenCount ?? ''}
+                    onChange={e => setProfile(p => ({ ...p, childrenCount: parseNumOrUndef(e.target.value) }))}
+                    placeholder="例如 2"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white focus:border-emerald-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* 退休年齡 + 風險屬性 */}
+              <div className="grid grid-cols-2 gap-3 pl-2">
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">預期退休年齡</label>
+                  <input
+                    type="number" min={40} max={90} inputMode="numeric"
+                    value={profile.retirementAge ?? ''}
+                    onChange={e => setProfile(p => ({ ...p, retirementAge: parseNumOrUndef(e.target.value) }))}
+                    placeholder="預設 65"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white focus:border-emerald-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">風險屬性</label>
+                  <select
+                    value={profile.riskTolerance ?? ''}
+                    onChange={e => setProfile(p => ({
+                      ...p,
+                      riskTolerance: (e.target.value || undefined) as RiskTolerance | undefined,
+                    }))}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white focus:border-emerald-500 outline-none"
+                  >
+                    <option value="">未填</option>
+                    {(Object.keys(RISK_TOLERANCE_LABELS) as RiskTolerance[]).map(k => (
+                      <option key={k} value={k}>{RISK_TOLERANCE_LABELS[k]}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* 期望退休後月所得（獨立一行，數字較長） */}
+              <div className="pl-2">
+                <label className="text-xs text-slate-400 mb-1 block">期望退休後月所得（NTD）</label>
+                <input
+                  type="number" min={0} inputMode="numeric"
+                  value={profile.desiredMonthlyRetirementIncome ?? ''}
+                  onChange={e => setProfile(p => ({ ...p, desiredMonthlyRetirementIncome: parseNumOrUndef(e.target.value) }))}
+                  placeholder="例如 60000"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white focus:border-emerald-500 outline-none"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 儲存按鈕 */}
