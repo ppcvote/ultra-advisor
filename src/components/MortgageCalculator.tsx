@@ -20,6 +20,8 @@ import {
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions } from '../firebase';
+import DisclaimerFooter from './DisclaimerFooter';
+import ShareButton from './ShareButton';
 // 不使用 Recharts，改用純 SVG 繪製
 
 // ============================================================
@@ -1070,6 +1072,15 @@ export default function MortgageCalculator() {
               </div>
             </div>
 
+            {/* 分享給客戶 — 並列在「結果摘要卡片」與「利息佔比條」之間，不影響既有列印 PDF 流程 */}
+            <div className="flex justify-end">
+              <ShareButton
+                variant="full"
+                title="房貸試算"
+                text={`【房貸試算】貸款 ${loanAmount} 萬 / ${loanTerm} 年 / 利率 ${interestRate}% — 月繳 ${formatMoneyFull(Math.round(calculations.monthlyPayment))} 元`}
+              />
+            </div>
+
             {/* 利息佔比條 */}
             <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/50">
               <div className="flex items-center justify-between mb-2 text-xs text-slate-400">
@@ -1096,11 +1107,11 @@ export default function MortgageCalculator() {
               </div>
             </div>
 
-            {/* 痛點對比 - 橫排 */}
-            <div className="bg-gradient-to-r from-red-900/20 to-slate-800/20 rounded-xl p-4 border border-red-500/20">
-              <p className="text-xs text-red-300 mb-3 flex items-center gap-1">
+            {/* 利息金額對照 - 橫排 */}
+            <div className="bg-gradient-to-r from-slate-800/40 to-slate-900/20 rounded-xl p-4 border border-slate-600/20">
+              <p className="text-xs text-slate-300 mb-3 flex items-center gap-1">
                 <AlertTriangle size={12} />
-                {formatMoney(calculations.totalInterest)} 利息 = ?
+                {formatMoney(calculations.totalInterest)} 利息金額對照（僅供概念參考）
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {calculations.painPoints.map((item, idx) => (
@@ -1262,40 +1273,42 @@ export default function MortgageCalculator() {
               </div>
 
               <div>
-                <h4 className="font-bold text-emerald-400 mb-2">🎬 開場</h4>
+                <h4 className="font-bold text-emerald-400 mb-2">試算摘要</h4>
                 <div className="bg-slate-800 p-2 rounded text-slate-300 text-[11px] leading-relaxed">
-                  「您知道貸款 {loanAmount} 萬、{loanTerm} 年，要付多少利息嗎？答案是 <span className="text-red-400 font-bold">{formatMoney(calculations.totalInterest)}</span>。這筆錢可以買 {calculations.painPoints[0].value} 台特斯拉。」
+                  本金 {loanAmount} 萬、年利率 {interestRate}%、貸款 {loanTerm} 年，依本息均攤公式，總利息支出約 <span className="text-blue-300 font-bold">{formatMoney(calculations.totalInterest)}</span>。
                 </div>
               </div>
 
               <div>
-                <h4 className="font-bold text-red-400 mb-2">🔥 痛點</h4>
+                <h4 className="font-bold text-blue-400 mb-2">利率敏感度</h4>
                 <div className="bg-slate-800 p-2 rounded text-[11px] space-y-1 text-slate-300">
-                  <p>「月付 ${formatMoney(calculations.monthlyPayment)} 看起來還好...」</p>
-                  <p>「但 {loanTerm} 年下來，利息是 <span className="text-red-400 font-bold">${formatMoney(calculations.totalInterest)}</span>，佔 {calculations.interestRatio.toFixed(0)}%！」</p>
-                  <p>「等於多送銀行 {Math.round(calculations.totalInterest / 10000)} 萬。」</p>
+                  <p>月付金額：${formatMoney(calculations.monthlyPayment)}</p>
+                  <p>{loanTerm} 年累計利息：${formatMoney(calculations.totalInterest)}（佔總還款 {calculations.interestRatio.toFixed(0)}%）</p>
+                  <p className="text-slate-400">利息為使用銀行資金之合理成本；長天期＋高利率時利息佔比上升。</p>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-bold text-amber-400 mb-2">💡 解方</h4>
-                <div className="bg-slate-800 p-2 rounded text-[11px] space-y-2">
-                  <p className="text-amber-300">① 每月多還 1 萬 → 省利息</p>
-                  <p className="text-amber-300">② 選 20 年 → 月付高但省更多</p>
-                  <p className="text-amber-300">③ 降息 0.5% → 30年省大錢</p>
+                <h4 className="font-bold text-amber-400 mb-2">常見優化選項</h4>
+                <div className="bg-slate-800 p-2 rounded text-[11px] space-y-2 text-slate-300">
+                  <p>提前部分還款：可減少利息支出，但須評估違約金與機會成本。</p>
+                  <p>縮短年期：月付提高、總利息降低，視現金流彈性決定。</p>
+                  <p>利率調整：浮動利率隨基準利率變動，固定利率有鎖定期限。</p>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-bold text-yellow-400 mb-2">✨ 收尾</h4>
-                <div className="bg-yellow-900/20 p-2 rounded border border-yellow-700 text-center italic text-yellow-200 text-[11px]">
-                  「房貸是最大負債，也最值得優化。」
+                <h4 className="font-bold text-slate-400 mb-2">提醒</h4>
+                <div className="bg-slate-800/50 p-2 rounded border border-slate-700 text-center text-slate-400 text-[11px] leading-relaxed">
+                  本試算為參考用，實際核貸利率、條件、違約金以銀行核定為準。
                 </div>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      <DisclaimerFooter scope="calc" />
     </div>
   );
 }

@@ -16,6 +16,7 @@ import {
   Landmark
 } from 'lucide-react';
 import { ResponsiveContainer, ComposedChart, Bar, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Area } from 'recharts';
+import DisclaimerFooter from './DisclaimerFooter';
 
 // --- 內建計算函式 ---
 const calculateMonthlyPayment = (principal: number, rate: number, years: number) => {
@@ -514,6 +515,8 @@ export const CarReplacementTool = ({ data, setData }: any) => {
            </div>
         </div>
       </div>
+
+      <DisclaimerFooter scope="calc" />
     </div>
   );
 };

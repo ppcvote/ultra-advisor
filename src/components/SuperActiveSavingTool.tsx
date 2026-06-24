@@ -17,6 +17,7 @@ import {
   Smile         // 新增
 } from 'lucide-react';
 import { ResponsiveContainer, ComposedChart, Area, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ReferenceArea } from 'recharts';
+import DisclaimerFooter from './DisclaimerFooter';
 
 export const SuperActiveSavingTool = ({ data, setData }: any) => {
   const safeData = {
@@ -428,6 +429,8 @@ export const SuperActiveSavingTool = ({ data, setData }: any) => {
            </div>
         </div>
       </div>
+
+      <DisclaimerFooter scope="investment" />
     </div>
   );
 };

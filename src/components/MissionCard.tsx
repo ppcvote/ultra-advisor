@@ -13,6 +13,10 @@ interface MissionCardProps {
   onOpenModal?: (modalName: string) => void;
   onNavigate?: (path: string) => void;
   onOpenPWAInstall?: () => void;
+  // If provided, render this specific mission instead of `currentMission`
+  // from the hook. Lets OverviewTab show the full 8-mission list while
+  // reusing the existing single-card click/complete plumbing.
+  mission?: Mission;
 }
 
 // 分類中文名稱
@@ -51,6 +55,7 @@ const MissionCard: React.FC<MissionCardProps> = ({
   onOpenModal,
   onNavigate,
   onOpenPWAInstall,
+  mission: missionProp,
 }) => {
   const { currentMission, allCompleted, loading, completeMission } = useMissions();
   const [completing, setCompleting] = useState(false);
@@ -188,57 +193,86 @@ const MissionCard: React.FC<MissionCardProps> = ({
     }
   };
 
-  // 載入中狀態
-  if (loading && !currentMission) {
-    return (
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-4 border border-slate-700/50">
-        <div className="flex items-center justify-center gap-2 text-slate-400">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          <span className="text-sm">載入任務中...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // 全部完成狀態
-  if (allCompleted) {
-    return (
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-4 border border-emerald-500/30">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-            <Check className="w-5 h-5 text-emerald-400" />
-          </div>
-          <div className="flex-1">
-            <p className="text-emerald-400 font-medium">已完成所有任務！</p>
-            <p className="text-slate-500 text-sm">持續使用系統獲得更多獎勵</p>
-          </div>
-          <Gift className="w-5 h-5 text-emerald-400/70" />
-        </div>
-      </div>
-    );
-  }
-
-  // 無任務狀態 - 顯示佔位卡片
-  if (!currentMission) {
-    return (
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-4 border border-slate-700/50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-slate-700/50 flex items-center justify-center">
-            <Gift className="w-5 h-5 text-slate-500" />
-          </div>
-          <div className="flex-1">
-            <p className="text-slate-400 font-medium">任務系統</p>
-            <p className="text-slate-500 text-sm">目前沒有可用任務</p>
+  // When parent passes an explicit mission, skip the single-card empty/done
+  // branches — list-mode rendering owns those states at a higher level.
+  if (!missionProp) {
+    // 載入中狀態
+    if (loading && !currentMission) {
+      return (
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-4 border border-slate-700/50">
+          <div className="flex items-center justify-center gap-2 text-slate-400">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-sm">載入任務中...</span>
           </div>
         </div>
-      </div>
-    );
+      );
+    }
+
+    // 全部完成狀態
+    if (allCompleted) {
+      return (
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-4 border border-emerald-500/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <Check className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-emerald-400 font-medium">已完成所有任務！</p>
+              <p className="text-slate-500 text-sm">持續使用系統獲得更多獎勵</p>
+            </div>
+            <Gift className="w-5 h-5 text-emerald-400/70" />
+          </div>
+        </div>
+      );
+    }
+
+    // 無任務狀態 - 顯示佔位卡片
+    if (!currentMission) {
+      return (
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-4 border border-slate-700/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-slate-700/50 flex items-center justify-center">
+              <Gift className="w-5 h-5 text-slate-500" />
+            </div>
+            <div className="flex-1">
+              <p className="text-slate-400 font-medium">任務系統</p>
+              <p className="text-slate-500 text-sm">目前沒有可用任務</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
   }
 
-  const mission = currentMission;
+  // Prefer the explicit mission prop (list mode); fall back to the hook's
+  // "next uncompleted" current mission (legacy single-card mode).
+  const mission = missionProp || currentMission;
+  if (!mission) return null;
+
+  // Already-completed missions render as a static checkmark row — no click,
+  // no completion logic, just visual progress in the list.
+  const isDone = mission.repeatType === 'once'
+    ? !!mission.isCompleted
+    : !!mission.isCompletedToday;
   const borderClass = categoryBorderColors[mission.category] || 'border-slate-500/50';
   const iconBgClass = categoryIconBg[mission.category] || 'bg-slate-500/20';
   const tagClass = categoryTagColors[mission.category] || 'text-slate-400 bg-slate-500/20';
+
+  if (isDone) {
+    return (
+      <div className="bg-slate-800/30 rounded-xl p-3 border border-emerald-500/20 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+          <Check className="w-4 h-4 text-emerald-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-slate-300 text-sm font-medium truncate line-through decoration-slate-600">
+            {mission.title}
+          </p>
+        </div>
+        <div className="text-emerald-400/80 text-xs font-bold shrink-0">+{mission.points} UA</div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative">

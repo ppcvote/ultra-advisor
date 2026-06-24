@@ -13,6 +13,9 @@ import {
   Percent     // 新增圖示
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceLine } from 'recharts';
+import DisclaimerFooter from './DisclaimerFooter';
+import ShareButton from './ShareButton';
+import { auth } from '../firebase';
 
 export const LaborPensionTool = ({ data, setData }: any) => {
   const safeData = {
@@ -179,15 +182,15 @@ export const LaborPensionTool = ({ data, setData }: any) => {
             <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase backdrop-blur-sm">
               Retirement Planning
             </span>
-            <span className="bg-rose-400/20 text-rose-100 px-3 py-1 rounded-full text-xs font-bold tracking-wider backdrop-blur-sm border border-rose-400/30">
-              現實喚醒・補足缺口
+            <span className="bg-slate-400/20 text-slate-100 px-3 py-1 rounded-full text-xs font-bold tracking-wider backdrop-blur-sm border border-slate-400/30">
+              通膨 + 勞保折算
             </span>
           </div>
           <h1 className="text-3xl md:text-4xl font-extrabold mb-2 tracking-tight flex items-center gap-3">
-            退休缺口試算 (殘酷版)
+            退休缺口試算
           </h1>
           <p className="text-slate-300 text-lg opacity-90 max-w-2xl">
-            別讓「覺得還久」成為您晚年最大的遺憾。加入 <span className="text-yellow-400 font-bold">通膨</span> 與 <span className="text-rose-400 font-bold">勞保打折</span> 因子，還原真實退休樣貌。
+            將 <span className="text-yellow-400 font-bold">通膨</span> 與 <span className="text-amber-300 font-bold">勞保打折</span> 因子納入試算，呈現未來幣值下的退休所得結構與缺口。
           </p>
         </div>
       </div>
@@ -413,6 +416,15 @@ export const LaborPensionTool = ({ data, setData }: any) => {
              </div>
           </div>
 
+          {/* 分享給客戶 — 把缺口摘要傳給 LINE，不影響既有圖表流程 */}
+          <div className="flex justify-end">
+            <ShareButton
+              variant="full"
+              title="退休缺口試算"
+              text={`【退休缺口試算】${currentAge} → ${retireAge} 歲 / 理想月薪 $${desiredMonthlyIncome.toLocaleString()} — 通膨後每月缺口 $${calculations.gap.toLocaleString()}`}
+            />
+          </div>
+
           {/* 生活品質預覽 (Lifestyle Preview) */}
           <div className="grid md:grid-cols-2 gap-6">
               {/* 現狀 */}
@@ -530,6 +542,8 @@ export const LaborPensionTool = ({ data, setData }: any) => {
            </div>
         </div>
       </div>
+
+      <DisclaimerFooter scope="calc" />
     </div>
   );
 };

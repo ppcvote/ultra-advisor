@@ -13,6 +13,7 @@ import {
 import type { InsuranceCheckupData } from '../../types/insurance';
 import PolicyManager from './PolicyManager';
 import CheckupReport from './CheckupReport';
+import DisclaimerFooter from '../DisclaimerFooter';
 
 interface InsuranceCheckupToolProps {
   data: InsuranceCheckupData;
@@ -101,6 +102,8 @@ export default function InsuranceCheckupTool({ data, setData, userId, clientId, 
           />
         )}
       </div>
+
+      <DisclaimerFooter scope="insurance" />
     </div>
   );
 }

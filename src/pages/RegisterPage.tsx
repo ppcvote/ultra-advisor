@@ -6,12 +6,15 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, CheckCircle, AlertCircle, Eye, EyeOff, Gift, User, Mail, Lock, ArrowLeft, Sparkles } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, Eye, EyeOff, Gift, User, Mail, Lock, ArrowLeft, Sparkles, MessageCircle } from 'lucide-react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
 
 import { toast } from '../utils/toast';
 import { safeStorage } from '../utils/safeStorage';
+import { trackEvent, identify } from '../lib/analytics';
+import { EVENTS } from '../lib/events';
+import { getUtmAttribution } from '../lib/utm';
 interface RegisterPageProps {
   onSuccess?: () => void;
   onBack?: () => void;
@@ -103,12 +106,21 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
   const [showPassword, setShowPassword] = useState(false);
 
   // 表單資料
+  // lineDisplayName 是顧問識別用（顯示在客戶看到的卡片署名），LINE 沒提供 API 查驗、留 optional
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    referralCode: ''
+    referralCode: '',
+    lineDisplayName: ''
   });
+
+  // 合規勾選（兩個皆需勾選才能送出）
+  // version 跟版本綁定，後端 audit 用 — 改條款內容時要 bump 並重新要勾
+  const CONSENT_VERSION = '2026-06-24';
+  const [consentTos, setConsentTos] = useState(false);
+  const [consentResponsibility, setConsentResponsibility] = useState(false);
+  const consentsOk = consentTos && consentResponsibility;
 
   // 表單錯誤
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -126,11 +138,17 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
     points: number;
   } | null>(null);
 
+  // 漏斗事件：到達註冊頁（有 UTM/referrer 時帶上，方便 PostHog 拆來源）
+  useEffect(() => {
+    const attribution = getUtmAttribution();
+    trackEvent(EVENTS.REGISTER_START, attribution ? { ...attribution } : undefined);
+  }, []);
+
   // SEO: 更新頁面標題和 Meta
   useEffect(() => {
     const seoConfig = {
       title: '免費註冊 | Ultra Advisor - AI 智能理財分析平台',
-      description: '免費試用 Ultra Advisor 7 天！18 種專業理財工具：房貸計算機、退休規劃、稅務傳承、資產配置。無需信用卡，立即開始。',
+      description: '免費試用 Ultra Advisor 7 天！14 種視覺化工具：房貸計算機、退休規劃、稅務傳承、資產配置。無需信用卡，立即開始。',
       url: 'https://ultra-advisor.tw/register'
     };
 
@@ -215,12 +233,19 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
 
     if (isSubmitting || !validateForm()) return;
 
+    // 雙重保險：button disabled 已擋一次、但 form submit 也可能被 Enter 鍵或外部觸發
+    // 沒勾合規 checkbox 直接 return（不彈 toast，UI 已視覺提示）
+    if (!consentsOk) return;
+
     setIsSubmitting(true);
     setErrors({});
 
     try {
       // 🔒 取得 reCAPTCHA token
       const recaptchaToken = await getRecaptchaToken();
+
+      // 首次造訪時記下來的 UTM / referrer，跟 user doc 一起存（first-touch attribution）
+      const acquisition = getUtmAttribution();
 
       const response = await fetch(API_ENDPOINT, {
         method: 'POST',
@@ -230,12 +255,19 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
           email: formData.email.trim().toLowerCase(),
           password: formData.password,
           referralCode: formData.referralCode.trim().toUpperCase() || null,
-          // 網頁註冊不帶 LINE 資料
+          // 網頁註冊不帶 lineUserId（沒走 LIFF），只帶顧問自填的 displayName 當識別
           lineUserId: null,
-          lineDisplayName: null,
+          lineDisplayName: formData.lineDisplayName.trim() || null,
           linePictureUrl: null,
           // 🔒 reCAPTCHA token
-          recaptchaToken
+          recaptchaToken,
+          // 取得來源（null 代表 direct/internal，後端可選擇忽略）
+          acquisition,
+          // 合規勾選證據 — version 標記、submit 時 client 時戳；
+          // 後端 createUserAccount 預期把 consentVersion 寫進 user doc、
+          // 並以 serverTimestamp() 作為 consentAt 寫入（client 時戳僅供 audit 對照）
+          consentVersion: CONSENT_VERSION,
+          consentSubmittedAt: new Date().toISOString()
         })
       });
 
@@ -244,6 +276,14 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
       if (result.success) {
         setSuccessData(result.data);
         setStep('success');
+
+        // 漏斗事件：註冊完成（uid 在 auth callback 才有，先帶 email hash-ish 標記）
+        // acquisition 整包帶上 — PostHog 可拆 utm_source/medium/campaign 做漏斗 breakdown
+        trackEvent(EVENTS.REGISTER_SUCCESS, {
+          has_referral: !!formData.referralCode.trim(),
+          has_acquisition: !!acquisition,
+          acquisition: acquisition || null,
+        });
 
         // 自動登入：用剛註冊的帳密直接登入
         try {
@@ -256,6 +296,11 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
           safeStorage.set('ua_saved_email', formData.email.trim().toLowerCase());
           safeStorage.set('ua_remember_me', 'true');
           setAutoLoginDone(true);
+
+          // 綁定 PostHog identity，把 acquisition 寫成 person property
+          if (auth.currentUser?.uid) {
+            identify(auth.currentUser.uid, acquisition ? { acquisition } : undefined);
+          }
         } catch (loginErr) {
           console.error('自動登入失敗:', loginErr);
           setAutoLoginError('自動登入失敗，請手動登入');
@@ -564,10 +609,72 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
             />
           </div>
 
+          {/* LINE 顯示名稱 - 顧問識別用、不強制、無驗證 */}
+          <div className="space-y-2 animate-[fadeInUp_0.5s_ease-out_0.45s_both]">
+            <label className="flex items-center gap-2 text-slate-300 text-sm font-medium">
+              <MessageCircle className="w-4 h-4 text-[#06C755]" />
+              LINE 顯示名稱（選填）
+            </label>
+            <input
+              type="text"
+              value={formData.lineDisplayName}
+              onChange={(e) => setFormData(prev => ({ ...prev, lineDisplayName: e.target.value }))}
+              placeholder="客戶看到的署名，例：林經理"
+              maxLength={40}
+              className="w-full px-4 py-4 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white placeholder-slate-500 text-base focus:outline-none focus:border-[#06C755] focus:shadow-[0_0_20px_rgba(6,199,85,0.3)] transition-all"
+            />
+            <p className="text-slate-500 text-xs">分享試算結果給客戶時會用這個名稱署名</p>
+          </div>
+
+          {/* 合規勾選 — 兩個都要勾 button 才解鎖 */}
+          {/* 不用 alert / toast：disabled state 已經明示沒勾就不能送 */}
+          <div className="space-y-3 pt-2 animate-[fadeInUp_0.5s_ease-out_0.48s_both]">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={consentTos}
+                onChange={(e) => setConsentTos(e.target.checked)}
+                className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#4DA3FF] focus:ring-2 focus:ring-[#4DA3FF] focus:ring-offset-0 cursor-pointer accent-[#4DA3FF]"
+              />
+              <span className="text-slate-400 text-xs leading-relaxed select-none">
+                我已閱讀並同意{' '}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#4DA3FF] hover:text-[#6db8ff] underline underline-offset-2"
+                >
+                  服務條款
+                </a>
+                {' '}與{' '}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#4DA3FF] hover:text-[#6db8ff] underline underline-offset-2"
+                >
+                  隱私權政策
+                </a>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={consentResponsibility}
+                onChange={(e) => setConsentResponsibility(e.target.checked)}
+                className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#4DA3FF] focus:ring-2 focus:ring-[#4DA3FF] focus:ring-offset-0 cursor-pointer accent-[#4DA3FF]"
+              />
+              <span className="text-slate-400 text-xs leading-relaxed select-none">
+                我了解本平台僅為財務規劃工具，所有建議與決策由我作為持照顧問負責
+              </span>
+            </label>
+          </div>
+
           {/* 提交按鈕 */}
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !consentsOk}
             className="w-full py-4 mt-6 bg-gradient-to-r from-[#4DA3FF] to-[#2E6BFF] text-white font-bold text-lg rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] animate-[fadeInUp_0.5s_ease-out_0.5s_both]"
           >
             {isSubmitting ? (
@@ -586,7 +693,7 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
             <ul className="space-y-2 text-slate-500 text-sm">
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-green-500" />
-                全部 18 種專業理財工具
+                全部 14 種視覺化工具
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-green-500" />

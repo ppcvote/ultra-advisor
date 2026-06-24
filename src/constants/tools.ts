@@ -68,7 +68,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
         icon: Activity,
         label: '市場數據戰情',
         description: '即時市場數據與權威統計資料',
-        benefits: ['癌症時鐘數據', '醫療通膨追蹤', '勞保破產倒數'],
+        benefits: ['癌症統計數據', '醫療通膨追蹤', '勞保精算追蹤'],
         isFree: true
       },
       {

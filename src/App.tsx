@@ -69,12 +69,17 @@ const PartnerApplicationPage = lazy(() => import('./pages/PartnerApplicationPage
 const UltraCloudDemo = lazy(() => import('./pages/UltraCloudDemo'));
 const WhiteboardPage = lazy(() => import('./pages/WhiteboardPage'));
 const EnglishLandingPage = lazy(() => import('./pages/EnglishLandingPage'));
+// Legal pages — lazy so 首頁 cold-start 不背負合規長文的 bundle 體積
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
 
 // 🆕 主題切換
 import { ThemeProvider } from './context/ThemeContext';
 
 import { toast } from './utils/toast';
 import { safeStorage } from './utils/safeStorage';
+import { trackEvent, identify, resetIdentity } from './lib/analytics';
+import { EVENTS } from './lib/events';
 const generateSessionId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 
 const PrintStyles = () => (
@@ -184,6 +189,8 @@ export default function App() {
   const [isWhiteboardRoute, setIsWhiteboardRoute] = useState(() => window.location.pathname.startsWith('/whiteboard')); // 🆕 Ultra 白板
   const [isEnglishRoute, setIsEnglishRoute] = useState(() => window.location.pathname === '/en'); // 🆕 英文版
   const [isResearchRoute, setIsResearchRoute] = useState(() => window.location.pathname.startsWith('/research')); // 🆕 研究報告
+  const [isPrivacyRoute, setIsPrivacyRoute] = useState(() => window.location.pathname === '/privacy'); // 個資法 §8 告知義務頁
+  const [isTermsRoute, setIsTermsRoute] = useState(() => window.location.pathname === '/terms');       // 服務條款 / 消保法 §19 冷靜期
   const [clientLoading, setClientLoading] = useState(false); 
   const [currentClient, setCurrentClient] = useState<any>(null);
   // 🆕 activeTab 持久化：重新整理後保持在原工具介面
@@ -406,7 +413,9 @@ export default function App() {
       setIsWhiteboardRoute(path.startsWith('/whiteboard')); // 🆕 Ultra 白板
       setIsEnglishRoute(path === '/en'); // 🆕 英文版
       setIsResearchRoute(path.startsWith('/research')); // 🆕 研究報告
-      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); }
+      setIsPrivacyRoute(path === '/privacy');
+      setIsTermsRoute(path === '/terms');
+      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); setIsPrivacyRoute(false); setIsTermsRoute(false); }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -426,6 +435,8 @@ export default function App() {
     else if (path === '/ultracloud') setIsUltraCloudDemoRoute(true); // 🆕 UltraCloud Demo
     else if (path.startsWith('/whiteboard')) setIsWhiteboardRoute(true); // 🆕 Ultra 白板
     else if (path === '/en') setIsEnglishRoute(true); // 🆕 英文版
+    else if (path === '/privacy') setIsPrivacyRoute(true);
+    else if (path === '/terms') setIsTermsRoute(true);
 
     // 🆕 SplashScreen 只在這個 session 第一次進入時顯示
     if (sessionStorage.getItem('splash_shown') !== 'true') {
@@ -438,10 +449,25 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // 每個 session 只發一次 first_login，避免重新整理灌水
+    let firstLoginEmitted = false;
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
-      if (!currentUser) { setCurrentClient(null); setIsDataLoaded(false); }
+      if (!currentUser) {
+        setCurrentClient(null);
+        setIsDataLoaded(false);
+        // 登出時清掉 PostHog identity，避免下個使用者繼承
+        resetIdentity();
+        firstLoginEmitted = false;
+        return;
+      }
+      // 取得 token 後第一次 → 算 first_login
+      if (!firstLoginEmitted) {
+        firstLoginEmitted = true;
+        identify(currentUser.uid);
+        trackEvent(EVENTS.FIRST_LOGIN, { uid: currentUser.uid });
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -449,7 +475,70 @@ export default function App() {
   // 🆕 activeTab 變化時保存到 localStorage（重新整理後保持原介面）
   useEffect(() => {
     safeStorage.set('ultra_advisor_active_tab', activeTab);
+    // 同步埋 tool_opened：所有 setActiveTab 入口（NavItem / WarRoom / DeepLink）共用這條路徑，
+    // 不必到 ~30 個 onClick 個別埋
+    trackEvent(EVENTS.TOOL_OPENED, { tool: activeTab });
   }, [activeTab]);
+
+  // firstRun 偵測 — 觸發條件:
+  //   1. URL 帶 ?firstRun=1（註冊頁登入流程附帶；測試也可手動帶）
+  //   2. user.metadata.creationTime 在 5 分鐘內（剛 createUserWithEmailAndPassword 完）
+  // 行為:
+  //   - 強制把 activeTab 帶到 'overview'，避免 user 一進來看到上次 session 殘留的工具頁
+  //   - setTimeout 100ms 觸發 onboarding_started analytics（讓 PostHog identify
+  //     先呼叫完，這個 timing 跟 first_login 的 fire-and-forget 一致）
+  //   - 並 seed 3 個 sample clients；seedSampleClients 內部會自己 idempotent 檢查
+  //     existing clients > 0 就跳過，所以重複觸發是安全的
+  //   - 同一 uid 只觸發一次：用 sessionStorage 做 latch（不能用 localStorage，
+  //     不同瀏覽器要能各自觸發；也不能用 useRef，重新整理後 ref 會重置但 sessionStorage
+  //     仍存在，避免 reload 重複 seed）
+  useEffect(() => {
+    if (!user) return;
+    const latchKey = `firstRun_done_${user.uid}`;
+    if (sessionStorage.getItem(latchKey)) return;
+
+    // ?firstRun=1 只在 non-prod 允許（被偽造的 URL 不應該注入 sample clients
+    // 進已存在的 prod 帳號，會混到顧問真實客戶）
+    const urlFlag = !import.meta.env.PROD && (() => {
+      try { return new URLSearchParams(window.location.search).get('firstRun') === '1'; }
+      catch { return false; }
+    })();
+
+    let isWithinFirstRunWindow = urlFlag;
+    if (!isWithinFirstRunWindow) {
+      const createdAtStr = user.metadata?.creationTime;
+      if (createdAtStr) {
+        const createdAtMs = new Date(createdAtStr).getTime();
+        if (!Number.isNaN(createdAtMs)) {
+          isWithinFirstRunWindow = Date.now() - createdAtMs < 5 * 60 * 1000;
+        }
+      }
+    }
+    if (!isWithinFirstRunWindow) {
+      sessionStorage.setItem(latchKey, '1');
+      return;
+    }
+
+    sessionStorage.setItem(latchKey, '1');
+    setActiveTab('overview');
+
+    // Fire-and-forget seed — 失敗 fallback 為「沒有 sample client」，
+    // OverviewTab 的 missions list 仍能用，所以可以 silent
+    (async () => {
+      try {
+        const { seedSampleClients } = await import('./lib/sampleClients');
+        await seedSampleClients(user.uid);
+      } catch (err) {
+        console.warn('[firstRun] seedSampleClients import/exec failed:', err);
+      }
+    })();
+
+    // 100ms 延後讓 identify() 先 flush
+    const t = setTimeout(() => {
+      trackEvent('onboarding_started', { uid: user.uid, source: urlFlag ? 'url_flag' : 'createdAt' });
+    }, 100);
+    return () => clearTimeout(t);
+  }, [user]);
 
   // 🆕 監聽 Firestore 用戶資料，更新會員資訊
   useEffect(() => {
@@ -659,6 +748,36 @@ export default function App() {
         <EnglishLandingPage
           onBack={() => {
             setIsEnglishRoute(false);
+            window.history.pushState({}, '', '/');
+            window.location.reload();
+          }}
+        />
+      </Suspense>
+    );
+  }
+
+  // 隱私權政策（公開、不需登入）— 個資法 §8 告知五要項、可直接 link 自註冊頁勾選框
+  if (isPrivacyRoute || window.location.pathname === '/privacy') {
+    return (
+      <Suspense fallback={<SplashScreen />}>
+        <PrivacyPage
+          onBack={() => {
+            setIsPrivacyRoute(false);
+            window.history.pushState({}, '', '/');
+            window.location.reload();
+          }}
+        />
+      </Suspense>
+    );
+  }
+
+  // 服務條款（公開、不需登入）
+  if (isTermsRoute || window.location.pathname === '/terms') {
+    return (
+      <Suspense fallback={<SplashScreen />}>
+        <TermsPage
+          onBack={() => {
+            setIsTermsRoute(false);
             window.history.pushState({}, '', '/');
             window.location.reload();
           }}

@@ -42,6 +42,9 @@ import {
   Cell,
   LabelList
 } from 'recharts';
+import DisclaimerFooter from './DisclaimerFooter';
+import ShareButton from './ShareButton';
+import { auth } from '../firebase';
 
 // ============================================================
 // 輔助函式
@@ -281,9 +284,11 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
       riskScore: 0,
       riskLevel: 'Low' as 'Low' | 'Medium' | 'High',
       
-      // 【關鍵】第一年即身故的效益
-      year1Benefit: annualPremium * installmentLeverage,  // 只繳一年就身故
-      year1ROI: ((annualPremium * installmentLeverage) / annualPremium - 1) * 100,  // 第一年 ROI
+      // 【關鍵】第一年即身故的效益（保障倍數）
+      // 法規：保險商品不得以「投報率 / ROI」為訴求（金管會保險局 §15）
+      // 改以「保障倍數」表達（保額 / 已繳保費）
+      year1Benefit: annualPremium * installmentLeverage,
+      year1Multiple: installmentLeverage,
     };
     
     // 分期規劃後計算
@@ -319,7 +324,7 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
       recommendationReasons.push('年齡較高，建議把握時間立即規劃');
     } else if (age <= 55) {
       recommendation = 'installment';
-      recommendationReasons.push('年齡優勢，分期繳可獲得更高保障效益');
+      recommendationReasons.push('年齡優勢，分期繳可在較長期間內承擔保費');
     }
     
     if (healthStatus === 'critical' || healthStatus === 'ill') {
@@ -597,6 +602,15 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
               <p className={`text-3xl font-black ${calculations.taxBefore > 0 ? 'text-red-600' : 'text-green-600'}`}>
                 {formatMoney(calculations.taxBefore)}
               </p>
+            </div>
+
+            {/* 分享給客戶 — 並列在「應納遺產稅」摘要下方，獨立於 ReportModal 列印 PDF 流程 */}
+            <div className="flex justify-end pt-1">
+              <ShareButton
+                variant="full"
+                title="遺產稅試算"
+                text={`【遺產稅試算】遺產總額 ${formatMoney(calculations.totalEstateBefore)} — 應納稅額 ${formatMoney(calculations.taxBefore)}`}
+              />
             </div>
           </div>
         </div>
@@ -904,11 +918,11 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
                 
                 {/* 【關鍵賣點】第一年即保障 */}
                 <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
-                  <p className="text-xs font-bold text-amber-800 mb-1">💡 第一年即享完整保障</p>
+                  <p className="text-xs font-bold text-amber-800 mb-1">第一年即享完整保障</p>
                   <p className="text-[10px] text-amber-600">
                     繳第一年 {formatMoney(annualPremium)}，即享 {formatMoney(calculations.installment.year1Benefit)} 理賠金保障
                     <br/>
-                    <b>保障效益：{calculations.installment.year1ROI.toFixed(0)}% ROI</b>
+                    <b>保障倍數：約 {calculations.installment.year1Multiple.toFixed(1)} 倍（保額 / 已繳保費）</b>
                   </p>
                 </div>
               </div>
@@ -1070,7 +1084,7 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
                 <h4 className="font-bold text-emerald-800 flex items-center gap-2">
                   <Calendar size={20}/> 分期方案
                 </h4>
-                <p className="text-xs text-emerald-500">年繳計畫・高保障效益</p>
+                <p className="text-xs text-emerald-500">年繳計畫・分年承擔保費</p>
               </div>
               {calculations.recommendation === 'installment' && (
                 <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-bold">推薦</span>
@@ -1222,54 +1236,49 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
                 </div>
               </div>
 
-              {/* 四大施力點 */}
+              {/* 遺產稅基本知識（中性教育內容） */}
               <div>
-                <h4 className="font-bold text-amber-400 mb-2">🎯 四大施力點</h4>
+                <h4 className="font-bold text-amber-400 mb-2">遺產稅常見規則</h4>
                 <div className="space-y-2 text-xs">
                   <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-amber-300 font-bold">🔒 帳戶凍結</p>
-                    <p className="text-slate-400">「{formatMoney(cash)} 現金，家人一毛領不出」</p>
+                    <p className="text-amber-300 font-bold">繼承程序</p>
+                    <p className="text-slate-400">依《遺產及贈與稅法》第8條，遺產稅未繳清前，原則上不得分割遺產、辦理交付或移轉登記。</p>
                   </div>
                   <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-orange-300 font-bold">⏳ 空窗期</p>
-                    <p className="text-slate-400">「3-6 個月沒錢可用」</p>
+                    <p className="text-orange-300 font-bold">申報期限</p>
+                    <p className="text-slate-400">依《遺贈稅法》第23條，自被繼承人死亡之日起 6 個月內申報；申請延期最長 3 個月。</p>
                   </div>
                   <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-red-300 font-bold">👥 協議風險</p>
-                    <p className="text-slate-400">「全體繼承人同意才能動」</p>
+                    <p className="text-red-300 font-bold">遺產分割</p>
+                    <p className="text-slate-400">依《民法》第1151條，遺產於分割前由全體繼承人共同繼承，處分需全體同意。</p>
                   </div>
                   <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-blue-300 font-bold">💸 用誰的錢</p>
-                    <p className="text-slate-400">「自己的錢 vs 保險公司的錢」</p>
+                    <p className="text-blue-300 font-bold">繳納方式</p>
+                    <p className="text-slate-400">依《遺贈稅法》第30條，可申請現金分 18 期、實物抵繳或以指定受益人之保險給付支付。</p>
                   </div>
                 </div>
               </div>
 
-              {/* 躉繳 vs 分期話術 */}
+              {/* 躉繳 vs 分期（純技術說明） */}
               <div>
-                <h4 className="font-bold text-emerald-400 mb-2">💰 躉繳 vs 分期</h4>
+                <h4 className="font-bold text-emerald-400 mb-2">躉繳 vs 分期 結構差異</h4>
                 <div className="space-y-2 text-xs">
                   <div className="bg-blue-900/50 p-2 rounded border border-blue-700">
-                    <p className="text-blue-300 font-bold">躉繳優勢</p>
-                    <p className="text-slate-400">「立即見效、確定性高、適合高齡急迫」</p>
+                    <p className="text-blue-300 font-bold">躉繳結構</p>
+                    <p className="text-slate-400">一次性繳清保費；保額確定性較高，現金需求大，須評估流動性。</p>
                   </div>
                   <div className="bg-emerald-900/50 p-2 rounded border border-emerald-700">
-                    <p className="text-emerald-300 font-bold">分期優勢</p>
-                    <p className="text-slate-400">「第一年繳 {formatMoney(annualPremium)} 就享 {formatMoney(calculations.installment.year1Benefit)} 保障，保障倍數 {installmentLeverage}x」</p>
+                    <p className="text-emerald-300 font-bold">分期結構</p>
+                    <p className="text-slate-400">第一年保費 {formatMoney(annualPremium)}，年度保障 {formatMoney(calculations.installment.year1Benefit)}，第一年保額／保費比約 {installmentLeverage}（隨繳期遞減）。</p>
                   </div>
                 </div>
               </div>
 
-              {/* 金句 */}
+              {/* 風險提示 */}
               <div>
-                <h4 className="font-bold text-purple-400 mb-2">✨ 收尾金句</h4>
-                <div className="space-y-2 text-xs">
-                  <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                    「沒有規劃是遺產稅，有規劃才是傳承」
-                  </div>
-                  <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                    「留給家人，還是留給國稅局？」
-                  </div>
+                <h4 className="font-bold text-slate-400 mb-2">提醒</h4>
+                <div className="bg-slate-800/50 p-2 rounded border border-slate-700 text-xs text-slate-400 leading-relaxed">
+                  本工具為遺產稅試算參考，實際稅額以稅捐稽徵機關核定為準。保險規劃涉及保費、保額、條款排除事項與要保人指定受益人之法律效果，建議搭配律師、會計師、保險業務員專業意見後再做決定。
                 </div>
               </div>
               </div>
@@ -1277,6 +1286,8 @@ export const TaxPlannerTool = ({ data, setData, userId }: any) => {
           </div>
         </div>
       )}
+
+      <DisclaimerFooter scope="tax" />
     </div>
   );
 };

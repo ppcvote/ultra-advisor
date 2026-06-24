@@ -34,6 +34,7 @@ import {
 import { useMembership } from '../hooks/useMembership';
 import { useCheatSheetTrigger } from '../hooks/useCheatSheetTrigger';
 import { ResponsiveContainer, ComposedChart, Area, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceLine } from 'recharts';
+import DisclaimerFooter from './DisclaimerFooter';
 
 // ============================================================
 // 輔助函式
@@ -1159,10 +1160,10 @@ export const FinancialRealEstateTool = ({ data, setData, userId }: any) => {
         </div>
       </div>
 
-      {/* 金句 */}
+      {/* 提示 */}
       <div className="bg-slate-800 rounded-xl p-4 text-center">
-        <p className="text-slate-300 italic text-sm">
-          「富人買資產，窮人買負債，中產階級買他們以為是資產的負債。金融房產，是真正的資產。」
+        <p className="text-slate-400 text-xs leading-relaxed">
+          本試算為借款投資組合之情境模擬，涉及槓桿操作，可能導致本金損失。請依個人風險承受度評估，必要時諮詢合格財務顧問。
         </p>
       </div>
 
@@ -1243,66 +1244,62 @@ export const FinancialRealEstateTool = ({ data, setData, userId }: any) => {
                 </div>
               </div>
 
-              {/* 開場話術 */}
+              {/* 結構說明 */}
               <div>
-                <h4 className="font-bold text-emerald-400 mb-2">🎬 開場</h4>
+                <h4 className="font-bold text-emerald-400 mb-2">「金融房產」是什麼</h4>
                 <div className="bg-slate-800 p-3 rounded text-xs space-y-2">
-                  <p className="text-slate-300">「王先生，您有聽過<b className="text-white">金融房產</b>嗎？」</p>
-                  <p className="text-slate-300">「就是用銀行的錢，買<b className="text-white">會生錢的資產</b>，讓配息自動幫您繳房貸。」</p>
+                  <p className="text-slate-300">本工具中所稱「金融房產」為一種借款投資組合：以信用或不動產擔保取得貸款資金，投入配息型金融商品（如配息基金、ETF、債券），以投資配息支應借款利息。</p>
+                  <p className="text-slate-400">此為高風險槓桿操作，並非實體不動產投資，不具自住、租賃或登記不動產之法律地位。</p>
                 </div>
               </div>
 
-              {/* 核心賣點 */}
+              {/* 試算前提 */}
               <div>
-                <h4 className="font-bold text-amber-400 mb-2">💡 核心賣點</h4>
+                <h4 className="font-bold text-amber-400 mb-2">試算前提</h4>
                 <div className="space-y-2 text-xs">
                   <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-emerald-300 font-bold">收益差額</p>
-                    <p className="text-slate-400">「貸款 {loanRate}%，配息 {investReturnRate}%，中間差 {calculations.rateSpread.toFixed(1)}% 就是您的獲利空間」</p>
+                    <p className="text-emerald-300 font-bold">利率假設</p>
+                    <p className="text-slate-400">貸款利率 {loanRate}%（假設固定），投資配息率 {investReturnRate}%（假設）。理論利差 {calculations.rateSpread.toFixed(1)}%；不保證收益。</p>
                   </div>
                   <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-blue-300 font-bold">以息養貸</p>
-                    <p className="text-slate-400">「每月配息 {formatMoneyYuan(calculations.monthlyIncome)}，房貸 {formatMoneyYuan(calculations.monthlyPayment)}」</p>
+                    <p className="text-blue-300 font-bold">現金流對照</p>
+                    <p className="text-slate-400">月配息假設 {formatMoneyYuan(calculations.monthlyIncome)}，月還款 {formatMoneyYuan(calculations.monthlyPayment)}。若配息調降或標的下跌，現金流可能轉負。</p>
                   </div>
                   <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-purple-300 font-bold">免頭期款</p>
-                    <p className="text-slate-400">「實體房產要 200-300 萬頭期，金融房產 0 頭期」</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* 異議處理 */}
-              <div>
-                <h4 className="font-bold text-rose-400 mb-2">🛡️ 異議處理</h4>
-                <div className="space-y-2 text-xs">
-                  <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-rose-300 font-bold">「會不會賠錢？」</p>
-                    <p className="text-slate-400">→ 「配息只要 {calculations.breakEvenRate.toFixed(1)}% 就打平，我們選 {investReturnRate}% 的標的」</p>
-                  </div>
-                  <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-rose-300 font-bold">「借錢投資很危險」</p>
-                    <p className="text-slate-400">→ 「房貸也是借錢，但沒人說買房危險。差別只在買什麼」</p>
-                  </div>
-                  <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-rose-300 font-bold">「配息會被砍」</p>
-                    <p className="text-slate-400">→ 「我們選穩健標的，即使降息 1-2%，還是正現金流」</p>
+                    <p className="text-purple-300 font-bold">資金來源</p>
+                    <p className="text-slate-400">投資資金 100% 來自貸款（無自備頭期款），槓桿倍數最高，因此波動與本金風險也最大。</p>
                   </div>
                 </div>
               </div>
 
-              {/* 金句 */}
+              {/* 風險揭露（重點） */}
               <div>
-                <h4 className="font-bold text-purple-400 mb-2">✨ 收尾金句</h4>
+                <h4 className="font-bold text-rose-400 mb-2">主要風險</h4>
                 <div className="space-y-2 text-xs">
-                  <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                    「富人買資產，窮人買負債」
+                  <div className="bg-slate-800 p-2 rounded">
+                    <p className="text-rose-300 font-bold">本金虧損</p>
+                    <p className="text-slate-400">投資標的下跌時，借款本金不會減少，可能出現「資產縮水但仍須還款」的情形。</p>
                   </div>
-                  <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                    「不是買房子出租，是買現金流」
+                  <div className="bg-slate-800 p-2 rounded">
+                    <p className="text-rose-300 font-bold">配息含本金</p>
+                    <p className="text-slate-400">高配息商品的配息常包含本金返還（境外基金須揭露「本金佔配息比率」），請檢視月報書與證券投資信託基金說明。</p>
                   </div>
-                  <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                    「讓銀行的錢幫您賺錢」
+                  <div className="bg-slate-800 p-2 rounded">
+                    <p className="text-rose-300 font-bold">利率上升</p>
+                    <p className="text-slate-400">浮動利率貸款於升息環境下，月還款金額會增加，可能使損益平衡點上升至 {calculations.breakEvenRate.toFixed(1)}% 以上。</p>
                   </div>
+                  <div className="bg-slate-800 p-2 rounded">
+                    <p className="text-rose-300 font-bold">流動性</p>
+                    <p className="text-slate-400">部分商品提前贖回有手續費或損失實現，急需現金時可能被迫低點賣出。</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 提醒 */}
+              <div>
+                <h4 className="font-bold text-slate-400 mb-2">提醒</h4>
+                <div className="bg-slate-800/50 p-2 rounded border border-slate-700 text-xs text-slate-400 leading-relaxed">
+                  本工具為借款投資組合之情境試算，不構成投資建議、招攬或保證收益。借款投資具槓桿風險，可能導致本金損失甚至超出原始投資金額。實際操作前請向合格投資顧問、銀行授信專員、稅務專家完整評估。
                 </div>
               </div>
               </div>
@@ -1310,6 +1307,8 @@ export const FinancialRealEstateTool = ({ data, setData, userId }: any) => {
           </div>
         </div>
       )}
+
+      <DisclaimerFooter scope="calc" />
     </div>
   );
 };

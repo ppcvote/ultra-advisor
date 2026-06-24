@@ -42,11 +42,11 @@ import { safeStorage } from '../utils/safeStorage';
 // 常數定義（避免每次 render 重建）
 // ==========================================
 const TAB_CONFIG = [
-  { id: 'inflation', label: '通膨碎鈔機', icon: TrendingDown, colorClass: 'bg-amber-500' },
-  { id: 'unhealthy', label: '不健康餘命', icon: Bed, colorClass: 'bg-slate-700' },
-  { id: 'pension', label: '勞保破產危機', icon: TrendingUp, colorClass: 'bg-red-600' },
-  { id: 'medical', label: '醫療通膨現況', icon: Activity, colorClass: 'bg-blue-600' },
-  { id: 'cancer', label: '癌症時鐘', icon: Clock, colorClass: 'bg-orange-500' }
+  { id: 'inflation', label: '通膨數據', icon: TrendingDown, colorClass: 'bg-amber-500' },
+  { id: 'unhealthy', label: '健康餘命', icon: Bed, colorClass: 'bg-slate-700' },
+  { id: 'pension', label: '勞保財務', icon: TrendingUp, colorClass: 'bg-red-600' },
+  { id: 'medical', label: '醫療費用', icon: Activity, colorClass: 'bg-blue-600' },
+  { id: 'cancer', label: '癌症統計', icon: Clock, colorClass: 'bg-orange-500' }
 ] as const;
 
 const CONSUMER_GOODS = [
@@ -73,7 +73,10 @@ const NURSING_COST = 3800;
 const STORAGE_KEY = 'marketDataZone_activeTab';
 
 // ==========================================
-// 業務小抄資料
+// 教育素材（中性統計與技術說明，無銷售話術）
+// 註：本工具原內含「業務小抄」結構（含恐嚇式、誇大式、比較式話術），
+// 因違反《保險業務員管理規則》第 15 條與廣告自律規範，於 2026-06 全面下架。
+// 改為僅保留統計來源、定義說明、規則摘要等中性教育內容。
 // ==========================================
 const SALES_CHEATSHEET: Record<string, {
   title: string;
@@ -83,88 +86,88 @@ const SALES_CHEATSHEET: Record<string, {
   closingLines: string[];
 }> = {
   inflation: {
-    title: '通膨碎鈔機',
+    title: '通膨數據',
     color: 'amber',
     hooks: [
-      { label: '便當切入法', script: '您還記得 10 年前便當一個多少錢嗎？從 75 漲到 135，漲幅 80%。但您的存款利率有跟上嗎？' },
-      { label: '退休金貶值法', script: '如果您準備了 1000 萬退休，20 年後實際購買力只剩 500 萬。這筆錢夠用嗎？' },
-      { label: '隱形稅收法', script: '通膨是政府不用立法就能收的稅。每年 3.5% 的通膨，等於您的錢每年自動繳稅給空氣。' },
+      { label: 'CPI 定義', script: '消費者物價指數（CPI）由主計總處按月公布，反映一般消費者購買代表性商品與服務的價格變動，並非單一商品漲幅。' },
+      { label: '實質報酬', script: '實質報酬 = 名目報酬 - 通膨率。資產規劃時應同時考慮名目與實質購買力，但不同資產類別風險屬性差異大。' },
+      { label: '通膨來源', script: '通膨成因包含貨幣供給、需求拉動、成本推動、輸入性通膨等多元因素，非單一機制可解釋。' },
     ],
     objections: [
-      { q: '我放定存很安全啊', a: '定存確實保本，但 1.5% 的利率追不上 3.5% 的通膨，您的錢其實每年縮水 2%。安全的代價是購買力流失。' },
-      { q: '通膨不會一直這麼高', a: '過去 20 年平均通膨約 2-3%，但 2024-2026 體感通膨更高。重點不是預測通膨，而是讓資產增值率大於通膨。' },
+      { q: '定存與通膨的關係如何衡量？', a: '當定存利率低於通膨率，存款購買力即逐期下降；但定存本金為保證金額（受存款保險保障），與投資商品的風險性質不同，應依資金用途規劃。' },
+      { q: '長期通膨預期應如何參考？', a: '台灣央行設定中期 CPI 目標約 2%，主計總處長期歷史平均約 1.5-2.5%。短期波動可能高於長期平均值，規劃時可採用中性假設並設定情境分析。' },
     ],
     closingLines: [
-      '您希望退休時的 1000 萬是「帳面數字」還是「實際購買力」？',
-      '現在開始規劃，讓您的錢跑贏通膨，而不是被通膨吃掉。',
+      '資產配置應同時考量名目報酬、實質購買力、流動性與本金安全。',
+      '本工具為通膨資料展示，非投資建議；請依個人現金流需求與風險承受度規劃。',
     ],
   },
   unhealthy: {
-    title: '不健康餘命',
+    title: '健康餘命統計',
     color: 'rose',
     hooks: [
-      { label: '8.4 年震撼法', script: '統計顯示，國人平均有 8.4 年是在「不健康」狀態下度過的。這段時間誰來照顧您？' },
-      { label: '尊嚴代價法', script: '8.4 年 × 每月 6 萬照護費 = 超過 600 萬。這筆錢您準備好了嗎？還是要讓子女負擔？' },
-      { label: '夾心世代法', script: '您的子女未來可能同時要養小孩、還房貸、照顧您。您忍心讓他們在您的尊嚴和他們的生活間做選擇嗎？' },
+      { label: '統計來源', script: '依衛福部「健康餘命統計」，2023 年國人平均餘命約 80 歲，健康餘命約 71.6 歲，差距約 8.4 年（資料來源：衛福部統計處）。' },
+      { label: '長期照顧費用', script: '依衛福部 2023 長照需求調查，居家照顧與機構式照護費用差異大，每月介於 1-8 萬不等，視失能等級與選擇之服務型態而定。' },
+      { label: '長照 2.0 制度', script: '我國長照 2.0 提供居家服務、日照、喘息服務、輔具補助等，可按需求等級申請部分補助；補助金額視 CMS 等級與所得分級而定。' },
     ],
     objections: [
-      { q: '我身體很健康', a: '健康是現在式，失能是未來式。統計是平均值，不分健康或不健康的人。而且越健康的人可能活越久，失能期間也可能更長。' },
-      { q: '到時候再說', a: '長照險 50 歲後保費幾乎翻倍，60 歲後可能被拒保。現在規劃是用最低成本買最大保障。' },
+      { q: '失能風險如何客觀評估？', a: '可參考保險局公告之失能等級表（共 11 級 80 項），以及衛福部之 CMS 評估量表；風險試算建議採實際統計數據而非個案推估。' },
+      { q: '長期照顧保險商品有哪些差異？', a: '市售商品包含長期照顧險、特定傷病險、失能扶助險三大類，理賠定義、給付方式、保費級距均不同，建議比對條款後再決定。' },
     ],
     closingLines: [
-      '長照險不是開銷，是給未來的自己一個有尊嚴的選擇。',
-      '與其讓子女為難，不如現在就把這筆錢撥好。',
+      '長期照顧規劃涉及社會保險、商業保險、家庭資源、自有資產四項來源，應綜合考量。',
+      '本工具為統計資料展示，非保險推介；保險規劃應由合格業務員依個人需求分析後提供。',
     ],
   },
   pension: {
-    title: '勞保破產危機',
+    title: '勞保財務狀況',
     color: 'red',
     hooks: [
-      { label: '倒數計時法', script: '勞保基金預計 2031 年破產。屆時您 XX 歲，正準備退休，卻可能領不到預期的退休金。' },
-      { label: '海砂屋比喻', script: '依靠勞保退休，就像住在海砂屋裡。看起來有屋頂，但不知道哪天會塌。' },
-      { label: '數學必然法', script: '3.2 個工作人口扶養 1 個老人，繳的人變少、領的人變多。這道數學題只有一個答案：少領、多繳、延退。' },
+      { label: '財務精算', script: '依勞動部公告之「勞工保險普通事故保險基金 113 年精算評估報告」，基金未提存負債持續累積，財務狀況為各界關注議題；精算結果會隨人口、費率、給付率變動而更新。' },
+      { label: '政府撥補', script: '2020 年起政府每年依預算撥補勞保基金（2024 年度為 1,300 億元），屬延緩破產時點之措施；長期改革仍需透過費率、給付率、所得替代率調整。' },
+      { label: '人口結構', script: '依國發會人口推估，2025 年扶老比約為 24.7%，預估 2070 年將達 81.8%（每 1.2 名工作人口扶養 1 名老人），影響社會保險財務結構。' },
     ],
     objections: [
-      { q: '政府會補助', a: '政府撥補創新高，但也只是延緩而非解決。而且撥補的錢從哪來？還是全民買單。' },
-      { q: '不可能讓勞保倒', a: '沒錯，但「不倒」不代表「領得到預期金額」。希臘退休金改革砍了 40%，這在台灣也可能發生。' },
+      { q: '勞保是否會無法給付？', a: '勞保條例第 69 條規定當基金不足時由國庫補足，制度上不會「破產」至無法給付；但給付率、請領年齡、費率調整為改革常見方向。實際影響因人而異。' },
+      { q: '退休所得替代率如何計算？', a: '所得替代率 = 退休後月收入 ÷ 退休前月收入。退休所得來源包含勞保老年給付、勞退新制（個人專戶）、商業年金、自有儲蓄；建議綜合試算。' },
     ],
     closingLines: [
-      '退休規劃應建立在「沒有勞保也能活」的前提上。',
-      '把退休金掌握在自己手中，才是真正的自由。',
+      '退休規劃應整合社會保險、企業退休金、個人儲蓄三層架構。',
+      '本工具為制度說明與資料展示，非保險或投資推介；實際規劃請諮詢合格財務顧問。',
     ],
   },
   medical: {
-    title: '醫療通膨現況',
+    title: '醫療費用統計',
     color: 'emerald',
     hooks: [
-      { label: '五天損失法', script: '住院 5 天，單人房差額 4 萬 + 看護 2 萬 + 薪資損失。一場小病可能讓您損失超過 7 萬。' },
-      { label: '健保限縮法', script: '健保為了維持運作，自付額一直調漲。以前健保買單的，現在很多要自費。' },
-      { label: '收入中斷法', script: '生病最可怕的不是醫療費，是收入中斷。房貸、生活費、小孩學費不會因為您住院就暫停。' },
+      { label: '健保給付範圍', script: '全民健保採總額預算制，醫材自付差額、特殊療法、新藥納入給付有審查機制，部分項目需自費或共同負擔。' },
+      { label: '住院費用結構', script: '住院費用包含病房差額、看護、自費醫材、自費藥品、雜費。健保部分負擔依住院日數、急性慢性、轉診規定有不同比率。' },
+      { label: '所得替代缺口', script: '住院期間若請假無薪，可能產生收入中斷；勞保有傷病給付制度（住院第 4 日起按平均月投保薪資 50% 給付），仍可能存在所得替代缺口。' },
     ],
     objections: [
-      { q: '我有健保就夠了', a: '健保是基本款，但單人房、自費藥、標靶治療都不給付。您生病時想住健保房還是單人房？' },
-      { q: '我有公司團保', a: '團保是福利，離職就沒了。而且額度通常不高，一場大病可能不夠用。' },
+      { q: '健保以外的醫療開支主要有哪些？', a: '常見項目：單人病房差額（每日數千至上萬不等）、自費醫材、新藥、看護、復健、交通與陪病人員費用。實支實付醫療險可規劃補強，但條款定義差異大。' },
+      { q: '團保與個人醫療險如何選擇？', a: '團保多為一年期、離職失效、保額有上限；個人醫療險為長期約定，需自行繳費。兩者各有優劣，可依個人就業穩定性與保障期間規劃。' },
     ],
     closingLines: [
-      '醫療險規劃重點：薪資補償 + 高額實支實付雜費。',
-      '不要讓一場病，毀掉多年的財務規劃。',
+      '醫療規劃應考量健保、團保、商業保險與自留風險四層架構。',
+      '本工具為醫療費用資料展示，非保險推介；保險規劃請諮詢合格業務員。',
     ],
   },
   cancer: {
-    title: '癌症時鐘',
+    title: '癌症發生率統計',
     color: 'orange',
     hooks: [
-      { label: '3分48秒法', script: '每 3 分 48 秒就有一人罹癌。在我們談話的這 30 分鐘裡，已經有 8 個人確診癌症。' },
-      { label: '慢性病化法', script: '癌症已經從「急性死亡」變成「慢性病」。五年存活率提高，但也代表 10 年以上的昂貴療程。' },
-      { label: '標靶療程法', script: '最新標靶藥一個療程 150-350 萬，健保給付門檻極高。沒有足夠保障，只能選便宜的療法。' },
+      { label: '統計來源', script: '依國健署「2021 年癌症登記報告」，台灣每年新發癌症人數約 12.6 萬人，五年存活率約 60%；不同癌別、期別差異極大。' },
+      { label: '五年存活率', script: '癌症五年存活率反映確診後存活機率；早期診斷之乳癌、攝護腺癌等五年存活率超過 90%，部分晚期癌別則低於 20%。' },
+      { label: '健保給付', script: '健保給付癌症治療項目持續擴大，標靶藥、免疫療法陸續納入。健保未給付項目可由商業癌症險、重大傷病險補強，但理賠定義差異大。' },
     ],
     objections: [
-      { q: '我家沒有癌症病史', a: '癌症 70% 是後天因素造成的：飲食、壓力、環境。家族沒病史不代表您不會得。' },
-      { q: '現在醫學很進步', a: '沒錯，但進步的療法也更貴。您希望有選擇最好療法的權利，還是只能選健保給付的？' },
+      { q: '家族病史與罹癌風險的關係？', a: '部分癌別（乳癌、大腸癌等）有家族遺傳因素，但多數癌症發生為多重因素，包含生活型態、環境暴露、年齡；家族無病史不代表零風險。' },
+      { q: '癌症險如何規劃較合宜？', a: '癌症險分初次罹癌、住院、手術、療程、化放療等項目給付，建議依個人預算與保障缺口選擇，不必然「越多越好」。' },
     ],
     closingLines: [
-      '癌症險不是買死亡，是買「選擇權」——選擇最好療法的權利。',
-      '重大傷病險額度建議：年收入的 3 倍以上。',
+      '癌症保障規劃應考量健保給付範圍、實支實付醫療險、重大傷病險、癌症險之互補性。',
+      '本工具為癌症統計資料展示，非保險推介；保障規劃請諮詢合格業務員。',
     ],
   },
 };
@@ -483,13 +486,13 @@ export default function MarketDataZone() {
              {/* 1. 核心數據區 */}
              <div className="flex flex-col md:flex-row items-center justify-between border-b border-slate-100 pb-8 gap-8">
                 <div className="space-y-3">
-                   <h3 className="text-3xl font-black text-slate-800 flex items-center gap-3 tracking-tight"><AlertTriangle className="text-red-500" size={32}/> 勞保收支逆差失控期</h3>
-                   <p className="text-slate-500 font-medium text-lg italic">2026 年預估逆差突破千億，政府精算 2031 年基金恐用罄。</p>
+                   <h3 className="text-3xl font-black text-slate-800 flex items-center gap-3 tracking-tight"><AlertTriangle className="text-red-500" size={32}/> 勞保基金收支狀況</h3>
+                   <p className="text-slate-500 font-medium text-lg">依勞動部 113 年精算報告，2026 年預估年度逆差續擴，政府目前以年度撥補方式延緩基金用罄時點。</p>
                 </div>
-                <div className="bg-red-50 border border-red-100 px-8 py-6 rounded-3xl text-right min-w-[240px] shadow-xl ring-2 ring-red-200 animate-pulse">
-                   <div className="text-xs text-red-500 font-black uppercase mb-2 flex items-center justify-end gap-2 tracking-widest"><Siren size={18}/> 暴險倒數計時</div>
-                   <div className="text-5xl font-black text-red-600 font-mono tracking-tighter">剩 {yearsLeft} 年</div>
-                   <div className="text-sm text-red-800 font-black bg-red-100 px-3 py-1 rounded-full inline-block mt-3 uppercase tracking-tighter">屆時您將 {ageAtBankrupt} 歲 (退休懸崖)</div>
+                <div className="bg-slate-50 border border-slate-200 px-8 py-6 rounded-3xl text-right min-w-[240px] shadow-md">
+                   <div className="text-xs text-slate-500 font-black uppercase mb-2 flex items-center justify-end gap-2 tracking-widest"><Siren size={18}/> 精算用罄時點（試算）</div>
+                   <div className="text-5xl font-black text-slate-700 font-mono tracking-tighter">約 {yearsLeft} 年</div>
+                   <div className="text-sm text-slate-700 font-bold bg-slate-100 px-3 py-1 rounded-full inline-block mt-3 tracking-tight">屆時您年齡約 {ageAtBankrupt} 歲（依精算報告，未計政府撥補）</div>
                 </div>
              </div>
              
@@ -509,13 +512,13 @@ export default function MarketDataZone() {
              <div className="grid md:grid-cols-2 gap-10 mt-12">
                 {/* 2. 三大真相 */}
                 <div className="space-y-6">
-                  <h4 className="font-black text-slate-800 flex items-center gap-2 text-xl"><Target className="text-red-600" size={24}/> 2026 勞保三大真相</h4>
+                  <h4 className="font-black text-slate-800 flex items-center gap-2 text-xl"><Target className="text-red-600" size={24}/> 2026 勞保財務三項觀察</h4>
                   <div className="space-y-3">
                     {[
-                      {t:"扶養比急遽惡化", d:"2026年預估 3.2 位工作人口扶養 1 位老人。繳錢的人變少，領錢的人變多，數學規律不可逆。"},
-                      {t:"政府撥補極限", d:"政府撥補金額雖創歷史新高，但在通膨與預算排擠下，僅能延緩而非扭轉結構性財務崩盤。"},
-                      {t:"改革必然少領", d:"受限於基金規模，未來『少領、多繳、延退』是唯一的數學解答。依靠政府退休金就像住在海砂屋。"}
-                    ].map((v, i)=>(<div key={i} className="p-5 bg-white border border-slate-100 rounded-3xl shadow-sm hover:border-red-400 transition-all flex gap-4 group">
+                      {t:"扶養比變化", d:"依國發會人口推估，2026 年約 3.2 位工作人口扶養 1 位老人，2070 年預估降至 1.2:1，影響社會保險費率與給付結構。"},
+                      {t:"政府撥補措施", d:"自 2020 年起政府年度撥補勞保基金（2024 年度 1,300 億元），屬延緩基金用罄時點之政策；長期仍需透過費率與給付率調整。"},
+                      {t:"可能改革方向", d:"國際社會保險改革常見方向包含調整費率、給付率、請領年齡。實際修法須經立法程序，個人退休規劃可參考三層保障架構。"}
+                    ].map((v, i)=>(<div key={i} className="p-5 bg-white border border-slate-100 rounded-3xl shadow-sm hover:border-slate-300 transition-all flex gap-4 group">
                       <ChevronRight className="text-red-400 shrink-0 group-hover:translate-x-1 transition-all" size={22}/><div className="text-sm"><p className="font-black text-slate-800 text-base">{v.t}</p><p className="text-slate-500 font-medium mt-1 leading-relaxed italic">{v.d}</p></div>
                     </div>))}
                   </div>
@@ -523,7 +526,7 @@ export default function MarketDataZone() {
                   <div className="p-5 bg-slate-50 border border-slate-200 rounded-3xl">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><FileText size={14}/> 權威數據來源文獻</p>
                     <div className="text-[11px] text-slate-500 space-y-3 font-bold italic">
-                      <p className="flex justify-between items-center group cursor-pointer hover:text-red-600 transition-colors"><span>• 勞動部勞安所 113年勞保精算報告 (2031 破產臨界)</span><ExternalLink size={12}/></p>
+                      <p className="flex justify-between items-center group cursor-pointer hover:text-red-600 transition-colors"><span>• 勞動部勞安所 113 年勞保普通事故保險基金精算評估報告</span><ExternalLink size={12}/></p>
                       <p className="flex justify-between items-center group cursor-pointer hover:text-red-600 transition-colors"><span>• 國發會 2025-2026 人口結構推估圖 (超高齡化預警)</span><ExternalLink size={12}/></p>
                       <p className="flex justify-between items-center group cursor-pointer hover:text-red-600 transition-colors"><span>• 行政院 2026 勞保撥補預算案編列公告</span><ExternalLink size={12}/></p>
                     </div>
@@ -534,13 +537,13 @@ export default function MarketDataZone() {
                    <div className="absolute top-0 right-0 p-4 opacity-5"><Activity size={200}/></div>
                    <div className="relative z-10">
                      <div className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase w-fit mb-6 tracking-widest">Consultant Insights</div>
-                     <h4 className="text-2xl font-bold text-red-400 mb-8 flex items-center gap-4 tracking-tighter"><ShieldAlert size={36}/> 總結：當退休金變成政府津貼</h4>
-                     <div className="space-y-6 text-sm text-slate-300 leading-relaxed font-bold italic opacity-90 transition-opacity">
-                        <p>「2026 年是正式轉折點。勞保不會消失，但其角色將從『生活保障』退縮為『基本津貼』。退休即懸崖的風險在 2031 年將達到頂峰。」</p>
-                        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 space-y-4 font-bold not-italic text-slate-100">
-                          <p className="flex items-center gap-3"><Target size={14} className="text-red-500"/> 退休規劃應建立在「沒有勞保」也能活的前提</p>
-                          <p className="flex items-center gap-3"><Target size={14} className="text-red-500"/> 強化私人第二與第三層年金（自提與複利）</p>
-                          <p className="flex items-center gap-3"><Target size={14} className="text-red-500"/> 退休金掌握在自己手中，才是真自由</p>
+                     <h4 className="text-2xl font-bold text-red-400 mb-8 flex items-center gap-4 tracking-tighter"><ShieldAlert size={36}/> 觀察小結：退休所得多元化規劃</h4>
+                     <div className="space-y-6 text-sm text-slate-300 leading-relaxed">
+                        <p>依精算趨勢，勞保現行給付結構在費率與給付率不調整的情況下面臨壓力。政府已啟動年度撥補機制，惟長期改革方向（費率、給付率、請領年齡）仍待立法調整。</p>
+                        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 space-y-4 text-slate-100">
+                          <p className="flex items-center gap-3"><Target size={14} className="text-red-500"/> 退休所得規劃可參考三層架構：社會保險、企業退休金、個人儲蓄</p>
+                          <p className="flex items-center gap-3"><Target size={14} className="text-red-500"/> 可評估勞退新制自提（薪資 6% 內免稅）與其他自有儲蓄工具</p>
+                          <p className="flex items-center gap-3"><Target size={14} className="text-red-500"/> 規劃前提建議涵蓋「社會保險給付額度變動」之情境</p>
                         </div>
                      </div>
                    </div>
@@ -700,13 +703,13 @@ export default function MarketDataZone() {
              <div className="grid md:grid-cols-2 gap-10 mt-12">
                 {/* 2. 三大真相 */}
                 <div className="space-y-6">
-                  <h4 className="font-black text-slate-800 flex items-center gap-3 text-xl"><Target className="text-rose-500" size={24}/> 2026 癌症醫療真相</h4>
+                  <h4 className="font-black text-slate-800 flex items-center gap-3 text-xl"><Target className="text-rose-500" size={24}/> 2026 癌症醫療兩項觀察</h4>
                   <div className="space-y-4">
                     {[
-                      {t:"慢性化趨勢", d:"癌症已從『急性死亡』轉變為『慢性病』。五年存活率提升的背後，是長達 10 年以上的昂貴維持性療程。"},
-                      {t:"精密醫學錢坑", d:"2026 年最新標靶與細胞療法，一套療程常落在 150 萬至 350 萬之間。健保給付門檻極高，自費已成唯一選擇。"}
+                      {t:"治療慢性化", d:"癌症五年存活率隨醫療進步提升，平均治療期程延長；維持性療程（標靶、免疫療法）為長期門診照護需求。"},
+                      {t:"自費治療項目", d:"標靶藥與細胞療法之自費費用因藥品、療程而異，依國健署資料常見區間為 150-350 萬元；健保給付項目持續滾動納入。"}
                     ].map((v, i)=>(<div key={i} className="p-6 bg-white border border-slate-200 rounded-[32px] shadow-sm hover:border-rose-400 hover:shadow-xl transition-all flex gap-5 group">
-                       <HeartPulse size={32} className="text-rose-400 shrink-0 group-hover:scale-110 transition-transform"/><div className="text-sm"><p className="font-black text-slate-800 text-lg tracking-tight">{v.t}</p><p className="text-slate-500 font-medium leading-relaxed mt-2 italic">{v.d}</p></div>
+                       <HeartPulse size={32} className="text-rose-400 shrink-0 group-hover:scale-110 transition-transform"/><div className="text-sm"><p className="font-black text-slate-800 text-lg tracking-tight">{v.t}</p><p className="text-slate-500 font-medium leading-relaxed mt-2">{v.d}</p></div>
                     </div>))}
                   </div>
                   {/* 3. 權威來源 */}
@@ -723,12 +726,12 @@ export default function MarketDataZone() {
                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-25 transition-opacity"><Crosshair size={220}/></div>
                    <div className="relative z-10">
                       <div className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase w-fit mb-8 tracking-widest">Consultant Insights</div>
-                      <h4 className="text-3xl font-black text-rose-400 mb-8 flex items-center gap-4 tracking-tighter"><ShieldAlert size={44}/> 總結：建立您的防火牆</h4>
-                      <p className="text-base leading-relaxed text-slate-300 italic font-bold mb-10 opacity-95">「2026 年癌症規劃重點：從單純的死殘賠付，正式轉向『高額自費醫療』與『長期看護保全』的雙向配置。不要讓一場病，毀掉一輩子的資產積累。」</p>
-                      <div className="bg-white/5 p-8 rounded-3xl border border-white/10 space-y-6 font-black tracking-widest text-slate-100 shadow-inner">
-                         <div className="flex items-center gap-4 text-sm"><div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div> 重大傷病險額度應 ＞ 年收入 3 倍</div>
-                         <div className="flex items-center gap-4 text-sm"><div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div> 實支實付需高度關注「雜費額度」</div>
-                         <div className="flex items-center gap-4 text-sm"><div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div> 長照專款應獨立配置，嚴禁交叉佔用</div>
+                      <h4 className="text-3xl font-black text-rose-400 mb-8 flex items-center gap-4 tracking-tighter"><ShieldAlert size={44}/> 觀察小結：醫療保障規劃面向</h4>
+                      <p className="text-base leading-relaxed text-slate-300 mb-10 opacity-95">近年癌症醫療規劃焦點，從傳統的死殘給付逐步擴及「自費醫療項目」與「長期照護需求」之保障配置；相關規劃須依個人健康狀況、家庭責任、財務狀況綜合評估。</p>
+                      <div className="bg-white/5 p-8 rounded-3xl border border-white/10 space-y-6 tracking-widest text-slate-100 shadow-inner">
+                         <div className="flex items-center gap-4 text-sm"><div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div> 重大傷病險、實支實付醫療險、癌症險之保障互補性</div>
+                         <div className="flex items-center gap-4 text-sm"><div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div> 實支實付商品之雜費上限、副本理賠條款比對</div>
+                         <div className="flex items-center gap-4 text-sm"><div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div> 長期照護費用之專款規劃與既有資產用途之區隔</div>
                       </div>
                    </div>
                 </div>

@@ -31,6 +31,7 @@ import { db } from '../firebase';
 
 import { toast } from '../utils/toast';
 import { safeStorage } from '../utils/safeStorage';
+import DisclaimerFooter from './DisclaimerFooter';
 // ============================================================
 // 類型定義
 // ============================================================
@@ -1586,6 +1587,10 @@ export default function SimpleCalculator({ user, onLogin }: SimpleCalculatorProp
         saveSuccess={saveSuccess}
         showLoginPrompt={showLoginPrompt}
       />
+
+      <div className="max-w-4xl mx-auto px-4 pb-4">
+        <DisclaimerFooter scope="calc" />
+      </div>
     </div>
   );
 }

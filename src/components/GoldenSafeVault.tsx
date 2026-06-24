@@ -6,6 +6,7 @@ import {
 import { useMembership } from '../hooks/useMembership';
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import DisclaimerFooter from './DisclaimerFooter';
 
 // ============================================================
 // 格式化函式
@@ -288,7 +289,7 @@ export default function GoldenSafeVault({ data, setData, userId }: any) {
             <Lock size={36}/> 黃金保險箱理論
           </h1>
           <p className="text-slate-300 text-lg max-w-2xl mx-auto md:mx-0">
-            存錢沒有奇蹟，只有路徑。最重要的是：您的保險箱上鎖了嗎？
+            儲蓄資產壓力測試工具：模擬重大事件對長期儲蓄的可能影響。
           </p>
         </div>
       </div>
@@ -699,156 +700,114 @@ export default function GoldenSafeVault({ data, setData, userId }: any) {
             <div className="flex-1 overflow-y-auto p-6">
               {isPaidMember ? (
                 <div className="space-y-6">
-                  {/* 核心觀念 */}
+                  {/* 概念說明 */}
                   <div>
                     <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
                       <span className="w-6 h-6 bg-yellow-500 text-white rounded-full flex items-center justify-center text-sm">1</span>
-                      核心觀念
+                      概念說明
                     </h3>
                     <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg">
-                      <p className="text-slate-700 leading-relaxed font-medium text-lg mb-3">
-                        「存錢沒有奇蹟，只有路徑」
+                      <p className="text-slate-700 leading-relaxed mb-3">
+                        本工具為「儲蓄資產壓力測試」之教育情境模擬，協助使用者觀察重大事件（醫療、市場波動、稅務）對長期儲蓄的可能影響。
                       </p>
-                      <p className="text-slate-600 leading-relaxed">
-                        錢不是存起來，就是花掉。今天沒有存起來，明天就會被花掉。<br/>
-                        重點不是「存多少」，而是「存的錢有沒有上鎖」。
+                      <p className="text-slate-600 leading-relaxed text-sm">
+                        模擬結果為情境假設，並非真實發生機率；資產配置策略應由本人或合格顧問依個人狀況評估。
                       </p>
                     </div>
                   </div>
 
-                  {/* 兩種存錢路徑 */}
+                  {/* 兩種儲蓄結構 */}
                   <div>
                     <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
                       <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm">2</span>
-                      兩種存錢路徑
+                      兩種儲蓄結構
                     </h3>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-blue-50 p-4 rounded-lg text-center">
-                        <p className="font-bold text-blue-700 mb-2">用錢存錢</p>
+                        <p className="font-bold text-blue-700 mb-2">單筆投入</p>
                         <p className="text-slate-600 text-sm">
-                          一次投入較大本金<br/>
-                          讓複利滾動
+                          一次投入較大本金，<br/>
+                          以複利累積
                         </p>
                       </div>
                       <div className="bg-emerald-50 p-4 rounded-lg text-center">
-                        <p className="font-bold text-emerald-700 mb-2">用時間存錢</p>
+                        <p className="font-bold text-emerald-700 mb-2">定期投入</p>
                         <p className="text-slate-600 text-sm">
-                          每年固定存入<br/>
-                          <strong>十年一個單位</strong>
+                          每年固定金額，<br/>
+                          長期累積
                         </p>
                       </div>
                     </div>
+                    <p className="text-slate-500 text-xs mt-2 leading-relaxed">
+                      兩種方式之風險屬性、流動性、稅務效果不同，無絕對優劣，須依個人現金流規劃選擇。
+                    </p>
                   </div>
 
-                  {/* 話術範例 */}
+                  {/* 三類風險事件（中性說明） */}
                   <div>
                     <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm">3</span>
-                      完整話術
-                    </h3>
-                    <div className="bg-purple-50 p-4 rounded-lg space-y-3 border-l-4 border-purple-400">
-                      <p className="text-slate-700 italic leading-relaxed">
-                        「存錢沒有奇蹟，只有路徑。」
-                      </p>
-                      <p className="text-slate-700 italic leading-relaxed">
-                        「錢不是存起來，就是花掉。今天沒有存起來，明天就會被花掉。」
-                      </p>
-                      <p className="text-slate-700 italic leading-relaxed">
-                        「但錢怎麼存？透過<strong>錢</strong>去存錢，或者用<strong>時間</strong>去存錢。」
-                      </p>
-                      <p className="text-slate-700 italic leading-relaxed">
-                        「用時間存錢的話，我建議<strong>以十年一個單位</strong>。」
-                      </p>
-                      <p className="text-slate-700 italic leading-relaxed">
-                        「選擇存錢方式，就像在選擇保險箱。但這保險箱如果沒有鎖，<strong>醫院、市場、政府</strong>都可能把手伸進來拿走你的錢，而且還不能拒絕。」
-                      </p>
-                      <p className="text-slate-700 italic leading-relaxed">
-                        「所以無論怎麼存錢，最重要的是這保險箱有沒有上鎖。」
-                      </p>
-                      <p className="text-slate-700 italic leading-relaxed font-bold text-emerald-700">
-                        「我們每年只要提撥10%的存錢金額出來，這三個風險將無法對你造成傷害。」
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* 三大風險說明 */}
-                  <div>
-                    <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm">4</span>
-                      三大伸手風險
+                      <span className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm">3</span>
+                      三類常見風險事件
                     </h3>
                     <div className="space-y-2">
-                      <div className="bg-red-50 p-3 rounded-lg flex items-start gap-3">
+                      <div className="bg-slate-50 p-3 rounded-lg flex items-start gap-3 border border-slate-200">
                         <span className="text-2xl">🏥</span>
                         <div>
-                          <p className="font-bold text-red-700">醫院伸手（重大傷病）</p>
+                          <p className="font-bold text-slate-700">重大傷病與長期照顧</p>
                           <p className="text-slate-600 text-sm">
-                            重大疾病發生時，醫療費、看護費、收入中斷，資產被迫變現
+                            若發生需高額自費醫療或長期照護之情形，自有資金可能須部分變現以支應開支。商業保險（醫療險、重大傷病險、長照險）為常見之風險移轉工具。
                           </p>
                         </div>
                       </div>
-                      <div className="bg-red-50 p-3 rounded-lg flex items-start gap-3">
+                      <div className="bg-slate-50 p-3 rounded-lg flex items-start gap-3 border border-slate-200">
                         <span className="text-2xl">📉</span>
                         <div>
-                          <p className="font-bold text-red-700">市場伸手（市場崩盤）</p>
+                          <p className="font-bold text-slate-700">市場波動</p>
                           <p className="text-slate-600 text-sm">
-                            金融海嘯、股災發生，市場跌30%是常態，資產瞬間縮水
+                            股票市場長期報酬正向，但歷史上曾出現單年回撤達 30-50% 的情形（如 2000、2008）。資產配置之風險屬性與時間軸應一併考量。
                           </p>
                         </div>
                       </div>
-                      <div className="bg-red-50 p-3 rounded-lg flex items-start gap-3">
+                      <div className="bg-slate-50 p-3 rounded-lg flex items-start gap-3 border border-slate-200">
                         <span className="text-2xl">🏛️</span>
                         <div>
-                          <p className="font-bold text-red-700">政府伸手（稅務/債務）</p>
+                          <p className="font-bold text-slate-700">稅務與債務</p>
                           <p className="text-slate-600 text-sm">
-                            遺產稅、贈與稅、債務追討，依法強制執行無法拒絕
+                            遺產稅、贈與稅、所得稅依現行稅法規定計算；個人債務、強制執行依《強制執行法》辦理。提前規劃可降低事件發生時之流動性壓力。
                           </p>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* 結案話術 */}
+                  {/* 規劃考量 */}
                   <div>
                     <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-sm">5</span>
-                      結案引導
+                      <span className="w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-sm">4</span>
+                      規劃考量點
                     </h3>
                     <div className="bg-emerald-50 p-4 rounded-lg border-l-4 border-emerald-500">
-                      <p className="text-slate-700 leading-relaxed italic">
-                        「那你覺得，用時間跟用資產存錢，哪個比較適合你？」
-                      </p>
-                      <p className="text-slate-500 text-sm mt-3">
-                        → 讓客戶自己選擇路徑，再根據選擇深入討論保障規劃
+                      <ul className="text-slate-700 text-sm space-y-2 list-disc pl-5">
+                        <li>整體財務目標（短／中／長期）</li>
+                        <li>家庭責任與被扶養人狀況</li>
+                        <li>風險承受度（投資波動可接受範圍）</li>
+                        <li>既有保障與既有資產配置缺口</li>
+                        <li>稅務狀況與遺產規劃需求</li>
+                      </ul>
+                      <p className="text-slate-500 text-xs mt-3">
+                        以上為討論面向，非銷售清單；建議與合格財務顧問或保險業務員逐項討論。
                       </p>
                     </div>
                   </div>
 
-                  {/* 常見問答 */}
+                  {/* 提醒 */}
                   <div>
                     <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                      <span className="w-6 h-6 bg-slate-500 text-white rounded-full flex items-center justify-center text-sm">6</span>
-                      常見問答
+                      <span className="w-6 h-6 bg-slate-500 text-white rounded-full flex items-center justify-center text-sm">5</span>
+                      提醒
                     </h3>
-                    <div className="space-y-3">
-                      <div className="border border-slate-200 rounded-lg p-3">
-                        <p className="font-bold text-slate-700">Q: 10%成本太高了吧？</p>
-                        <p className="text-slate-600 text-sm mt-1">
-                          A: 「10%是保守估算。如果發生重大傷病，一次可能損失15%以上，市場崩盤更可能損失30%。您覺得先付10%保住全部，還是賭賭看？」
-                        </p>
-                      </div>
-                      <div className="border border-slate-200 rounded-lg p-3">
-                        <p className="font-bold text-slate-700">Q: 我身體很健康，應該不需要。</p>
-                        <p className="text-slate-600 text-sm mt-1">
-                          A: 「保險箱的鎖是給健康的時候裝的。等到需要的時候，可能已經裝不上了。」
-                        </p>
-                      </div>
-                      <div className="border border-slate-200 rounded-lg p-3">
-                        <p className="font-bold text-slate-700">Q: 我資產夠多，應該不怕這些風險。</p>
-                        <p className="text-slate-600 text-sm mt-1">
-                          A: 「資產越大，被伸手拿走的比例越驚人。1億資產損失15%就是1500萬，這不是小數目。」
-                        </p>
-                      </div>
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-600 leading-relaxed">
+                      本工具為教育目的之情境模擬，不構成投資、保險、稅務或法律建議。實際規劃涉及個人狀況差異，請諮詢合格之財務顧問、保險業務員、稅務代理人或律師。
                     </div>
                   </div>
                 </div>
@@ -1027,6 +986,8 @@ export default function GoldenSafeVault({ data, setData, userId }: any) {
           </div>
         </div>
       )}
+
+      <DisclaimerFooter scope="insurance" />
     </div>
   );
 }

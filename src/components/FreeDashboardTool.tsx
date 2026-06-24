@@ -29,6 +29,7 @@ import { BigSmallReservoirTool } from './BigSmallReservoirTool';
 import { TaxPlannerTool } from './TaxPlannerTool';
 
 import { safeStorage } from '../utils/safeStorage';
+import DisclaimerFooter from './DisclaimerFooter';
 // 工具定義表
 const TOOL_REGISTRY = [
   { id: 'golden_safe', name: '黃金保險箱', component: GoldenSafeVault, dataKey: 'goldenSafeData', color: 'bg-amber-500' },
@@ -451,6 +452,8 @@ const FreeDashboardTool: React.FC<FreeDashboardProps> = ({ allData, setAllData, 
           </div>
         )}
       </div>
+
+      <DisclaimerFooter scope="calc" />
     </div>
   );
 };

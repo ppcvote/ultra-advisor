@@ -36,6 +36,9 @@ import {
   Legend,
   ReferenceLine
 } from 'recharts';
+import DisclaimerFooter from './DisclaimerFooter';
+import ShareButton from './ShareButton';
+import { auth } from '../firebase';
 
 // ============================================
 // Helper Functions (Utils)
@@ -1169,6 +1172,15 @@ const MillionDollarGiftTool = ({ data, setData, userId }: any) => {
             rate={c3Rate}
           />
         </div>
+
+        {/* 分享給客戶 — 與「三循環成果關鍵指標」並列下方 */}
+        <div className="flex justify-end mt-4">
+          <ShareButton
+            variant="full"
+            title="百萬禮物專案"
+            text={`【百萬禮物專案】首期 ${loanAmount} 萬 / ${loanTerm * 3} 年計畫 — 預估淨收益 ${netProfit_Wan} 萬`}
+          />
+        </div>
       </div>
 
       {/* Strategy Section: 策略說明 */}
@@ -1341,66 +1353,58 @@ const MillionDollarGiftTool = ({ data, setData, userId }: any) => {
                   </div>
                 </div>
 
-                {/* ========== 2. 開場話術 ========== */}
+                {/* ========== 2. 專案結構說明 ========== */}
                 <div>
-                  <h4 className="font-bold text-emerald-400 mb-2">開場</h4>
+                  <h4 className="font-bold text-emerald-400 mb-2">專案結構</h4>
                   <div className="bg-slate-800 p-3 rounded text-xs space-y-2">
-                    <p className="text-slate-300">「王先生，您有想過要送給孩子一份<b className="text-white">會長大的禮物</b>嗎？」</p>
-                    <p className="text-slate-300">「這個專案讓您用<b className="text-white">{loanTerm * 3}年時間</b>，累積 <b className="text-white">{finalAssetValue_Wan}萬</b> 資產，當作孩子的成年禮或自己的退休金。」</p>
+                    <p className="text-slate-300">本試算採三循環設計：每 {loanTerm} 年為一循環，共 {loanTerm * 3} 年。每循環貸款 {loanAmount} 萬，投入指定標的，假設年化報酬 {investReturnRate}%。</p>
+                    <p className="text-slate-400">{isCompoundMode ? '複利模式：配息再投入。' : '配息模式：配息用於償還貸款利息。'}此為情境模擬，非保證收益。</p>
                   </div>
                 </div>
 
-                {/* ========== 3. 核心賣點 ========== */}
+                {/* ========== 3. 試算假設 ========== */}
                 <div>
-                  <h4 className="font-bold text-amber-400 mb-2">核心賣點</h4>
+                  <h4 className="font-bold text-amber-400 mb-2">試算假設</h4>
                   <div className="space-y-2 text-xs">
                     <div className="bg-slate-800 p-2 rounded">
-                      <p className="text-emerald-300 font-bold">收益差額</p>
-                      <p className="text-slate-400">「貸款 {loanRate}%，投資報酬 {investReturnRate}%，中間差 {rateSpread.toFixed(1)}% 就是您的獲利空間」</p>
+                      <p className="text-emerald-300 font-bold">利率假設</p>
+                      <p className="text-slate-400">貸款利率 {loanRate}%（固定），投資年化 {investReturnRate}%（假設）。實際借貸利率以銀行核定為準，投資報酬非保證且可能為負。</p>
                     </div>
                     <div className="bg-slate-800 p-2 rounded">
-                      <p className="text-blue-300 font-bold">三循環複利</p>
-                      <p className="text-slate-400">「透過三次循環，{isCompoundMode ? '讓資產滾雪球般成長' : '配息幫您還貸款'}，最終累積 {finalAssetValue_Wan} 萬」</p>
+                      <p className="text-blue-300 font-bold">複利公式</p>
+                      <p className="text-slate-400">三次循環後期末資產約 {finalAssetValue_Wan} 萬（不含通膨、稅負、匯率、手續費調整）。</p>
                     </div>
                     <div className="bg-slate-800 p-2 rounded">
-                      <p className="text-purple-300 font-bold">資產放大效果</p>
-                      <p className="text-slate-400">「實付 {totalProjectCost_Wan} 萬，擁有 {finalAssetValue_Wan} 萬資產，放大 {assetMultiplier} 倍」</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ========== 4. 異議處理 ========== */}
-                <div>
-                  <h4 className="font-bold text-rose-400 mb-2">異議處理</h4>
-                  <div className="space-y-2 text-xs">
-                    <div className="bg-slate-800 p-2 rounded">
-                      <p className="text-rose-300 font-bold">「借錢投資很危險？」</p>
-                      <p className="text-slate-400">→ 「買房也是借錢，但沒人說買房危險。差別只在買什麼、報酬率多少。」</p>
-                    </div>
-                    <div className="bg-slate-800 p-2 rounded">
-                      <p className="text-rose-300 font-bold">「21年太久了？」</p>
-                      <p className="text-slate-400">→ 「房貸也是20-30年，但金融房產{isCompoundMode ? '還會自己長大' : '還有配息幫您還款'}。」</p>
-                    </div>
-                    <div className="bg-slate-800 p-2 rounded">
-                      <p className="text-rose-300 font-bold">「配息會被砍？」</p>
-                      <p className="text-slate-400">→ 「我們選穩健標的，即使降息 1-2%，長期平均還是有正報酬。」</p>
+                      <p className="text-purple-300 font-bold">成本對照</p>
+                      <p className="text-slate-400">累計實付（本息合計，未折現）約 {totalProjectCost_Wan} 萬。實際內部報酬率（IRR）需考慮時間價值，請另行計算。</p>
                     </div>
                   </div>
                 </div>
 
-                {/* ========== 5. 收尾金句 ========== */}
+                {/* ========== 4. 風險與限制 ========== */}
                 <div>
-                  <h4 className="font-bold text-purple-400 mb-2">收尾金句</h4>
+                  <h4 className="font-bold text-rose-400 mb-2">風險與限制</h4>
                   <div className="space-y-2 text-xs">
-                    <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                      「給孩子的不是一筆錢，而是一套會長大的資產」
+                    <div className="bg-slate-800 p-2 rounded">
+                      <p className="text-rose-300 font-bold">槓桿風險</p>
+                      <p className="text-slate-400">投資資金來自貸款，若標的下跌或配息低於預期，可能出現現金流缺口，仍須以個人收入填補貸款本息。</p>
                     </div>
-                    <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                      「用時間換財富，讓複利為您工作」
+                    <div className="bg-slate-800 p-2 rounded">
+                      <p className="text-rose-300 font-bold">長期承諾</p>
+                      <p className="text-slate-400">本專案規劃期間 {loanTerm * 3} 年，期間個人收入、健康、利率環境均可能改變。提前解約可能產生違約金或實現虧損。</p>
                     </div>
-                    <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                      「{loanTerm * 3}年後，您會感謝今天的決定」
+                    <div className="bg-slate-800 p-2 rounded">
+                      <p className="text-rose-300 font-bold">配息變動</p>
+                      <p className="text-slate-400">高配息商品的配息率可能調降，且部分配息來自本金。應檢視標的之配息來源（含本金佔比）。</p>
                     </div>
+                  </div>
+                </div>
+
+                {/* ========== 5. 提醒 ========== */}
+                <div>
+                  <h4 className="font-bold text-slate-400 mb-2">提醒</h4>
+                  <div className="bg-slate-800/50 p-2 rounded border border-slate-700 text-xs text-slate-400 leading-relaxed italic">
+                    本工具為長期投資與貸款組合的情境模擬，不構成投資建議、保險推介或貸款推銷。實際決策應由本人就風險承受度、現金流穩定性、家庭規劃綜合評估，必要時諮詢合格財務顧問。
                   </div>
                 </div>
               </div>
@@ -1408,6 +1412,8 @@ const MillionDollarGiftTool = ({ data, setData, userId }: any) => {
           </div>
         </div>
       )}
+
+      <DisclaimerFooter scope="tax" />
     </div>
   );
 };

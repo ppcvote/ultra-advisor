@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { FileBarChart, ArrowUpFromLine, X, User, Calendar, PenTool, Phone, Mail, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, ComposedChart 
+import { FileBarChart, ArrowUpFromLine, X, User, Calendar, PenTool, Phone, Mail, Eye, EyeOff, CheckCircle2, Building2 } from 'lucide-react';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, ComposedChart
 } from 'recharts';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 // --- 引入專屬報告元件 ---
 import GiftReport from './GiftReport';
 import EstateReport from './EstateReport';
 import StudentLoanReport from './StudentLoanReport';
 import SuperActiveReport from './SuperActiveReport';
+import DisclaimerFooter from './DisclaimerFooter';
 
 // ------------------------------------------------------------------
 // Legacy Chart Renderer (保留給其他尚未改版的工具)
@@ -44,12 +47,22 @@ const LegacyChartSection = ({ reportContent, isPrinting }: { reportContent: any,
 // ------------------------------------------------------------------
 // Report Component Main (總指揮)
 // ------------------------------------------------------------------
+// Shape of optional advisor-profile fields we hydrate from Firestore users/{uid}.
+// All optional — the auth user prop (`user`) only carries displayName/email/uid,
+// so phone / licenses / companyName have to be lazy-fetched at modal open time.
+interface AdvisorProfile {
+  phone?: string;
+  licenses?: string[];
+  companyName?: string;
+}
+
 const ReportModal = ({ isOpen, onClose, user, client, activeTab, data }: any) => {
   const [advisorNote, setAdvisorNote] = useState('');
   const [showNoteInput, setShowNoteInput] = useState(true);
   const [showContact, setShowContact] = useState(true);
-  const [mounted, setMounted] = useState(false); 
+  const [mounted, setMounted] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [advisorProfile, setAdvisorProfile] = useState<AdvisorProfile>({});
 
   // Logo 路徑
   const LOGO_URL = "/logo.png";
@@ -65,6 +78,30 @@ const ReportModal = ({ isOpen, onClose, user, client, activeTab, data }: any) =>
           setShowNoteInput(true);
       }
   }, [isOpen]);
+
+  // Lazy-fetch the advisor's Firestore profile when the modal opens.
+  // Why: the `user` prop is the firebase.User (auth-only) and doesn't carry
+  // phone / licenses / companyName. We pull them on-demand instead of plumbing
+  // them through every call site. Silently no-op on error so the report still
+  // renders if the doc is missing or rules block the read.
+  useEffect(() => {
+      if (!isOpen || !user?.uid) return;
+      let cancelled = false;
+      getDoc(doc(db, 'users', user.uid))
+          .then((snap) => {
+              if (cancelled || !snap.exists()) return;
+              const d = snap.data() as any;
+              setAdvisorProfile({
+                  phone: typeof d.phone === 'string' && d.phone.trim() ? d.phone.trim() : undefined,
+                  licenses: Array.isArray(d.licenses)
+                      ? d.licenses.filter((x: any) => typeof x === 'string' && x.trim()).map((x: string) => x.trim())
+                      : undefined,
+                  companyName: typeof d.companyName === 'string' && d.companyName.trim() ? d.companyName.trim() : undefined,
+              });
+          })
+          .catch(() => { /* silent — report should still render */ });
+      return () => { cancelled = true; };
+  }, [isOpen, user?.uid]);
    
   if (!isOpen || !mounted) return null;
 
@@ -192,10 +229,31 @@ const ReportModal = ({ isOpen, onClose, user, client, activeTab, data }: any) =>
                         <div>
                             <p className="text-xs text-slate-400 font-bold mb-2 uppercase tracking-wider">Financial Advisor</p>
                             <h2 className="text-2xl font-bold text-slate-800">{user?.displayName || '專業理財顧問'}</h2>
+                            {advisorProfile.companyName && (
+                                <p className="text-slate-500 mt-1 flex items-center gap-2 text-sm">
+                                    <Building2 size={14}/> {advisorProfile.companyName}
+                                </p>
+                            )}
+                            {advisorProfile.licenses && advisorProfile.licenses.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {advisorProfile.licenses.map((lic) => (
+                                        <span
+                                            key={lic}
+                                            className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-bold text-blue-700 tracking-wider"
+                                        >
+                                            {lic}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                             {showContact && (
                                 <>
                                     {user?.email && <p className="text-slate-500 mt-2 flex items-center gap-2 text-sm"><Mail size={14}/> {user.email}</p>}
-                                    <p className="text-slate-500 mt-1 flex items-center gap-2 text-sm"><Phone size={14}/> 09xx-xxx-xxx</p>
+                                    {advisorProfile.phone ? (
+                                        <p className="text-slate-500 mt-1 flex items-center gap-2 text-sm"><Phone size={14}/> {advisorProfile.phone}</p>
+                                    ) : (
+                                        <p className="text-slate-400 mt-1 flex items-center gap-2 text-sm"><Phone size={14}/> 請聯繫顧問</p>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -294,9 +352,15 @@ const ReportModal = ({ isOpen, onClose, user, client, activeTab, data }: any) =>
                     )}
                 </div>
 
+                {/* Compliance disclaimer — CRITICAL #2 個資合規三件套.
+                    Wrapped so the dark-theme component reads correctly on the
+                    white A4 page; the inner component handles the legal copy. */}
+                <div className="mt-6 print-break-inside [&_.bg-slate-900\\/40]:!bg-slate-50 [&_.border-slate-700\\/60]:!border-slate-200 [&_.text-slate-400]:!text-slate-600 [&_.text-slate-300]:!text-slate-800 [&_.text-slate-500]:!text-slate-500 [&_.bg-slate-800\\/80]:!bg-white [&_.border-slate-700]:!border-slate-200">
+                    <DisclaimerFooter scope="calc" />
+                </div>
+
                 {/* Footer */}
                 <div className="mt-4 print:mt-1 text-center text-[10px] text-slate-300 border-t border-slate-50 pt-4 print:mt-1">
-                    <p>免責聲明：本報告所載資料僅供財務規劃參考，不構成任何投資建議。投資有風險，請謹慎評估。</p>
                     <p>© {new Date().getFullYear()} Ultra Advisor System • Generated for {client?.name}</p>
                 </div>
             </div>

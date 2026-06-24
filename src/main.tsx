@@ -1,7 +1,19 @@
+// 觀測三件套必須在任何其他 import 之前 init，才能抓到模組載入期間的錯誤
+import { initSentry } from './lib/sentry'
+initSentry()
+
 import { StrictMode, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { initAnalytics } from './lib/analytics'
+import { captureUtmIfFirstTouch } from './lib/utm'
+
+// PostHog init + UTM first-touch capture
+// 順序：先 capture UTM（純 localStorage，不依賴 PH）、再 init PH（送 pageview 時已有 UTM 在 query）
+captureUtmIfFirstTouch()
+initAnalytics()
+
 const BlogPage = lazy(() => import('./pages/BlogPage'))
 
 // ============================================

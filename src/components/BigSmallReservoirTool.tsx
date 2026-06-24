@@ -32,6 +32,9 @@ import {
 } from 'lucide-react';
 import { useMembership } from '../hooks/useMembership';
 import { useCheatSheetTrigger } from '../hooks/useCheatSheetTrigger';
+import DisclaimerFooter from './DisclaimerFooter';
+import ShareButton from './ShareButton';
+import { auth } from '../firebase';
 import { 
   ResponsiveContainer, 
   ComposedChart, 
@@ -485,12 +488,21 @@ export const BigSmallReservoirTool = ({ data, setData, userId }: any) => {
                 成長 {calculations.opportunityCostRate}%
               </p>
             </div>
-            
+
             {calculations.doubleYear && calculations.doubleYear <= years && (
               <div className="p-2 bg-amber-50 rounded-lg border border-amber-200 text-center">
                 <p className="text-[10px] text-amber-600">🎉 第 {calculations.doubleYear} 年達成翻倍</p>
               </div>
             )}
+
+            {/* 分享給客戶 — 跟 ReportModal 列印 PDF 並列，預設文字摘要走 LINE */}
+            <div className="flex justify-end pt-1">
+              <ShareButton
+                variant="full"
+                title="大小水庫專案"
+                text={`【大小水庫專案】本金 ${formatMoney(initialCapital)} / ${years} 年 — ${years} 年後總資產 ${formatMoney(calculations.totalAsset)}（成長 ${calculations.opportunityCostRate}%）`}
+              />
+            </div>
           </div>
         </div>
 
@@ -997,8 +1009,8 @@ export const BigSmallReservoirTool = ({ data, setData, userId }: any) => {
 
       {/* 金句 */}
       <div className="bg-slate-800 rounded-xl p-4 text-center">
-        <p className="text-slate-300 italic text-sm">
-          「不要吃掉種子，要讓種子長成大樹。大水庫是您的糧倉，小水庫是您的果園。」
+        <p className="text-slate-400 text-xs leading-relaxed">
+          本試算採年複利簡化模型，未計入手續費、稅負與通膨。投資涉及風險，配息率非保證。
         </p>
       </div>
 
@@ -1075,74 +1087,66 @@ export const BigSmallReservoirTool = ({ data, setData, userId }: any) => {
                 </div>
               </div>
 
-              {/* 開場話術 */}
+              {/* 概念說明 */}
               <div>
-                <h4 className="font-bold text-cyan-400 mb-2">🎬 開場</h4>
+                <h4 className="font-bold text-cyan-400 mb-2">兩種配息處置方式</h4>
                 <div className="bg-slate-800 p-3 rounded text-xs space-y-2">
-                  <p className="text-slate-300">「王先生，您目前的配息是<b className="text-white">花掉</b>還是<b className="text-white">再投資</b>？」</p>
-                  <p className="text-slate-400">（等回答）</p>
-                  <p className="text-slate-300">「花掉？那我幫您算一下，這個決定 {years} 年後會差多少...」</p>
+                  <p className="text-slate-300">本工具比較「配息支出消費」與「配息再投入（複利）」兩種情境，於相同本金與年化報酬假設下的試算結果。</p>
+                  <p className="text-slate-400">是否將配息再投入屬個人現金流規劃選擇；退休族群有合理的配息支出需求，並非錯誤決策。</p>
                 </div>
               </div>
 
-              {/* 衝擊話術 */}
+              {/* 試算對照 */}
               <div>
-                <h4 className="font-bold text-rose-400 mb-2">💥 數字衝擊</h4>
-                <div className="bg-rose-900/50 p-3 rounded border border-rose-700 text-xs">
-                  <p>「您看，同樣 {formatMoney(initialCapital)} 本金：</p>
-                  <p className="mt-2">花掉配息：{years}年後還是 <b className="text-rose-300">{formatMoney(initialCapital)}</b></p>
-                  <p>大小水庫：{years}年後變成 <b className="text-emerald-300">{formatMoney(calculations.totalAsset)}</b></p>
-                  <p className="mt-2 text-rose-300 font-bold">差距 {formatMoney(calculations.opportunityCost)}！這就是花掉配息的代價。」</p>
+                <h4 className="font-bold text-amber-400 mb-2">試算對照</h4>
+                <div className="bg-slate-800 p-3 rounded text-xs space-y-1">
+                  <p className="text-slate-400">本金：{formatMoney(initialCapital)}</p>
+                  <p className="text-slate-400">期間：{years} 年</p>
+                  <p className="text-slate-300 mt-2">配息支出（不再投入）：期末本金維持 <b className="text-slate-200">{formatMoney(initialCapital)}</b>（不計通膨）</p>
+                  <p className="text-slate-300">配息再投入（複利）：期末約 <b className="text-emerald-300">{formatMoney(calculations.totalAsset)}</b></p>
+                  <p className="text-slate-500 mt-2">兩者差距約 {formatMoney(calculations.opportunityCost)}，未扣除手續費、稅負及配息率變動因素。</p>
                 </div>
               </div>
 
-              {/* 四大施力點 */}
+              {/* 影響複利的技術因素 */}
               <div>
-                <h4 className="font-bold text-amber-400 mb-2">🎯 四大施力點</h4>
+                <h4 className="font-bold text-amber-400 mb-2">影響長期累積的因素</h4>
                 <div className="space-y-2 text-xs">
                   <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-amber-300 font-bold">🍔 生活膨脹</p>
-                    <p className="text-slate-400">「配息花掉就沒了，{years}年後還是只有本金」</p>
+                    <p className="text-amber-300 font-bold">再投入頻率</p>
+                    <p className="text-slate-400">月配再投入 vs 年配再投入，複利效率不同；本工具採年複利簡化計算。</p>
                   </div>
                   <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-orange-300 font-bold">📉 複利斷裂</p>
-                    <p className="text-slate-400">「中斷1年，{years}年後少 {formatMoney(Math.round(calculations.timeCost5/5))}」</p>
+                    <p className="text-orange-300 font-bold">配息率波動</p>
+                    <p className="text-slate-400">假設年化 {investReturnRate}%，實際配息率隨市場波動，可能高於或低於此值。</p>
                   </div>
                   <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-rose-300 font-bold">🎰 機會成本</p>
-                    <p className="text-slate-400">「花掉 = 放棄 {formatMoney(calculations.opportunityCost)} 未來財富」</p>
+                    <p className="text-rose-300 font-bold">通膨折現</p>
+                    <p className="text-slate-400">{years} 年後的 {formatMoney(calculations.totalAsset)}，依 2% 通膨折算現值約為 {formatMoney(Math.round(calculations.totalAsset / Math.pow(1.02, years)))}。</p>
                   </div>
                   <div className="bg-slate-800 p-2 rounded">
-                    <p className="text-slate-300 font-bold">👨‍👩‍👧 傳承歸零</p>
-                    <p className="text-slate-400">「花光配息 = 沒有增值資產留給下一代」</p>
+                    <p className="text-slate-300 font-bold">稅務</p>
+                    <p className="text-slate-400">境內利息所得有 27 萬免稅額；境外所得屬基本稅額制（最低稅負制）申報範圍。</p>
                   </div>
                 </div>
               </div>
 
-              {/* 時間緊迫 */}
+              {/* 時間因素技術說明 */}
               <div>
-                <h4 className="font-bold text-orange-400 mb-2">⏰ 時間緊迫</h4>
-                <div className="bg-orange-900/50 p-3 rounded border border-orange-700 text-xs">
-                  <p>「而且您看這個時間成本——</p>
-                  <p className="mt-1">現在開始：{formatMoney(calculations.totalAsset)}</p>
-                  <p>晚5年：{formatMoney(calculations.delay5Total)} <span className="text-rose-400">(-{formatMoney(calculations.timeCost5)})</span></p>
-                  <p className="mt-1 text-orange-300 font-bold">每晚1年，就少賺 {formatMoney(Math.round(calculations.timeCost5/5))}！」</p>
+                <h4 className="font-bold text-orange-400 mb-2">時間因素</h4>
+                <div className="bg-slate-800 p-3 rounded text-xs">
+                  <p className="text-slate-300">複利公式 A = P × (1+r)<sup>n</sup>，n 越大、A 對 r 的敏感度越高。延後 5 年起點試算：</p>
+                  <p className="mt-2 text-slate-400">同步開始：約 {formatMoney(calculations.totalAsset)}</p>
+                  <p className="text-slate-400">延後 5 年：約 {formatMoney(calculations.delay5Total)}</p>
+                  <p className="mt-2 text-slate-500">差異為複利期間縮短的結果；此為數學特性，不必然構成投資建議。</p>
                 </div>
               </div>
 
-              {/* 金句 */}
+              {/* 提醒 */}
               <div>
-                <h4 className="font-bold text-purple-400 mb-2">✨ 收尾金句</h4>
-                <div className="space-y-2 text-xs">
-                  <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                    「不要吃掉種子，讓種子長成大樹」
-                  </div>
-                  <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                    「大水庫是糧倉，小水庫是果園」
-                  </div>
-                  <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                    「讓錢去工作，不要讓錢去度假」
-                  </div>
+                <h4 className="font-bold text-slate-400 mb-2">提醒</h4>
+                <div className="bg-slate-800/50 p-2 rounded border border-slate-700 text-xs text-slate-400 leading-relaxed">
+                  本試算為複利對照之教育工具，不構成投資建議。是否將配息再投入應考量個人現金流、生活費需求、風險承受度與稅務狀況。
                 </div>
               </div>
               </div>
@@ -1150,6 +1154,8 @@ export const BigSmallReservoirTool = ({ data, setData, userId }: any) => {
           </div>
         </div>
       )}
+
+      <DisclaimerFooter scope="investment" />
     </div>
   );
 };

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   BookOpen, ExternalLink, RefreshCw, Share2, TrendingUp,
-  Crown, Users, Wrench, ArrowRight, Newspaper, Plus, Zap, Mic, PencilRuler
+  Crown, Users, Wrench, ArrowRight, Newspaper, Zap, Mic, PencilRuler, Target
 } from 'lucide-react';
+import MissionCard from '../MissionCard';
+import { useMissions } from '../../hooks/useMissions';
 // 移除：dailyMarketReports 改走 /api/market-report，不再 import db / onSnapshot
 // 🔧 PERF: 只 import 輕量 metadata（id/slug/title/excerpt/publishDate），不拉 content 全文
 // 原本 index.ts ~900KB raw → 改用 metadata.ts ~57KB raw（content 改 BlogPage 動態 import）
@@ -37,6 +39,16 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   const [marketReport, setMarketReport] = useState<any>(null);
   const todayBg = todayBackground;
   const isNewUser = clientCount === 0;
+
+  // Onboarding missions list — drives the 8-step "快速上手" panel for new users.
+  // Hook auto-fetches on auth; we only consume `missions` + `loading` here.
+  const { missions, loading: missionsLoading } = useMissions();
+  // Surface only the onboarding bucket on the overview — social/habit/daily
+  // missions belong in a dedicated tab so they don't clutter the new-user view.
+  const onboardingMissions = missions.filter(m => m.category === 'onboarding');
+  const completedCount = onboardingMissions.filter(m =>
+    m.repeatType === 'once' ? m.isCompleted : m.isCompletedToday
+  ).length;
 
   useEffect(() => {
     // 🔧 PERF: 改走 /api/market-report（5min CDN s-maxage）取代 onSnapshot
@@ -106,24 +118,51 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
         </div>
       </div>
 
-      {/* ====== P0: 新用戶引導 ====== */}
-      {isNewUser && (
+      {/* ====== P0: 新用戶引導 — 8 步驟任務看板 ======
+          原本只有「新增第一位客戶」單一 CTA，留下其他 7 條黏著動作沒有 surface（連 LINE、設大頭貼、第一次試算…）
+          改成 missions list 後新用戶有完整可勾選地圖；onAddClient 仍保留為其中一張 mission 的 fallback。 */}
+      {(isNewUser || (onboardingMissions.length > 0 && completedCount < onboardingMissions.length)) && (
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-950/80 via-slate-900 to-purple-950/80 border border-blue-500/20 p-5">
           <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/4" />
           <div className="relative">
-            <div className="flex items-center gap-2 mb-2">
-              <Zap size={16} className="text-blue-400" />
-              <h3 className="text-sm font-bold text-white">開始使用</h3>
+            <div className="flex items-center gap-2 mb-1">
+              <Target size={16} className="text-blue-400" />
+              <h3 className="text-sm font-bold text-white">快速上手任務</h3>
+              {onboardingMissions.length > 0 && (
+                <span className="text-[10px] font-bold text-blue-300 bg-blue-500/15 px-2 py-0.5 rounded-full">
+                  {completedCount} / {onboardingMissions.length}
+                </span>
+              )}
             </div>
-            <p className="text-sm text-slate-400 mb-4">
-              建立第一位客戶後，即可使用 {toolCount} 種分析工具產出專業提案
+            <p className="text-xs text-slate-400 mb-4">
+              {onboardingMissions.length || 8} 步驟、預計 10 分鐘，每完成一項可獲得點數
             </p>
-            <button
-              onClick={onAddClient}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-blue-600/20"
-            >
-              <Plus size={16} /> 新增第一位客戶
-            </button>
+
+            {missionsLoading && onboardingMissions.length === 0 ? (
+              <div className="flex items-center gap-2 text-slate-500 text-sm py-3">
+                <Zap size={14} className="animate-pulse" />
+                <span>載入任務中…</span>
+              </div>
+            ) : onboardingMissions.length === 0 ? (
+              // 任務系統尚未初始化（functions/initMissions 沒跑）— 退回原本的單一 CTA
+              // 保險 fallback：寧可顯示 1 個按鈕也別給空白區塊
+              <button
+                onClick={onAddClient}
+                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-blue-600/20"
+              >
+                <Users size={16} /> 新增第一位客戶
+              </button>
+            ) : (
+              <div className="space-y-2">
+                {onboardingMissions.map(m => (
+                  <MissionCard
+                    key={m.id}
+                    mission={m}
+                    onNavigate={(p) => { window.location.href = p; }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -26,6 +26,7 @@ import {
 import { useMembership } from '../hooks/useMembership';
 import { useCheatSheetTrigger } from '../hooks/useCheatSheetTrigger';
 import { ResponsiveContainer, ComposedChart, Area, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceArea } from 'recharts';
+import DisclaimerFooter from './DisclaimerFooter';
 
 // --- 輔助函式 ---
 
@@ -822,66 +823,58 @@ export const StudentLoanTool = ({ data, setData, userId }: any) => {
                   </div>
                 </div>
 
-                {/* ========== 2. 開場話術 ========== */}
+                {/* ========== 2. 學貸基本資訊 ========== */}
                 <div>
-                  <h4 className="font-bold text-emerald-400 mb-2">🎬 開場</h4>
+                  <h4 className="font-bold text-emerald-400 mb-2">學貸利率參考</h4>
                   <div className="bg-slate-800 p-3 rounded text-xs space-y-2">
-                    <p className="text-slate-300">「你有想過，<b className="text-white">學貸</b>其實是人生中利率最低的貸款之一嗎？」</p>
-                    <p className="text-slate-300">「大部分人急著把學貸繳掉，但聰明人會把它變成<b className="text-white">人生的第一筆投資本金</b>。」</p>
+                    <p className="text-slate-300">2025-2026 學年度教育部就學貸款利率為郵儲一年期定儲固定利率加 0.15%，目前約 {loanRate}%（依教育部公告浮動）。</p>
+                    <p className="text-slate-400">本工具為「先投資、後還貸」策略試算，僅供教育目的；非投資建議。實際是否提前還款，應綜合個人現金流、風險承受度評估。</p>
                   </div>
                 </div>
 
-                {/* ========== 3. 核心賣點 ========== */}
+                {/* ========== 3. 試算前提（中性技術說明） ========== */}
                 <div>
-                  <h4 className="font-bold text-amber-400 mb-2">💡 核心賣點</h4>
+                  <h4 className="font-bold text-amber-400 mb-2">試算假設</h4>
                   <div className="space-y-2 text-xs">
                     <div className="bg-slate-800 p-2 rounded">
-                      <p className="text-emerald-300 font-bold">收益差額</p>
-                      <p className="text-slate-400">「學貸只要 {loanRate}%，投資預期 {investReturnRate}%，中間差 {(investReturnRate - loanRate).toFixed(1)}% 就是你的獲利空間」</p>
+                      <p className="text-emerald-300 font-bold">利率差</p>
+                      <p className="text-slate-400">學貸利率 {loanRate}%，假設投資年化報酬 {investReturnRate}%，理論利差 {(investReturnRate - loanRate).toFixed(1)}%。投資報酬非保證，可能為負。</p>
                     </div>
                     <div className="bg-slate-800 p-2 rounded">
-                      <p className="text-blue-300 font-bold">時間複利</p>
-                      <p className="text-slate-400">「越早開始投資，複利效果越驚人。同樣的錢，晚 5 年開始差距可達數十萬」</p>
+                      <p className="text-blue-300 font-bold">複利公式</p>
+                      <p className="text-slate-400">A = P × (1+r)<sup>n</sup>。本工具未扣除投資手續費、稅負、匯率損失等實務成本。</p>
                     </div>
                     <div className="bg-slate-800 p-2 rounded">
-                      <p className="text-purple-300 font-bold">2025 新制紅利</p>
-                      <p className="text-slate-400">「新制緩繳最長 12 年、只繳息最長 12 年，等於有超過 20 年的複利時間」</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ========== 4. 異議處理 ========== */}
-                <div>
-                  <h4 className="font-bold text-rose-400 mb-2">🛡️ 異議處理</h4>
-                  <div className="space-y-2 text-xs">
-                    <div className="bg-slate-800 p-2 rounded">
-                      <p className="text-rose-300 font-bold">「借錢投資不好吧？」</p>
-                      <p className="text-slate-400">→ 「這不是額外借錢，而是把原本要付的學費『延後支付』，用時間差創造價值」</p>
-                    </div>
-                    <div className="bg-slate-800 p-2 rounded">
-                      <p className="text-rose-300 font-bold">「投資會賠錢怎麼辦？」</p>
-                      <p className="text-slate-400">→ 「選擇穩健的配息基金，長期年化報酬通常在 5-7%，遠高於學貸 {loanRate}%」</p>
-                    </div>
-                    <div className="bg-slate-800 p-2 rounded">
-                      <p className="text-rose-300 font-bold">「我想早點還清沒有負債」</p>
-                      <p className="text-slate-400">→ 「心情上理解，但數學上不划算。{(investReturnRate - loanRate).toFixed(1)}% 的收益差額，{totalDuration} 年後可多累積 {currentFinalAsset} 萬」</p>
+                      <p className="text-purple-300 font-bold">2025 緩繳新制</p>
+                      <p className="text-slate-400">教育部 2025 修正《高級中等以上學校學生就學貸款辦法》，符合條件者可申請緩繳最長 12 年、僅繳息最長 12 年（須符合所得門檻並逐次申請）。</p>
                     </div>
                   </div>
                 </div>
 
-                {/* ========== 5. 收尾金句 ========== */}
+                {/* ========== 4. 常見技術問答 ========== */}
                 <div>
-                  <h4 className="font-bold text-purple-400 mb-2">✨ 收尾金句</h4>
+                  <h4 className="font-bold text-rose-400 mb-2">技術問答</h4>
                   <div className="space-y-2 text-xs">
-                    <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                      「把負債變資產，這才是富人思維」
+                    <div className="bg-slate-800 p-2 rounded">
+                      <p className="text-rose-300 font-bold">投資與還款先後順序如何決定？</p>
+                      <p className="text-slate-400">→ 數學上，若投資稅後實質報酬 &gt; 貸款利率，理論上延後還款累積資產較多；但須承擔投資波動、流動性、心理負擔等成本。</p>
                     </div>
-                    <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                      「同樣是還學貸，聰明人會順便存下人生第一桶金」
+                    <div className="bg-slate-800 p-2 rounded">
+                      <p className="text-rose-300 font-bold">投資若虧損會如何？</p>
+                      <p className="text-slate-400">→ 學貸本金與利息仍須償還，投資虧損由本人承擔。歷史報酬不代表未來表現。</p>
                     </div>
-                    <div className="bg-purple-900/30 p-2 rounded border border-purple-700 text-center italic">
-                      「現在開始，{totalDuration} 年後你會感謝今天的自己」
+                    <div className="bg-slate-800 p-2 rounded">
+                      <p className="text-rose-300 font-bold">提前還款有手續費嗎？</p>
+                      <p className="text-slate-400">→ 教育部就學貸款依現行規定，提前清償不收手續費，且利息僅算至清償日。</p>
                     </div>
+                  </div>
+                </div>
+
+                {/* ========== 5. 風險提示 ========== */}
+                <div>
+                  <h4 className="font-bold text-slate-400 mb-2">提醒</h4>
+                  <div className="bg-slate-800/50 p-2 rounded border border-slate-700 text-xs text-slate-400 leading-relaxed">
+                    本試算為教育與情境模擬，非投資建議。投資具有本金損失風險，過往績效不代表未來表現。是否動用學貸資金進行投資涉及財務、稅務、心理因素，請與合格財務顧問討論後再決定。
                   </div>
                 </div>
               </div>
@@ -889,6 +882,8 @@ export const StudentLoanTool = ({ data, setData, userId }: any) => {
           </div>
         </div>
       )}
+
+      <DisclaimerFooter scope="calc" />
     </div>
   );
 };

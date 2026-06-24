@@ -65,7 +65,15 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
                   {client.name.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-bold text-white text-sm truncate">{client.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="font-bold text-white text-sm truncate">{client.name}</div>
+                    {/* 示範客戶徽章 — 提示這是 onboarding seed 出來的、可隨時刪除 */}
+                    {client.isSample && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0">
+                        示範
+                      </span>
+                    )}
+                  </div>
                   <div className="text-[11px] text-slate-500">
                     {client.updatedAt?.toDate?.().toLocaleDateString() || ''}
                   </div>

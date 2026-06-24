@@ -13,12 +13,18 @@ import {
   Eye, Brain, Cpu
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { trackEvent } from '../lib/analytics';
+import { EVENTS } from '../lib/events';
 // 🔧 PERF: 改用輕量 metadata，不要拉全部 blog content 進主 bundle
 import { blogMetadata as blogArticles } from '../data/blog/metadata';
 // PERF: 不要 import 整包 365 筆 dailyQuotes (99.81KB / 39.60KB gz)
 // build 時 prerender 今天那筆到 _today-quote.generated.ts, runtime 只拉一筆
 import { todayQuote, todayBackground } from '../data/_today-quote.generated';
 import { formatDateChinese } from '../utils/dateFormat';
+// 工具數量 SoT — 之前硬編 15/18，但 ALL_TOOLS 實際長度 14。
+// 改從 constants 動態讀，避免文案與實際工具數脫節。
+import { ALL_TOOLS } from '../constants/tools';
+const TOOL_COUNT = ALL_TOOLS.length;
 
 // ==========================================
 // 🎬 Scroll Reveal Component
@@ -984,7 +990,7 @@ const OptimizedHeroSection = ({ onFreeTrial, onWatchDemo, hasVideo }) => {
         <div className="grid md:grid-cols-3 gap-4 max-w-3xl mx-auto hero-reveal-line"
              style={{animationDelay: '0.95s'}}>
           {[
-            { icon: BarChart3, text: "視覺化工具任你用", end: 15, suffix: " 種", color: "blue" },
+            { icon: BarChart3, text: "視覺化工具任你用", end: TOOL_COUNT, suffix: " 種", color: "blue" },
             { icon: Clock, text: "原本 3 小時的提案準備", end: 15, suffix: " 分鐘搞定", color: "amber" },
             { icon: FileBarChart, text: "篇專業文章免費用", end: 60, suffix: "+", color: "emerald" }
           ].map((item, i) => (
@@ -1011,7 +1017,7 @@ const OptimizedHeroSection = ({ onFreeTrial, onWatchDemo, hasVideo }) => {
                      transition-all duration-500 hover:-translate-y-1.5 flex items-center gap-3"
             strength={0.35}>
             <Sparkles className="group-hover:rotate-12 transition-transform duration-300" size={24} />
-            免費試用 15 種工具
+            免費試用 {TOOL_COUNT} 種工具
             <ArrowRight className="group-hover:translate-x-1.5 transition-transform duration-300" size={20} />
           </MagneticButton>
 
@@ -1078,7 +1084,7 @@ const LiveStatsBar = () => {
             <div className="flex items-center gap-2 text-slate-500">
               <Sparkles size={16} className="text-amber-400" />
               <span>
-                <span className="text-white font-bold">15</span> 種視覺化工具
+                <span className="text-white font-bold">{TOOL_COUNT}</span> 種視覺化工具
                 <span className="text-slate-600">（含 4 種永久免費）</span>
               </span>
             </div>
@@ -1314,7 +1320,7 @@ const CompactProductShowcase = () => {
   ];
 
   return (
-    <section id="products" aria-label="15 種視覺化銷售工具" className="py-32 bg-[#030712] relative overflow-hidden">
+    <section id="products" aria-label={`${TOOL_COUNT} 種視覺化銷售工具`} className="py-32 bg-[#030712] relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 glow-divider" />
       <div className="absolute top-[20%] right-[10%] w-[500px] h-[500px] bg-blue-600/[0.04] rounded-full blur-[180px] pointer-events-none" />
 
@@ -1324,7 +1330,7 @@ const CompactProductShowcase = () => {
             <span className="px-4 py-1.5 bg-blue-500/10 border border-blue-500/20
                            text-blue-400 text-xs font-black uppercase tracking-[0.4em]
                            rounded-full">
-              銷售利器 — 15 種工具
+              銷售利器 — {TOOL_COUNT} 種工具
             </span>
             <h2 data-speakable="true" className="text-4xl md:text-5xl font-black text-white mt-8 tracking-[-0.02em]">
               打開圖表，
@@ -1416,7 +1422,7 @@ const CompactProductShowcase = () => {
                              hover:shadow-[0_0_60px_rgba(59,130,246,0.6),0_0_120px_rgba(59,130,246,0.25)]
                              transition-all duration-500 hover:-translate-y-1.5 inline-flex items-center gap-3">
               <Sparkles size={24} />
-              免費試用全部 15 種工具
+              免費試用全部 {TOOL_COUNT} 種工具
               <ArrowRight size={20} />
             </button>
           </div>
@@ -1460,11 +1466,11 @@ const RealSocialProof = () => {
           {[
             {
               label: "視覺化工具",
-              value: "15",
+              value: String(TOOL_COUNT),
               desc: "創富 + 守富 + 傳富全分類",
               icon: BarChart3,
               color: "blue",
-              countEnd: 15
+              countEnd: TOOL_COUNT
             },
             {
               label: "持照顧問審閱文章",
@@ -1905,6 +1911,11 @@ export function LandingPage({ onStart, onSignup, onHome }) {
   // ✅ 滾動狀態（用於 Sticky Header 優化）
   const [isScrolled, setIsScrolled] = useState(false);
 
+  // 一次性 mount 事件：判斷 landing 漏斗起點是否健康
+  useEffect(() => {
+    trackEvent(EVENTS.LANDING_VIEW, { path: window.location.pathname });
+  }, []);
+
   // ✅ 載入動態內容
   useEffect(() => {
     const loadDynamicContent = async () => {
@@ -2007,7 +2018,7 @@ export function LandingPage({ onStart, onSignup, onHome }) {
           <span className="flex items-center gap-2"><Clock size={14}/> 2026 癌症時鐘倒數：{formatTime(seconds)}</span>
           <span className="flex items-center gap-2"><TriangleAlert size={14}/> 2026 預估醫療通膨：+15.8%</span>
           <span className="flex items-center gap-2"><TrendingUp size={14}/> 實質體感通膨：4.5% 起</span>
-          <span className="flex items-center gap-2"><ShieldAlert size={14}/> 勞保破產倒數：2031 臨界點</span>
+          <span className="flex items-center gap-2"><ShieldAlert size={14}/> 勞保精算用罄時點（113 年報告）</span>
           <span className="flex items-center gap-2"><Clock size={14}/> 2026 癌症時鐘倒數：{formatTime(seconds)}</span>
           <span className="flex items-center gap-2"><TriangleAlert size={14}/> 2026 預估醫療通膨：+15.8%</span>
         </div>
@@ -2227,7 +2238,7 @@ export function LandingPage({ onStart, onSignup, onHome }) {
         {/* ==================== 實際產品畫面（先看到長什麼樣）==================== */}
         <ProductScreenshotCarousel />
 
-        {/* ==================== 銷售：15 種視覺化工具 ==================== */}
+        {/* ==================== 銷售：視覺化工具總覽 ==================== */}
         <CompactProductShowcase />
 
         {/* ==================== AI 幫你省時間 ==================== */}
@@ -2283,7 +2294,7 @@ export function LandingPage({ onStart, onSignup, onHome }) {
                   進階會員額外福利
                 </h2>
                 <p className="text-slate-500 mt-4 max-w-2xl mx-auto">
-                  除了 15 種工具，付費會員還有兩個被低估的小機制
+                  除了 {TOOL_COUNT} 種工具，付費會員還有兩個被低估的小機制
                 </p>
               </div>
             </Reveal>
