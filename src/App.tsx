@@ -684,9 +684,14 @@ export default function App() {
       <Suspense fallback={<SplashScreen />}>
       <RegisterPage
         onSuccess={() => {
+          // 註：RegisterPage 內已 auto-signInWithEmailAndPassword 完成、
+          // 並透過 goToHome 自己 reload 到 /?firstRun=1（會跳過 Splash 3 秒）。
+          // 此 callback 目前是 future-safe 預留（萬一未來 RegisterPage 改流程直接 callback 而非 reload）：
+          // 進 /?firstRun=1 + 預設 splash_shown，讓 onAuthStateChanged 直接帶進 WarRoom OverviewTab。
+          try { sessionStorage.setItem('splash_shown', 'true'); } catch { /* ignore */ }
           setIsRegisterRoute(false);
-          setIsLoginRoute(true);
-          window.history.pushState({}, '', '/login');
+          window.history.pushState({}, '', '/?firstRun=1');
+          window.location.reload();
         }}
         onBack={() => {
           setIsRegisterRoute(false);

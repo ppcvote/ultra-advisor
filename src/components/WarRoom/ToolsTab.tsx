@@ -111,7 +111,8 @@ const ToolsTab: React.FC<ToolsTabProps> = ({ isPaid, onSelectTool, onSelectClien
                     </div>
                   )}
 
-                  {(tool.isFree || FREE_ACCESS.includes(tool.id)) && !isPaid && (
+                  {/* 🔧 fix: 用 FREE_ACCESS_TOOL_IDS（SoT），舊 FREE_ACCESS 常數已移除（line 17 comment 已說明） */}
+                  {(tool.isFree || FREE_ACCESS_TOOL_IDS.includes(tool.id)) && !isPaid && (
                     <span className="absolute top-2 right-2 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium">
                       免費
                     </span>

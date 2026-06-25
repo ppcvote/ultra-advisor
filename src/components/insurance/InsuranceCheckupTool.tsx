@@ -98,6 +98,7 @@ export default function InsuranceCheckupTool({ data, setData, userId, clientId, 
           <CheckupReport
             userId={userId}
             clientId={clientId}
+            clientName={clientName}
             onBack={() => handleStepChange(1)}
           />
         )}

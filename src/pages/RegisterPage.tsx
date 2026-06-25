@@ -302,8 +302,16 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
             identify(auth.currentUser.uid, acquisition ? { acquisition } : undefined);
           }
         } catch (loginErr) {
+          // 帳號已創成功、但自動登入這一步 race condition 失敗（極罕見：Firebase token clock drift、
+          // 或網路在這 1 秒斷線）。不能讓 user 卡在「註冊成功但進不去」的 limbo，
+          // 顯示 UI 提示 + toast、按鈕改成「前往登入頁面」、saved_email 已寫入讓登入頁自動填。
           console.error('自動登入失敗:', loginErr);
           setAutoLoginError('自動登入失敗，請手動登入');
+          toast.error('自動登入失敗，請手動登入');
+          // 還是把 email 存起來、登入頁會自動帶入（密碼 user 自己記得）
+          try {
+            safeStorage.set('ua_saved_email', formData.email.trim().toLowerCase());
+          } catch { /* ignore */ }
         }
       } else {
         // 處理特定錯誤
@@ -349,11 +357,23 @@ export default function RegisterPage({ onSuccess, onBack, onLogin }: RegisterPag
   };
 
   // 前往首頁
+  // 註：剛註冊完並自動登入成功 → 走 firstRun 入場（?firstRun=1 觸發 App 的 onboarding effect
+  //   把 activeTab 強制帶到 'overview'、seed sample clients）；同時預先 set splash_shown
+  //   讓 App 跳過 3 秒 Splash 直接進 OverviewTab。
+  // 其他情況（autoLoginError、user 自己按返回）→ 一般 reload，Splash 正常 3 秒（既有行為）。
   const goToHome = () => {
     if (onBack) {
       onBack();
     } else {
-      window.history.pushState({}, '', '/');
+      // 自動登入成功才 bypass Splash + 帶 firstRun flag
+      if (autoLoginDone) {
+        try {
+          sessionStorage.setItem('splash_shown', 'true');
+        } catch { /* ignore quota */ }
+        window.history.pushState({}, '', '/?firstRun=1');
+      } else {
+        window.history.pushState({}, '', '/');
+      }
       window.location.reload();
     }
   };

@@ -408,6 +408,8 @@ const WarRoom: React.FC<WarRoomProps> = ({ user, onSelectClient, onLogout, onNav
             onAddClient={() => setShowAddClient(true)}
             onEditClient={c => { setEditingClient(c); setShowEditClient(true); }}
             onDeleteClient={handleDeleteClient}
+            // Sprint L1: tag 寫入需要 uid（updateDoc users/{uid}/clients/{cid}）— 既有 user-scoped rule 已 cover
+            userId={user?.uid}
           />
         )}
 

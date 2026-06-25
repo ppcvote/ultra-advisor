@@ -17,10 +17,13 @@ import {
 import { usePolicies } from '../../hooks/usePolicies';
 import { useProductCache } from '../../hooks/useProductCache';
 import type { PolicyInfo, ClaimSummary, Coverage, Gender, ProductCategory, PRODUCT_CATEGORY_LABELS } from '../../types/insurance';
+import ShareToCustomerButton from '../ShareToCustomerButton';
+import { buildInsuranceCheckupPayload } from './buildInsuranceCheckupPayload';
 
 interface CheckupReportProps {
   userId?: string;
   clientId?: string;
+  clientName?: string;
   onBack?: () => void;
 }
 
@@ -986,7 +989,7 @@ function EditCoverageModal({ coverage, category, onSave, onClose }: EditCoverage
   );
 }
 
-export default function CheckupReport({ userId, clientId, onBack }: CheckupReportProps) {
+export default function CheckupReport({ userId, clientId, clientName, onBack }: CheckupReportProps) {
   const { policies, loading, updatePolicy } = usePolicies(userId || null, clientId);
   const { lookupProduct } = useProductCache();
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
@@ -1417,6 +1420,29 @@ export default function CheckupReport({ userId, clientId, onBack }: CheckupRepor
   const selectedPersonData = selectedPerson ? coverageByPerson[selectedPerson] : null;
   const selectedPersonInfo = extractedPeople.find(p => p.name === selectedPerson);
 
+  // ShareToCustomer payload — Sprint 10 A. Builder is pure + PII-stripped:
+  // - no person.name in members[] (role enum only)
+  // - no insurer / policyNumber / claimSummary detail
+  // - clientName used only to identify which extractedPerson is `self`,
+  //   never copied into the payload (codec rejects free-text role anyway)
+  // Recomputed only when the score / people / coverage map / clientName change
+  // — not on every productLookups tick during AI analysis.
+  const sharePayload = useMemo(
+    () => buildInsuranceCheckupPayload({
+      extractedPeople: extractedPeople.map(p => ({ name: p.name, age: p.age, totalPremium: p.totalPremium })),
+      coverageByPerson,
+      totalAnnualPremium,
+      averageScore,
+      clientName,
+    }),
+    [extractedPeople, coverageByPerson, totalAnnualPremium, averageScore, clientName]
+  );
+
+  // Only show the share button when there's a meaningful report to share —
+  // empty members[] would generate a public URL with literally no rows for
+  // the customer to see, which looks broken on their end.
+  const canShare = sharePayload.inputs.members.length > 0;
+
   // 查詢進度
   const lookupProgress = useMemo(() => {
     const total = coveragesToLookup.length;
@@ -1841,7 +1867,7 @@ export default function CheckupReport({ userId, clientId, onBack }: CheckupRepor
       )}
 
       {/* 導航按鈕 */}
-      <div className="flex gap-3 mt-8">
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-8">
         <button
           onClick={onBack}
           className="flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors"
@@ -1849,6 +1875,18 @@ export default function CheckupReport({ userId, clientId, onBack }: CheckupRepor
           <ArrowLeft size={18} />
           返回保單輸入
         </button>
+        {/* 客戶分享連結 — Sprint 10 A
+            只在有可分享成員時露出（buildInsuranceCheckupPayload 已 anonymize 家庭成員 → FamilyRole enum，
+            無真名 / 保單號 / insurer 進 URL）。 */}
+        {canShare && (
+          <ShareToCustomerButton
+            tool="insurance_checkup"
+            reportLabel="保單健診"
+            variant="full"
+            inputs={sharePayload.inputs}
+            outputs={sharePayload.outputs}
+          />
+        )}
       </div>
 
       {/* 編輯險種彈窗 */}

@@ -1171,7 +1171,8 @@ export const BigSmallReservoirTool = ({ data, setData, userId }: any) => {
                   </div>
                   <div className="bg-slate-800 p-2 rounded">
                     <p className="text-orange-300 font-bold">配息率波動</p>
-                    <p className="text-slate-400">假設年化 {investReturnRate}%，實際配息率隨市場波動，可能高於或低於此值。</p>
+                    {/* 🔧 fix: 此工具用的是配息再投入年化率（reinvestRate, line 140），不是 MillionDollarGift 的 investReturnRate；typo 導致進階說明展開時 crash */}
+                    <p className="text-slate-400">假設年化 {reinvestRate}%，實際配息率隨市場波動，可能高於或低於此值。</p>
                   </div>
                   <div className="bg-slate-800 p-2 rounded">
                     <p className="text-rose-300 font-bold">通膨折現</p>

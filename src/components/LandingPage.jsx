@@ -724,108 +724,60 @@ const AutoReportSection = () => (
 );
 
 // ==========================================
-// 💬 Testimonials 真人見證區塊
+// 💬 Beta 階段誠實聲明區塊（取代假見證、Sprint 4 誠實化原則）
 // ==========================================
+// why：原本 4 則假見證（小蔡/林小姐/陳先生/王先生）含具體數字「+40%」「12 倍」
+// 在 L1 私域邀請制階段違反誠實原則；改為 beta 階段透明聲明 + 邀請回饋 CTA、
+// 同時保留 social-proof 版位節奏（價值區→這裡→FAQ），未來累積真實見證再回填。
 const TestimonialsSection = () => {
-  const testimonials = [
-    {
-      name: "小蔡",
-      role: "入行 8 個月的保險業務",
-      cert: "壽險業務員",
-      content: "剛入行的時候真的什麼都不會，約到客戶也不知道要講什麼。有了 Ultra Advisor 之後，我把圖表打開，客戶自己就開始問問題了。上個月終於達標了！",
-      metric: "從零到達標",
-      metricColor: "amber",
-    },
-    {
-      name: "林小姐",
-      role: "保險業務主管",
-      cert: "FCHFP",
-      content: "我讓新人都用 Ultra Advisor，最大的改變是他們不用再背話術了。打開工具、輸入數字、秀出圖表，客戶自己就看懂了。新人的成交率明顯提升。",
-      metric: "新人成交率 +40%",
-      metricColor: "emerald",
-    },
-    {
-      name: "陳先生",
-      role: "RFC 持照理財規劃師",
-      cert: "RFC",
-      content: "以前每次準備客戶提案都要花 3-4 小時手動做圖表，現在 15 分鐘就搞定。客戶看到報表的第一反應就是：「這也太專業了吧！」這種專業感是 Excel 做不出來的。",
-      metric: "效率提升 12 倍",
-      metricColor: "blue",
-    },
-    {
-      name: "王先生",
-      role: "獨立財務規劃師",
-      cert: "CFP",
-      content: "面對高資產客戶，只要打開 Ultra Advisor 的圖表，專業度立刻拉滿。現在客戶都主動找我做規劃，還會介紹朋友來。",
-      metric: "客戶主動轉介紹",
-      metricColor: "purple",
-    },
-  ];
-
   return (
     <section className="py-32 bg-[#030712] relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 glow-divider" />
       <div className="absolute top-[30%] right-[10%] w-[500px] h-[500px] bg-blue-600/[0.03] rounded-full blur-[180px] pointer-events-none" />
       <div className="absolute bottom-[20%] left-[5%] w-[400px] h-[400px] bg-purple-600/[0.03] rounded-full blur-[150px] pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto px-6 relative">
+      <div className="max-w-4xl mx-auto px-6 relative">
         <Reveal>
-          <div className="text-center mb-16">
-            <span className="px-4 py-1.5 bg-blue-500/10 border border-blue-500/20
-                           text-blue-400 text-xs font-black uppercase tracking-[0.4em]
+          <div className="text-center mb-12">
+            <span className="px-4 py-1.5 bg-amber-500/10 border border-amber-500/20
+                           text-amber-400 text-xs font-black uppercase tracking-[0.4em]
                            rounded-full">
-              Testimonials
+              Beta · 2026
             </span>
             <h2 className="text-4xl md:text-6xl font-black text-white mt-8 tracking-[-0.02em]">
-              用戶怎麼說
+              首批種子顧問實測中
             </h2>
-            <p className="text-slate-500 text-lg mt-6 max-w-2xl mx-auto">
-              從菜鳥到資深，都在用
+            <p className="text-slate-400 text-lg mt-6 max-w-2xl mx-auto leading-relaxed">
+              Ultra Advisor 目前處於 L1 私域邀請階段，由 IARFC 持照規劃師、
+              安聯壽險顧問與 Discord 社群種子顧問試用中。
+              <br className="hidden md:block" />
+              真實成效數據與顧問回饋將於 2026 年第三季公開。
             </p>
           </div>
         </Reveal>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {testimonials.map((t, i) => (
-            <Reveal key={i} delay={i * 120}>
-              <TiltCard intensity={10}>
-              <div className="testimonial-card p-8 flex flex-col h-full relative overflow-hidden">
-                {/* Stars */}
-                <div className="flex gap-1 mb-4">
-                  {[...Array(5)].map((_, j) => (
-                    <Star key={j} size={16} className="text-amber-400 fill-amber-400" />
-                  ))}
-                </div>
-
-                {/* Quote */}
-                <p className="text-slate-300 leading-relaxed text-sm flex-1 mb-6">
-                  「{t.content}」
-                </p>
-
-                {/* Metric badge */}
-                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full
-                               bg-${t.metricColor}-500/10 border border-${t.metricColor}-500/20
-                               text-${t.metricColor}-400 text-xs font-black mb-6 w-fit`}>
-                  <TrendingUp size={14} />
-                  {t.metric}
-                </div>
-
-                {/* Author */}
-                <div className="flex items-center gap-3 pt-4 border-t border-white/[0.06]">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600
-                                flex items-center justify-center text-white font-black text-sm">
-                    {t.name[0]}
-                  </div>
-                  <div>
-                    <p className="text-white font-bold text-sm">{t.name}</p>
-                    <p className="text-slate-500 text-xs">{t.role} · {t.cert}</p>
-                  </div>
-                </div>
-              </div>
-              </TiltCard>
-            </Reveal>
-          ))}
-        </div>
+        <Reveal delay={120}>
+          <div className="testimonial-card p-8 md:p-10 text-center max-w-2xl mx-auto">
+            <p className="text-slate-300 leading-relaxed text-base mb-6">
+              如果你是 IARFC、CFP、RFC 或保險業務顧問，
+              <br className="hidden md:block" />
+              歡迎加入 beta 並回報你的實際使用情境。
+              <br />
+              你的回饋會直接影響下一版的工具設計。
+            </p>
+            <a
+              href="https://line.me/R/ti/p/@ginrolladvisor"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full
+                         bg-gradient-to-r from-blue-500 to-purple-600
+                         text-white text-sm font-black hover:opacity-90 transition-opacity"
+            >
+              <TrendingUp size={16} />
+              LINE 聯絡老闆加入 beta
+            </a>
+          </div>
+        </Reveal>
       </div>
     </section>
   );

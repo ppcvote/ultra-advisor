@@ -1194,7 +1194,8 @@ const MarketDataCard: React.FC<MarketDataCardProps> = ({ userId, userDisplayName
 
       if (isMobile) {
         // 手機：開新視窗顯示圖片，讓用戶長按存到相簿
-        const dataUrl = finalCanvas.toDataURL('image/png', 1.0);
+        // 🔧 fix: finalCanvas 是 Sprint 7 renamed-變數殘留 typo（手機下載 path 從未跑成功），應為 outputCanvas（line 1181 唯一宣告）
+        const dataUrl = outputCanvas.toDataURL('image/png', 1.0);
         const newWindow = window.open('', '_blank');
         if (newWindow) {
           newWindow.document.write(`
