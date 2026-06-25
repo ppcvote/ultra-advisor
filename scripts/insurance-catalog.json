@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-06-25T15:58:07.183Z",
+  "source": "self-test-fixture",
+  "stats": {
+    "totalEntries": 5,
+    "uniqueCompanies": 5,
+    "estimatedCompanyCoverage": "22.7%",
+    "byCompany": {
+      "國泰人壽": 1,
+      "富邦人壽": 1,
+      "南山人壽": 1,
+      "新光人壽": 1,
+      "安聯人壽": 1
+    },
+    "byCategory": {
+      "壽險": 1,
+      "醫療": 1,
+      "重疾": 1,
+      "長照": 1,
+      "年金": 1
+    },
+    "byStatus": {
+      "販售中": 3,
+      "改版": 1,
+      "已停售": 1
+    }
+  },
+  "entries": [
+    {
+      "company": "國泰人壽",
+      "productName": "康健平安終身壽險",
+      "productCode": "CKWL2024A",
+      "categoryMain": "壽險",
+      "categorySub": null,
+      "effectiveDate": "2024-05-20",
+      "status": "販售中",
+      "_schemaVersion": 1,
+      "_source": "catalog-research"
+    },
+    {
+      "company": "富邦人壽",
+      "productName": "美好醫靠住院日額醫療保險附約",
+      "productCode": "富邦人壽-美好醫靠住院日額醫療保險附約",
+      "categoryMain": "醫療",
+      "categorySub": null,
+      "effectiveDate": "2025-01-01",
+      "status": "販售中",
+      "_schemaVersion": 1,
+      "_source": "catalog-research"
+    },
+    {
+      "company": "南山人壽",
+      "productName": "一生鑽石重大疾病終身健康保險",
+      "productCode": "NSRC2023",
+      "categoryMain": "重疾",
+      "categorySub": null,
+      "effectiveDate": "2023-08-15",
+      "status": "改版",
+      "_schemaVersion": 1,
+      "_source": "catalog-research"
+    },
+    {
+      "company": "新光人壽",
+      "productName": "安心守護長期照顧終身保險",
+      "productCode": "SKLTC22",
+      "categoryMain": "長照",
+      "categorySub": null,
+      "effectiveDate": "2022-03-01",
+      "status": "已停售",
+      "_schemaVersion": 1,
+      "_source": "catalog-research"
+    },
+    {
+      "company": "安聯人壽",
+      "productName": "優利人生變額年金保險",
+      "productCode": "ALVA2024",
+      "categoryMain": "年金",
+      "categorySub": null,
+      "effectiveDate": "2024-11-01",
+      "status": "販售中",
+      "_schemaVersion": 1,
+      "_source": "catalog-research"
+    }
+  ]
+}
