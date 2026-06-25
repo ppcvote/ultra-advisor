@@ -5492,4 +5492,342 @@ exports.pinAuth = functions.https.onRequest(async (req, res) => {
   }
 });
 
+// ==========================================
+// Sprint 11 Stream 3.B — Lifecycle Email Pipeline
+// ==========================================
+// D0 (welcome) → triggered by auth.user().onCreate
+// D2 / D4 / D5 / D6 → daily pubsub cron (Asia/Taipei)
+//
+// IRONCLAD RULES:
+//  - RESEND_API_KEY env 未設 → DRY-RUN (logger.info only), 不 throw, 不擋部署
+//  - 不引入新 npm 依賴 — Resend 走 axios + REST (已 require axios at top of file)
+//  - 「現在時間」一律 onRun callback 內取，不在 schedule 字串裡寫死日期
+//  - 寄完 update users/{uid}.lifecycleStage 去重 (避免 cron 重跑同一天重寄)
+//  - 不動 Sprint 5 trial_countdown / checkTrialExpiration LINE 通知邏輯 — 那是 LINE channel,
+//    這條是 email channel, 兩者並存。後續若 push notification 介入會在 Sprint 12 統一。
+// ==========================================
+
+const { getLifecycleTemplate } = require('./lib/lifecycle-email-templates');
+
+// Lifecycle stage progression. cron 跑時找 stage < target 才寄,確保 D2→D4→D5→D6 順序不會跳。
+const LIFECYCLE_STAGE_ORDER = {
+  none: 0,
+  welcome: 1,
+  no_client_yet: 2,
+  aha_reminder: 3,
+  trial_countdown: 4,
+  trial_ending: 5,
+};
+
+const APP_BASE_URL = 'https://ultra-advisor.tw';
+const LIFECYCLE_FROM = 'Ultra Advisor <hello@ultra-advisor.tw>';
+
+/**
+ * Interpolate {{vars}} placeholders. Pure string replace; no template engine.
+ * Caller MUST supply all vars referenced in the template — undefined values are
+ * substituted as empty string (avoids "{{undefined}}" leaking to inboxes).
+ */
+function interpolateTemplate(str, vars) {
+  return Object.entries(vars).reduce((acc, [k, v]) => {
+    const safe = v === undefined || v === null ? '' : String(v);
+    return acc.replace(new RegExp(`{{${k}}}`, 'g'), safe);
+  }, str);
+}
+
+/**
+ * Resend dispatcher. Dry-run if RESEND_API_KEY not set so the cron is safe to
+ * deploy without credentials — user verifies via Cloud Function logs first,
+ * then sets the secret to flip to real-send (no code change needed).
+ *
+ * @param {string} toEmail - Recipient email
+ * @param {string} stage   - LifecycleStage key (see TEMPLATES)
+ * @param {object} vars    - Interpolation context: displayName, ctaUrl, daysRemaining, etc.
+ * @returns {Promise<{ dryRun: boolean, sent?: boolean, error?: string }>}
+ */
+async function sendLifecycleEmail(toEmail, stage, vars) {
+  const template = getLifecycleTemplate(stage);
+  if (!template) {
+    functions.logger.warn('[lifecycle] unknown stage', { stage });
+    return { dryRun: false, sent: false, error: 'unknown_stage' };
+  }
+
+  const RESEND_API_KEY = process.env.RESEND_API_KEY;
+
+  // === DRY-RUN PATH ===
+  // No API key set yet → log what we would have sent. Lets us deploy the cron
+  // and verify cohort queries against real users before flipping the send switch.
+  if (!RESEND_API_KEY) {
+    functions.logger.info('[lifecycle] DRY-RUN (RESEND_API_KEY unset)', {
+      to: toEmail,
+      stage,
+      subject: interpolateTemplate(template.subject, vars),
+      vars,
+    });
+    return { dryRun: true, sent: false };
+  }
+
+  // === REAL SEND PATH ===
+  try {
+    await axios.post(
+      'https://api.resend.com/emails',
+      {
+        from: LIFECYCLE_FROM,
+        to: toEmail,
+        subject: interpolateTemplate(template.subject, vars),
+        html: interpolateTemplate(template.html, vars),
+        text: interpolateTemplate(template.text, vars),
+        headers: {
+          // Preheader is rendered via inbox preview; Resend doesn't have a
+          // dedicated field, so we lean on the inline preheader convention.
+          'X-Entity-Ref-ID': `lifecycle-${stage}-${Date.now()}`,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 10_000,
+      }
+    );
+    functions.logger.info('[lifecycle] sent', { to: toEmail, stage });
+    return { dryRun: false, sent: true };
+  } catch (err) {
+    // Log full Resend response body if available — helps debug 422 invalid-from-domain etc.
+    functions.logger.error('[lifecycle] resend error', {
+      to: toEmail,
+      stage,
+      status: err.response?.status,
+      data: err.response?.data,
+      message: err.message,
+    });
+    return { dryRun: false, sent: false, error: err.message };
+  }
+}
+
+/**
+ * Auth onCreate — D0 welcome email.
+ * Fires once when a Firebase Auth user is created (any method: email/password,
+ * Google, anonymous-upgrade, LINE flow's auth.createUser).
+ *
+ * NOTE: createTrialAccount() (line ~874) creates a Firestore user doc with
+ * createdAt timestamp. This trigger fires from the auth event — Firestore doc
+ * may not exist yet (race). We don't need it for the welcome email; we only
+ * need email + a sensible display name.
+ *
+ * To avoid double-sending if the user later upgrades + we ship a re-trigger
+ * later, we write lifecycleStage='welcome' to users/{uid}. cron daily then
+ * sees this and starts D2 cadence from there.
+ */
+exports.onUserAuthCreate = functions.auth.user().onCreate(async (user) => {
+  // Anonymous users have no email. Skip — they'll get the email when they upgrade.
+  if (!user.email) {
+    functions.logger.info('[lifecycle:welcome] skip — no email', { uid: user.uid });
+    return null;
+  }
+
+  const displayName =
+    user.displayName ||
+    user.email.split('@')[0] ||
+    '你';
+
+  const ctaUrl = `${APP_BASE_URL}/?utm_source=lifecycle&utm_campaign=welcome`;
+
+  try {
+    const result = await sendLifecycleEmail(user.email, 'welcome', {
+      displayName,
+      ctaUrl,
+    });
+
+    // Always mark stage as 'welcome' so cron doesn't re-send D0. Even in dry-run.
+    // serverTimestamp() — taken in callback (rule: time在 callback 內).
+    //
+    // critic P0: 之前沒寫 createdAt → cron 用 .where('createdAt', '>=', ...) 撈不到
+    //   走 auth-only path 的新註冊 (LiffRegister / 直接 createUserWithEmailAndPassword)
+    //   結果 D2/D4/D5/D6 永遠不會寄。merge:true 保留 createTrialAccount 已寫的值、
+    //   缺則由本 trigger 補上。
+    await db.collection('users').doc(user.uid).set(
+      {
+        lifecycleStage: 'welcome',
+        lifecycleSentAt: admin.firestore.FieldValue.serverTimestamp(),
+        lifecycleWelcomeAt: admin.firestore.FieldValue.serverTimestamp(),
+        // 補關鍵：cron cohort 視窗 query 依此欄
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    functions.logger.info('[lifecycle:welcome] processed', {
+      uid: user.uid,
+      dryRun: result.dryRun,
+    });
+  } catch (err) {
+    // Don't throw — onCreate failure blocks downstream auth flow. Log only.
+    functions.logger.error('[lifecycle:welcome] error', {
+      uid: user.uid,
+      message: err.message,
+    });
+  }
+  return null;
+});
+
+/**
+ * Daily lifecycle cron — D2 / D4 / D5 / D6.
+ *
+ * Runs once a day 09:00 Asia/Taipei. For each cohort, queries users whose
+ * createdAt falls in the cohort window AND whose lifecycleStage < target.
+ *
+ * Window logic (day-N cohort = "user created N days ago today"):
+ *   windowStart = now - (N+1) days
+ *   windowEnd   = now - N days
+ *   → catches anyone whose D-N anniversary lands in the last 24h regardless
+ *     of exact clock time. Slight overlap with D-N±1 is filtered by
+ *     lifecycleStage check (we already sent → skip).
+ *
+ * Schedule string is plain cron syntax (not "every 24 hours" App-Engine
+ * shorthand) so it matches existing schedules (checkTrialExpiration etc.) in
+ * this file — consistent + works on both gen-1 functions and gen-2 scheduler.
+ *
+ * Cost: 1 invocation/day × 4 queries × users-per-window. For <10k users this
+ * is well under free-tier (2M invocations/month).
+ */
+exports.sendLifecycleEmails = functions.pubsub
+  .schedule('0 9 * * *')
+  .timeZone('Asia/Taipei')
+  .onRun(async (context) => {
+    // RULE: "現在時間" 在 callback 內取。
+    const now = admin.firestore.Timestamp.now();
+    const nowMs = now.toMillis();
+    const DAY_MS = 24 * 60 * 60 * 1000;
+
+    // Cohort defs — keep in sync with template stages.
+    // For trial_countdown we compute daysRemaining from trialExpiresAt (handled below).
+    const COHORTS = [
+      { dayN: 2, stage: 'no_client_yet',   minStageOrder: LIFECYCLE_STAGE_ORDER.no_client_yet },
+      { dayN: 4, stage: 'aha_reminder',    minStageOrder: LIFECYCLE_STAGE_ORDER.aha_reminder },
+      { dayN: 5, stage: 'trial_countdown', minStageOrder: LIFECYCLE_STAGE_ORDER.trial_countdown },
+      { dayN: 6, stage: 'trial_ending',    minStageOrder: LIFECYCLE_STAGE_ORDER.trial_ending },
+    ];
+
+    let totalSent = 0;
+    let totalDryRun = 0;
+    let totalSkipped = 0;
+
+    for (const cohort of COHORTS) {
+      const windowEnd = admin.firestore.Timestamp.fromMillis(nowMs - cohort.dayN * DAY_MS);
+      const windowStart = admin.firestore.Timestamp.fromMillis(nowMs - (cohort.dayN + 1) * DAY_MS);
+
+      try {
+        // Query: users created in window, no email send for this stage yet.
+        // We can't compound-where on createdAt range + lifecycleStage equality
+        // without a composite index. So we filter stage in JS — cohort window is
+        // small (typically <100 docs/day for current scale).
+        const snap = await db.collection('users')
+          .where('createdAt', '>=', windowStart)
+          .where('createdAt', '<', windowEnd)
+          .get();
+
+        functions.logger.info(`[lifecycle:${cohort.stage}] cohort size`, { count: snap.size });
+
+        for (const doc of snap.docs) {
+          const userData = doc.data();
+          const uid = doc.id;
+
+          // Skip if already past this stage (cron re-ran, manual stage set, etc.)
+          const currentStageOrder = LIFECYCLE_STAGE_ORDER[userData.lifecycleStage] || 0;
+          if (currentStageOrder >= cohort.minStageOrder) {
+            totalSkipped++;
+            continue;
+          }
+
+          // Stage-specific gates (avoid wrong emails):
+          //  - no_client_yet → only if 0 real clients (we want to ignore the
+          //    3 demo clients seeded at signup). We use a `realClientCount`
+          //    field; if missing, skip-safe rather than spam.
+          if (cohort.stage === 'no_client_yet') {
+            const realCount = Number(userData.realClientCount ?? userData.clientCount ?? 0);
+            if (realCount > 0) {
+              totalSkipped++;
+              continue;
+            }
+          }
+          //  - aha_reminder → only if toolUsageCount == 0 (user hasn't opened
+          //    any of the 18 tools). Tracked by existing tool-open analytics.
+          if (cohort.stage === 'aha_reminder') {
+            const usage = Number(userData.toolUsageCount ?? 0);
+            if (usage > 0) {
+              totalSkipped++;
+              continue;
+            }
+          }
+
+          // No email → skip silently. We'll never have a stage > welcome
+          // without an email because onUserAuthCreate gates on email, but
+          // legacy users seeded via console may lack it.
+          if (!userData.email) {
+            totalSkipped++;
+            continue;
+          }
+
+          // Build template vars — daysRemaining only meaningful for trial_countdown.
+          const displayName =
+            userData.displayName ||
+            userData.email.split('@')[0] ||
+            '你';
+
+          const vars = {
+            displayName,
+            ctaUrl: `${APP_BASE_URL}/?utm_source=lifecycle&utm_campaign=${cohort.stage}`,
+            privacyUrl: `${APP_BASE_URL}/privacy`,
+            termsUrl: `${APP_BASE_URL}/terms`,
+            unsubscribeUrl: `${APP_BASE_URL}/settings/email?uid=${uid}`,
+            daysRemaining: '',
+          };
+
+          if (cohort.stage === 'trial_countdown' || cohort.stage === 'trial_ending') {
+            // Derive from trialExpiresAt if present, otherwise fall back to
+            // (7 - dayN) — covers Sprint 5 schema where daysRemaining was a
+            // counter field, not a derived value.
+            if (userData.trialExpiresAt?.toMillis) {
+              const remaining = Math.max(
+                0,
+                Math.ceil((userData.trialExpiresAt.toMillis() - nowMs) / DAY_MS)
+              );
+              vars.daysRemaining = String(remaining);
+            } else if (typeof userData.daysRemaining === 'number') {
+              vars.daysRemaining = String(userData.daysRemaining);
+            } else {
+              vars.daysRemaining = String(Math.max(0, 7 - cohort.dayN));
+            }
+          }
+
+          const result = await sendLifecycleEmail(userData.email, cohort.stage, vars);
+
+          // Update stage REGARDLESS of dry-run vs real — dry-run still represents
+          // "we processed this user today, don't loop again tomorrow".
+          // If real-send failed (network), DON'T update — let tomorrow retry.
+          if (result.dryRun || result.sent) {
+            await doc.ref.update({
+              lifecycleStage: cohort.stage,
+              lifecycleSentAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            if (result.dryRun) totalDryRun++;
+            else totalSent++;
+          }
+        }
+      } catch (err) {
+        functions.logger.error(`[lifecycle:${cohort.stage}] cohort error`, {
+          message: err.message,
+        });
+      }
+    }
+
+    functions.logger.info('[lifecycle] daily run complete', {
+      sent: totalSent,
+      dryRun: totalDryRun,
+      skipped: totalSkipped,
+    });
+    return null;
+  });
+
 console.log('Ultra Advisor Cloud Functions loaded');

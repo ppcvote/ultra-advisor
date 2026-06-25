@@ -25,6 +25,9 @@ import {
   subscribeAgendaPrefs,
   type AgendaPrefs,
 } from '../../lib/agendaPrefs';
+// Sprint 11 Stream 3.A: a11y hook — Esc + click-outside + focus-return.
+// Replaces the bespoke mousedown listener with the shared, SR-friendly version.
+import { usePopoverDismiss } from '../../hooks/usePopoverDismiss';
 import type { ProfileData, WarRoomTab } from './types';
 
 interface OverviewTabProps {
@@ -80,21 +83,22 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   };
 
   // ===== Sprint 9 D: agenda 偏好齒輪 popover =====
-  // click-outside dismissal — 沿用 mousedown listener 模式（比 click 早觸發、避免 button click 衝突）
+  // Sprint 11 Stream 3.A: 換成 usePopoverDismiss — 一次補 Esc + click-outside + focus-return + autofocus。
+  // 既有的 mousedown-only listener 沒處理鍵盤、popover 關閉後焦點落到 <body>、SR 用戶迷失。
   const [showPrefsPopover, setShowPrefsPopover] = useState(false);
   const prefsPopoverRef = useRef<HTMLDivElement | null>(null);
+  // triggerRef: focus-return target on close (avoids focus falling to <body> after Esc)
+  const prefsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  // initialFocusRef: autofocus first checkbox on open so keyboard users have an immediate tab target
+  const prefsFirstCheckboxRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    if (!showPrefsPopover) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (prefsPopoverRef.current && !prefsPopoverRef.current.contains(e.target as Node)) {
-        setShowPrefsPopover(false);
-      }
-    };
-    // mousedown 比 click 早觸發、避免 popover 內按鈕點擊先被 outside listener 關掉
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showPrefsPopover]);
+  usePopoverDismiss({
+    isOpen: showPrefsPopover,
+    onDismiss: () => setShowPrefsPopover(false),
+    containerRef: prefsPopoverRef,
+    triggerRef: prefsTriggerRef,
+    initialFocusRef: prefsFirstCheckboxRef,
+  });
 
   // Onboarding missions list — drives the 8-step "快速上手" panel for new users.
   // Hook auto-fetches on auth; we only consume `missions` + `loading` here.
@@ -194,15 +198,22 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
               <div className="relative ml-auto" ref={prefsPopoverRef}>
                 <button
                   type="button"
+                  ref={prefsTriggerRef}
                   onClick={() => setShowPrefsPopover(v => !v)}
                   aria-label="調整今日重點顯示"
                   aria-expanded={showPrefsPopover}
+                  aria-haspopup="dialog"
                   className="p-1.5 rounded-lg text-slate-500 hover:text-amber-300 hover:bg-amber-500/10 transition-colors"
                 >
                   <Settings size={14} />
                 </button>
                 {showPrefsPopover && (
                   <div
+                    // role=dialog + aria-modal=false: SR announces this as a popover-style
+                    // dialog (not a full modal — page is still interactive behind it).
+                    role="dialog"
+                    aria-modal="false"
+                    aria-label="調整今日重點顯示"
                     className="absolute top-full right-0 mt-1 w-56 z-20
                                bg-slate-900 border border-slate-700 rounded-xl shadow-xl
                                p-2 space-y-0.5"
@@ -214,7 +225,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                       { key: 'showBirthday',   label: '本週生日',   icon: <Cake size={12} className="text-pink-400" /> },
                       { key: 'showStale',      label: '久未追蹤',   icon: <Clock size={12} className="text-blue-400" /> },
                       { key: 'showIncomplete', label: '資料不足',   icon: <FileEdit size={12} className="text-emerald-400" /> },
-                    ] as const).map(row => (
+                    ] as const).map((row, rowIdx) => (
                       <label
                         key={row.key}
                         className="flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer
@@ -222,6 +233,9 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                       >
                         <input
                           type="checkbox"
+                          // First checkbox gets the autofocus ref so keyboard users land
+                          // here when popover opens (Tab navigation starts here).
+                          ref={rowIdx === 0 ? prefsFirstCheckboxRef : undefined}
                           checked={agendaPrefs[row.key]}
                           onChange={(e) => setAgendaPref(row.key, e.target.checked)}
                           className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-800

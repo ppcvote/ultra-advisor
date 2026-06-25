@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { X, Copy, MessageCircle, Check, AlertCircle } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
-import { shareToLine } from '../../../utils/shareToLine';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -61,19 +60,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, isReferral
       setCopyState('failed');
     }
 
-    // 跳 LINE — 用既有 shareToLine util、但 LINE OA 接訊不吃 lineit share endpoint
-    // 改直接 window.open OA deep link（lineit 是「分享到 LINE timeline」、不是「私訊 OA」）
-    // 保留 import shareToLine 是因為任務 spec 要求引用既有 util，但實際 OA 私訊只能走 ti/p
+    // 直開 LINE OA deep link（lineit 端點是「分享到 timeline」、不是「私訊 OA」、無關此情境）
     window.open(LINE_BOSS_URL, '_blank', 'noopener,noreferrer');
 
     // 2 秒後 reset 複製狀態（避免顧問再點時看到舊狀態）
     setTimeout(() => setCopyState('idle'), 2000);
 
     // 註：prefilledMessage 目前 LINE OA ti/p 端點不支援預填、暫時只能複製 email
-    // 未來若改成 oaMessage 路徑（line.me/R/oaMessage/@id/?msg）可以預填
-    // 把 prefilledMessage 也丟到 clipboard（覆蓋 email）是另一條路、但會混淆顧問
+    // 未來若改 oaMessage 路徑（line.me/R/oaMessage/@id/?msg）可以預填
     void prefilledMessage;
-    void shareToLine;
   };
 
   // 直接開 LINE（不複製 email、不關 modal）
@@ -98,8 +93,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, isReferral
           </button>
         </div>
 
-        {/* Portaly 付款 iframe — 既有流程不動 */}
-        <div className="w-full" style={{ height: '620px' }}>
+        {/* Portaly 付款 iframe — 既有流程不動
+            為什麼 height 用 clamp(360px, 50vh, 620px)：
+              - 桌機 (viewport ≥ 1240px) → 50vh ≈ 620px、命中 max 上限、視覺與原本一致
+              - 手機 844px viewport → 50vh = 422px、空出底部 ~400px 給 sticky LINE action bar
+              - 360px floor 保護橫屏與超小螢幕 (≥ Portaly form 必要最小高度)
+            不改 iframe src（任務鐵則）。 */}
+        <div className="w-full" style={{ height: 'clamp(360px, 50vh, 620px)' }}>
           <iframe
             src={iframeUrl}
             width="100%"
@@ -110,8 +110,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, isReferral
           />
         </div>
 
-        {/* 開通流程說明 + LINE 引導 — 取代原本「自動開通」謊言 */}
-        <div className="p-4 border-t border-slate-700 bg-slate-800/60 space-y-3">
+        {/* 開通流程說明 + LINE 引導 — 取代原本「自動開通」謊言
+            sticky bottom-0：手機 viewport (844px) 上 iframe 縮短後、底下 action bar 仍貼底可見
+            桌機 max-h-[95vh] 容器內 sticky 也不會影響佈局、因為 modal 已是 fixed 定位 */}
+        <div className="p-4 border-t border-slate-700 bg-slate-800/95 backdrop-blur sticky bottom-0 z-10 space-y-3">
           {/* 誠實說明：手動開通、24 小時內 */}
           <div className="flex items-start gap-2 p-3 bg-slate-900/60 rounded-xl border border-slate-700">
             <AlertCircle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />

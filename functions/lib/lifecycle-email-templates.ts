@@ -29,7 +29,7 @@
 export type LifecycleStage =
   | 'welcome'         // D0 — register success
   | 'no_client_yet'   // D2 — still 0 clients
-  | 'aha_reminder'    // D4 — 18 個工具未啟用過任何一個
+  | 'aha_reminder'    // D4 — 14 個工具未啟用過任何一個
   | 'trial_countdown' // D5 — 試用期剩 2 天（假設 7 天試用）
   | 'trial_ending';   // D6 — 試用期最後一天
 
@@ -120,7 +120,7 @@ const noClientYet: LifecycleTemplate = {
 };
 
 // ============================================================
-// D4 — Aha-moment 提醒（18 個工具都沒打開過）
+// D4 — Aha-moment 提醒（14 個工具都沒打開過）
 // ============================================================
 const ahaReminder: LifecycleTemplate = {
   stage: 'aha_reminder',
@@ -131,7 +131,7 @@ const ahaReminder: LifecycleTemplate = {
 <html lang="zh-Hant"><body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px;">
   <h1 style="font-size:22px;margin:0 0 16px;">第一次試算，建議從這個工具開始</h1>
   <p>Hi {{displayName}}，</p>
-  <p>我們發現你帳號開通 4 天，但 18 個工具都還沒打開過。Ultra Advisor 的價值 90% 在試算結果，光看介面看不出來。</p>
+  <p>我們發現你帳號開通 4 天，但 14 個工具都還沒打開過。Ultra Advisor 的價值 90% 在試算結果，光看介面看不出來。</p>
   <p>建議最快的入門路徑：</p>
   <ul style="padding-left:20px;color:#374151;">
     <li>戰情室 → 點「示範｜王太太」</li>
@@ -146,7 +146,7 @@ const ahaReminder: LifecycleTemplate = {
   `.trim(),
   text: `Hi {{displayName}}，
 
-我們發現你帳號開通 4 天，但 18 個工具都還沒打開過。Ultra Advisor 的價值 90% 在試算結果，光看介面看不出來。
+我們發現你帳號開通 4 天，但 14 個工具都還沒打開過。Ultra Advisor 的價值 90% 在試算結果，光看介面看不出來。
 
 最快入門路徑：
 1. 戰情室 → 點「示範｜王太太」
@@ -174,9 +174,9 @@ const trialCountdown: LifecycleTemplate = {
   <p>Hi {{displayName}}，</p>
   <p>提醒你的試用期還剩 {{daysRemaining}} 天。幾件你可能想知道的：</p>
   <ul style="padding-left:20px;color:#374151;">
-    <li>到期不續訂 → 帳號降為免費版，但 18 個工具中的 4 個基礎款仍可用</li>
+    <li>到期不續訂 → 帳號降為免費版，但 14 個工具中的 4 個基礎款仍可用</li>
     <li>已建客戶資料會保留 30 天，期間升級隨時可救回</li>
-    <li>月費 NT$ —— 元，無綁約，<a href="{{termsUrl}}">7 天冷靜期</a>內可全額退款（消保法 §19）</li>
+    <li>付費方案 Beta 階段請 LINE <a href="https://line.me/R/oaMessage/%40ginrolladvisor/?text=想了解付費方案">@ginrolladvisor</a> 詢問，無綁約</li>
   </ul>
   <p>不需要硬推銷，純粹讓你知道時程。</p>
   <p style="margin-top:24px;"><a href="{{ctaUrl}}" style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">看付費方案</a></p>
@@ -190,7 +190,7 @@ const trialCountdown: LifecycleTemplate = {
 
 - 不續訂 → 降為免費版，4 個基礎工具仍可用
 - 客戶資料保留 30 天，期間升級可救回
-- 月費無綁約，7 天冷靜期內全額退款（{{termsUrl}}）
+- 付費方案 Beta 階段請 LINE @ginrolladvisor 詢問，無綁約
 
 看付費方案：{{ctaUrl}}
 
