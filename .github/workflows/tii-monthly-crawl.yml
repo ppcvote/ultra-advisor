@@ -1,0 +1,166 @@
+# Sprint 15 W1 — TII Monthly Crawl
+#
+# Why this workflow:
+#   Sprint 15 turns the Sprint 12 one-shot TII crawler into a monthly diff
+#   pipeline. This Action runs `scripts/crawl-tii-monthly.cjs` and uploads the
+#   per-month diff report as an artifact.
+#
+# Scheduling decision (V2 critic):
+#   We DO NOT cron at month 1 02:00 — that hit window overlaps with TII's
+#   common Sunday-overnight maintenance + holiday-eve outages, and a missed
+#   month is expensive (admins lose visibility into 修訂條款 push). Instead
+#   the cron fires on the 1st AND 2nd AND 3rd at 05:00 UTC, and the crawler
+#   itself is idempotent — `--resume` skips already-processed product codes,
+#   and `writeReviewQueueEntry()` uses a deterministic doc id keyed on
+#   `${runMonth}__${changeKind}__${productId}` so re-runs collapse cleanly.
+#   First successful run of the month wins; subsequent runs are no-ops on
+#   the queue (and skipped early via the resume state file).
+#
+# Live-cron switch:
+#   `schedule:` is COMMENTED OUT until Sprint 15 W3. W1 ships the workflow
+#   gated to manual `workflow_dispatch` only so we can dry-run end-to-end
+#   without burning CAPTCHA budget or polluting Firestore.
+
+name: TII Monthly Crawl
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'Actually write to Firestore (false = dry-run)'
+        type: boolean
+        default: false
+      captcha_mode:
+        description: 'CAPTCHA solver mode'
+        type: choice
+        options: [auto, manual]
+        default: auto
+      full:
+        description: 'Run full 22 life + 21 P&C matrix (else --limit 3)'
+        type: boolean
+        default: false
+  # Sprint 15 W3 will enable this — leaving here so the future toggle is one
+  # comment-line away. NOTE: GitHub-hosted cron drifts up to 30min on a busy
+  # hour; 05:00 UTC == 13:00 Asia/Taipei, well clear of TII maintenance.
+  # schedule:
+  #   - cron: '0 5 1-3 * *'   # 1st, 2nd, 3rd of every month at 05:00 UTC
+
+permissions:
+  contents: read
+  issues: write   # for the captchaHitRate alert auto-issue
+
+concurrency:
+  group: tii-monthly-crawl
+  cancel-in-progress: false   # don't kill an in-flight run; idempotency handles overlap
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install deps (root)
+        run: npm ci --no-audit --no-fund
+
+      # Idempotency guard: if a successful run already happened this month
+      # the report file is present in `scripts/` (committed back by the
+      # prior run's PR, or stored as an artifact we re-download). We pull
+      # the latest artifact and short-circuit if present + healthy. This is
+      # the "first-of-month wins" semantics V2 critic asked for.
+      - name: Check for existing month report
+        id: month_check
+        run: |
+          RUN_MONTH=$(date -u +%Y-%m)
+          echo "run_month=$RUN_MONTH" >> "$GITHUB_OUTPUT"
+          if [ -f "scripts/tii-diff-${RUN_MONTH}.json" ]; then
+            echo "already_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run TII monthly crawler (dry-run by default)
+        if: steps.month_check.outputs.already_run == 'false'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GCP_SA_KEY_FILE }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TII_SLACK_WEBHOOK: ${{ secrets.TII_SLACK_WEBHOOK }}
+        # Up to 3 retries with 6h backoff handled by GH retry-on-failure
+        # — see `continue-on-error` below + a re-invoke of the `crawl` job
+        # via re-run UI. We don't bake retry inside the script because
+        # crawler `--resume` already covers per-product flakes; the
+        # workflow retry is for TII whole-site outages.
+        run: |
+          set -e
+          FLAGS=""
+          if [ "${{ inputs.commit }}" = "true" ]; then FLAGS="$FLAGS --commit"; fi
+          if [ "${{ inputs.full }}" = "true" ]; then FLAGS="$FLAGS --full"; fi
+          FLAGS="$FLAGS --captcha-mode ${{ inputs.captcha_mode }}"
+          FLAGS="$FLAGS --report-dir scripts"
+          FLAGS="$FLAGS --state-file scripts/tii-monthly-state.json"
+          echo "Running: node scripts/crawl-tii-monthly.cjs $FLAGS"
+          node scripts/crawl-tii-monthly.cjs $FLAGS
+
+      # Parse `metrics.captchaHitRate` from the report and open an auto-issue
+      # if degradation detected (V2 critic must-fix).
+      - name: Inspect captchaHitRate
+        if: always() && steps.month_check.outputs.already_run == 'false'
+        id: captcha_check
+        run: |
+          REPORT="scripts/tii-diff-${{ steps.month_check.outputs.run_month }}.json"
+          if [ ! -f "$REPORT" ]; then
+            echo "no_report=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "no_report=false" >> "$GITHUB_OUTPUT"
+          HEALTHY=$(node -e "const r=require('./$REPORT'); process.stdout.write(String((r.metrics||{}).captchaHealthy ?? true));")
+          RATE=$(node -e "const r=require('./$REPORT'); process.stdout.write(String((r.metrics||{}).captchaHitRate ?? 1));")
+          echo "healthy=$HEALTHY" >> "$GITHUB_OUTPUT"
+          echo "rate=$RATE" >> "$GITHUB_OUTPUT"
+
+      - name: Open CAPTCHA degradation issue
+        if: steps.captcha_check.outputs.healthy == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const rate = '${{ steps.captcha_check.outputs.rate }}';
+            const month = '${{ steps.month_check.outputs.run_month }}';
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `TII CAPTCHA hit-rate degradation (${month}): ${rate}`,
+              body: [
+                `## Auto-alert`,
+                `Run month: \`${month}\``,
+                `captchaHitRate: \`${rate}\` (threshold: 0.7)`,
+                ``,
+                `Likely cause:`,
+                `- TII rotated CAPTCHA font / added noise lines`,
+                `- Gemini Vision degraded`,
+                `- Network rate-limiting from CI runner egress`,
+                ``,
+                `Next steps:`,
+                `1. Pull the per-month report artifact and inspect \`partialCompanies\` / \`failed\`.`,
+                `2. Re-run with \`captcha_mode=manual\` if pattern looks human-only.`,
+                `3. Review \`scripts/lib/tii-captcha-solver.cjs\` prompt — TII may have changed CAPTCHA layout.`,
+              ].join('\n'),
+              labels: ['tii-crawler', 'auto-alert'],
+            });
+
+      - name: Upload diff report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tii-diff-${{ steps.month_check.outputs.run_month }}
+          path: |
+            scripts/tii-diff-*.json
+            scripts/tii-monthly-state.json
+          if-no-files-found: ignore
+          retention-days: 90

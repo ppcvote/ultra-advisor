@@ -6337,4 +6337,447 @@ exports.logAuditEvent = functions.https.onCall(async (data, context) => {
   return { eventId };
 });
 
+// ==========================================
+// Sprint 15 W1 — Versioned catalog backfill (Task B4)
+// ==========================================
+//
+// 把 Sprint 13 灌入的 catalog (insurance_products/{id}) 升級到 versioned 結構：
+//   insurance_products/{id}                       ← 加 activeVersion='v1' / totalVersions=1
+//   insurance_products/{id}/versions/v1           ← 新建 subcollection doc，複製 spec 進去
+//   users/{uid}/insurancePolicies/{pid}           ← 加 catalogProductVersion='v1' (Phase 2 callable)
+//
+// 鐵則：
+//   - epoch ms 在 callback 內取 (runtime ts)；FieldValue.serverTimestamp() 對齊 Firestore 時鐘
+//   - idempotent — 已有 activeVersion 的 doc 直接 skip，重跑安全
+//   - dry-run default — 預設不寫 Firestore、只回 stats
+//   - admin only — verifyAdminAccess(context) gate
+//   - 寫 backfill_progress/{runId} 讓 admin UI 拉進度條
+//   - 不對顧客端暴露：backfill_progress 在 firestore.rules 內 read=isAdmin / write=false
+//   - source 永遠 'tii' (Sprint 13 closed union)
+//
+// 為什麼分兩個 callable：
+//   - product 那邊一筆寫 1 個 root doc + 1 個 subcoll doc，540 秒 1GB 才夠跑全 catalog
+//   - policy 那邊掃 collectionGroup('insurancePolicies') / 客戶 PII 路徑、流程獨立
+//   - 切兩個就能個別重跑、個別 dry-run、failure 不會互相 block
+//
+// 與 schema_v2 對齊（Sprint 15 spec）：
+//   versions/v1: {
+//     effectiveFrom: existing.effectiveDate,   // 法定生效日 (TII)
+//     effectiveTo: null,                       // 還在售 → null
+//     status: 'active',
+//     pdfStoragePath: 'insurance-conditions/{id}/v1.pdf',  // placeholder (W2 才上傳)
+//     pdfSha256: existing.pdfSha256 || null,
+//     ...spec fields,
+//     catalogProcessedAt: <callback runtime ts>,
+//     schemaVersion: 1
+//   }
+
+// ---- 共用：寫 backfill_progress（每 BACKFILL_PROGRESS_EVERY 筆寫一次，省 Firestore 額度）
+const BACKFILL_PROGRESS_EVERY = 100;
+const BACKFILL_DEFAULT_LIMIT = 1000;
+const BACKFILL_MAX_LIMIT = 5000;
+
+async function writeBackfillProgress(runId, payload) {
+  try {
+    await db.collection('backfill_progress').doc(runId).set(
+      {
+        ...payload,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    // progress 寫失敗不該影響主流程
+    functions.logger.warn('[backfill] progress write failed', {
+      runId,
+      message: err.message,
+    });
+  }
+}
+
+/**
+ * backfillProductVersions — 把 insurance_products/{id} 升級到 versioned 結構
+ *
+ * Input data:
+ *   - dryRun: boolean (default true) — 只統計、不寫 Firestore
+ *   - limit: number (default 1000, max 5000) — 本次最多處理幾筆
+ *   - resumeFrom: string|null — 從某 doc id (字典序) 開始續傳
+ *
+ * Output:
+ *   { runId, processed, migrated, skipped, error, dryRun, lastDocId }
+ */
+exports.backfillProductVersions = functions
+  .runWith({ timeoutSeconds: 540, memory: '1GB' })
+  .https.onCall(async (data, context) => {
+    await verifyAdminAccess(context);
+
+    const dryRun = data?.dryRun !== false; // default true
+    const limitRaw = Number(data?.limit) || BACKFILL_DEFAULT_LIMIT;
+    const limit = Math.max(1, Math.min(BACKFILL_MAX_LIMIT, limitRaw));
+    const resumeFrom =
+      typeof data?.resumeFrom === 'string' && data.resumeFrom.length > 0
+        ? data.resumeFrom
+        : null;
+
+    // runtime ts 在 callback 內取 (對齊 logAuditEvent / Sprint 12 codec convention)
+    const callbackStartedAtMs = Date.now();
+    const runId = `product_${callbackStartedAtMs}_${crypto.randomBytes(4).toString('hex')}`;
+
+    let processed = 0;
+    let migrated = 0;
+    let skipped = 0;
+    let errorCount = 0;
+    let lastDocId = null;
+    const errorSamples = []; // 只留前 5 筆 error 給 admin UI debug
+
+    await writeBackfillProgress(runId, {
+      runId,
+      kind: 'product',
+      status: 'running',
+      dryRun,
+      limit,
+      resumeFrom,
+      processed: 0,
+      migrated: 0,
+      skipped: 0,
+      errorCount: 0,
+      startedAt: admin.firestore.FieldValue.serverTimestamp(),
+      startedAtMs: callbackStartedAtMs,
+      startedBy: context.auth.uid,
+    });
+
+    try {
+      let query = db.collection('insurance_products').orderBy(admin.firestore.FieldPath.documentId());
+      if (resumeFrom) {
+        // startAfter by doc id — 用 documentId() ordering
+        query = query.startAfter(resumeFrom);
+      }
+      query = query.limit(limit);
+
+      const snap = await query.get();
+
+      for (const docSnap of snap.docs) {
+        processed += 1;
+        lastDocId = docSnap.id;
+        const productId = docSnap.id;
+        const existing = docSnap.data() || {};
+
+        try {
+          // Idempotency：已有 activeVersion → skip
+          if (existing.activeVersion) {
+            skipped += 1;
+            continue;
+          }
+
+          // 每筆 set 都用 callback-runtime ts；要 Firestore-server-aligned 用 FieldValue
+          const nowTsServer = admin.firestore.FieldValue.serverTimestamp();
+
+          // firstSeenAt 偏好 existing.createdAt / existing.crawledAt（Sprint 13 ingest 寫的）
+          const firstSeenAt =
+            existing.createdAt || existing.crawledAt || nowTsServer;
+
+          // 組 versions/v1 subcollection doc — 只搬白名單欄位 + 加 lifecycle fields
+          const versionDoc = {
+            // Lifecycle fields (Sprint 15 spec)
+            effectiveFrom: existing.effectiveDate || null,
+            effectiveTo: null,
+            status: 'active',
+            // PDF placeholder (W2 才真上傳；現在先放 path schema)
+            pdfStoragePath: `insurance-conditions/${productId}/v1.pdf`,
+            pdfSha256: existing.pdfSha256 || null,
+            // Spec snapshot — 從 root doc 複製 spec 欄位進來，做為 v1 baseline
+            id: productId,
+            company: existing.company || null,
+            companySlug: existing.companySlug || null,
+            productName: existing.productName || null,
+            productCode: existing.productCode || null,
+            categoryMain: existing.categoryMain || null,
+            categorySub: existing.categorySub || null,
+            effectiveDate: existing.effectiveDate || null,
+            source: existing.source || 'tii', // 鐵則：永遠 'tii'
+            sourceUrl: existing.sourceUrl || null,
+            // Audit
+            catalogProcessedAt: nowTsServer,
+            schemaVersion: 1,
+          };
+
+          // Root doc 升級欄位
+          const rootUpdate = {
+            activeVersion: 'v1',
+            totalVersions: 1,
+            firstSeenAt,
+            lastModifiedAt: nowTsServer,
+          };
+
+          if (dryRun) {
+            // dry-run 模式：只算數、不寫 Firestore
+            migrated += 1;
+            if (processed <= 5) {
+              functions.logger.info('[backfill][dry-run] product would migrate', {
+                runId,
+                productId,
+                rootUpdate: { ...rootUpdate, lastModifiedAt: '[serverTs]', firstSeenAt: typeof firstSeenAt === 'object' ? '[ts]' : firstSeenAt },
+                versionPdfPath: versionDoc.pdfStoragePath,
+              });
+            }
+          } else {
+            // commit 模式：root + subcollection 兩個寫入用同一個 batch (atomic)
+            const batch = db.batch();
+            const versionRef = db
+              .collection('insurance_products')
+              .doc(productId)
+              .collection('versions')
+              .doc('v1');
+            batch.set(versionRef, versionDoc, { merge: false });
+            batch.update(docSnap.ref, rootUpdate);
+            await batch.commit();
+            migrated += 1;
+          }
+        } catch (perDocErr) {
+          errorCount += 1;
+          if (errorSamples.length < 5) {
+            errorSamples.push({
+              docId: productId,
+              message: String(perDocErr?.message || perDocErr).slice(0, 200),
+            });
+          }
+          functions.logger.error('[backfill] product per-doc failed', {
+            runId,
+            productId,
+            message: perDocErr?.message,
+          });
+          // 不 throw — 整批繼續，這筆會被 skip 不計入 migrated
+        }
+
+        // 每 N 筆寫一次 progress
+        if (processed % BACKFILL_PROGRESS_EVERY === 0) {
+          await writeBackfillProgress(runId, {
+            processed,
+            migrated,
+            skipped,
+            errorCount,
+            lastDocId,
+          });
+        }
+      }
+
+      const done = snap.size < limit; // 拿不到 limit 筆 → 已經到尾
+      await writeBackfillProgress(runId, {
+        processed,
+        migrated,
+        skipped,
+        errorCount,
+        lastDocId,
+        errorSamples,
+        status: done ? 'completed' : 'partial',
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        completedAtMs: Date.now(),
+      });
+
+      return {
+        runId,
+        processed,
+        migrated,
+        skipped,
+        errorCount,
+        lastDocId,
+        dryRun,
+        done,
+        errorSamples,
+      };
+    } catch (err) {
+      functions.logger.error('[backfill] product run failed', {
+        runId,
+        message: err?.message,
+      });
+      await writeBackfillProgress(runId, {
+        processed,
+        migrated,
+        skipped,
+        errorCount,
+        lastDocId,
+        status: 'failed',
+        error: String(err?.message || err).slice(0, 500),
+        failedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      throw new functions.https.HttpsError(
+        'internal',
+        `backfillProductVersions 失敗: ${err?.message || err}`
+      );
+    }
+  });
+
+/**
+ * backfillClientPolicyVersions — 把 users/{uid}/insurancePolicies/{pid} 加 catalogProductVersion='v1'
+ *
+ * 客戶 PII 路徑下的 subcollection — 用 collectionGroup('insurancePolicies') 掃過。
+ * 只動「已 link 到 catalogProductId、但還沒標 catalogProductVersion」的 doc。
+ * 沒 link catalog 的 (advisor 手填) 跳過 — 它們本來就 floating。
+ *
+ * Input data:
+ *   - dryRun: boolean (default true)
+ *   - limit: number (default 1000, max 5000)
+ *   - resumeFrom: string|null — 上次最後 doc path（含 users/.../insurancePolicies/...）
+ *
+ * Output:
+ *   { runId, processed, migrated, skipped, errorCount, lastDocPath, dryRun, done }
+ */
+exports.backfillClientPolicyVersions = functions
+  .runWith({ timeoutSeconds: 540, memory: '1GB' })
+  .https.onCall(async (data, context) => {
+    await verifyAdminAccess(context);
+
+    const dryRun = data?.dryRun !== false;
+    const limitRaw = Number(data?.limit) || BACKFILL_DEFAULT_LIMIT;
+    const limit = Math.max(1, Math.min(BACKFILL_MAX_LIMIT, limitRaw));
+    const resumeFrom =
+      typeof data?.resumeFrom === 'string' && data.resumeFrom.length > 0
+        ? data.resumeFrom
+        : null;
+
+    const callbackStartedAtMs = Date.now();
+    const runId = `policy_${callbackStartedAtMs}_${crypto.randomBytes(4).toString('hex')}`;
+
+    let processed = 0;
+    let migrated = 0;
+    let skipped = 0;
+    let errorCount = 0;
+    let lastDocPath = null;
+    const errorSamples = [];
+
+    await writeBackfillProgress(runId, {
+      runId,
+      kind: 'policy',
+      status: 'running',
+      dryRun,
+      limit,
+      resumeFrom,
+      processed: 0,
+      migrated: 0,
+      skipped: 0,
+      errorCount: 0,
+      startedAt: admin.firestore.FieldValue.serverTimestamp(),
+      startedAtMs: callbackStartedAtMs,
+      startedBy: context.auth.uid,
+    });
+
+    try {
+      // collectionGroup 掃所有 users/*/insurancePolicies/*
+      // 排序用 __name__（doc 路徑），可以 startAfter 字串路徑做續傳
+      let query = db
+        .collectionGroup('insurancePolicies')
+        .orderBy(admin.firestore.FieldPath.documentId());
+      if (resumeFrom) {
+        query = query.startAfter(resumeFrom);
+      }
+      query = query.limit(limit);
+
+      const snap = await query.get();
+
+      for (const docSnap of snap.docs) {
+        processed += 1;
+        lastDocPath = docSnap.ref.path;
+        const existing = docSnap.data() || {};
+
+        try {
+          // 三個 skip 條件：
+          //   1. 沒有 link catalog（advisor 手填、跟 versioned schema 無關）
+          //   2. 已經有 catalogProductVersion（idempotent skip）
+          if (!existing.catalogProductId) {
+            skipped += 1;
+            continue;
+          }
+          if (existing.catalogProductVersion) {
+            skipped += 1;
+            continue;
+          }
+
+          if (dryRun) {
+            migrated += 1;
+            if (processed <= 5) {
+              functions.logger.info('[backfill][dry-run] policy would migrate', {
+                runId,
+                docPath: lastDocPath,
+                catalogProductId: existing.catalogProductId,
+              });
+            }
+          } else {
+            await docSnap.ref.update({
+              catalogProductVersion: 'v1',
+              catalogVersionLinkedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            migrated += 1;
+          }
+        } catch (perDocErr) {
+          errorCount += 1;
+          if (errorSamples.length < 5) {
+            errorSamples.push({
+              docPath: lastDocPath,
+              message: String(perDocErr?.message || perDocErr).slice(0, 200),
+            });
+          }
+          functions.logger.error('[backfill] policy per-doc failed', {
+            runId,
+            docPath: lastDocPath,
+            message: perDocErr?.message,
+          });
+        }
+
+        if (processed % BACKFILL_PROGRESS_EVERY === 0) {
+          await writeBackfillProgress(runId, {
+            processed,
+            migrated,
+            skipped,
+            errorCount,
+            lastDocPath,
+          });
+        }
+      }
+
+      const done = snap.size < limit;
+      await writeBackfillProgress(runId, {
+        processed,
+        migrated,
+        skipped,
+        errorCount,
+        lastDocPath,
+        errorSamples,
+        status: done ? 'completed' : 'partial',
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        completedAtMs: Date.now(),
+      });
+
+      return {
+        runId,
+        processed,
+        migrated,
+        skipped,
+        errorCount,
+        lastDocPath,
+        dryRun,
+        done,
+        errorSamples,
+      };
+    } catch (err) {
+      functions.logger.error('[backfill] policy run failed', {
+        runId,
+        message: err?.message,
+      });
+      await writeBackfillProgress(runId, {
+        processed,
+        migrated,
+        skipped,
+        errorCount,
+        lastDocPath,
+        status: 'failed',
+        error: String(err?.message || err).slice(0, 500),
+        failedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      throw new functions.https.HttpsError(
+        'internal',
+        `backfillClientPolicyVersions 失敗: ${err?.message || err}`
+      );
+    }
+  });
+
 console.log('Ultra Advisor Cloud Functions loaded');

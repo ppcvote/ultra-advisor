@@ -224,6 +224,34 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // Sprint 15 W1 — Versioned schema backfill 進度回報
+    // 結構：backfill_progress/{runId}（runId 由 callable / CLI 產生）
+    // - read: admin only（給 admin UI 拉進度條 / debug error samples）
+    // - write: backend admin SDK only（callable / CLI 走 admin SDK 寫；顧問端零寫入）
+    match /backfill_progress/{runId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Sprint 15 W1 — 統一審核 queue（TII 月排程 + 顧問補登 + 公司 scraper 三源匯流）
+    // 結構：insurance_review_queue/{runMonth__changeKind__productId}
+    // - read: admin only（顧問端絕對不暴露；rules + UI 雙重 gate）
+    // - write: backend admin SDK only（crawler / callable 寫；顧問端零寫入避免偽造）
+    // - 客戶 PII 嚴禁：寫入端負責 sanitize（MissingProductModal.sanitizeOcrSnapshot）
+    match /insurance_review_queue/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Sprint 15 W1 — TII 月排程 raw 抓取結果（per-run diff report 鏡像）
+    // 結構：tii_crawl_results/{runMonth}
+    // - read: admin only（給 admin UI 看 captchaHitRate / partialCompanies / failed[]）
+    // - write: backend admin SDK only（crawler --commit 收尾寫，顧問端零寫入）
+    match /tii_crawl_results/{runMonth} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // ============================================
     // 5. 每日市場報告（公開可讀，寫入由後端處理）
     // ============================================
