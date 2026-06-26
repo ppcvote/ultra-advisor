@@ -165,6 +165,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Sprint 13 — 保險商品 catalog（資料來自 TII 法定備查商品代碼/規格/生效日）
+    // 登入顧問可讀（ProductPicker / InsuranceCheckup autoload），
+    // 僅後端 admin SDK (ingest-catalog-to-firestore.cjs) 可寫。
+    match /insurance_products/{doc} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
     // ============================================
     // 5. 每日市場報告（公開可讀，寫入由後端處理）
     // ============================================

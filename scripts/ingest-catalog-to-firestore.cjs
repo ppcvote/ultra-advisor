@@ -349,7 +349,17 @@ function loadCatalog(inputPath) {
       source: parsed.source,
     } };
   }
-  throw new Error('catalog JSON top-level must be array or { entries: [...] }');
+  // Sprint 13 ship critic — parse-insurance-database.cjs writes `products`
+  // (semantically clearer than `entries` in that context). Accept here so
+  // both legacy `entries` shape and Sprint 13 `products` shape feed in.
+  if (Array.isArray(parsed.products)) {
+    return { entries: parsed.products, meta: {
+      schemaVersion: parsed.version,
+      generatedAt: parsed.generatedAt,
+      source: parsed.source,
+    } };
+  }
+  throw new Error('catalog JSON top-level must be array or { entries: [...] } or { products: [...] }');
 }
 
 /** Filter + sort + slice — apply --resume-from + --limit. */
