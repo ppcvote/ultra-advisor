@@ -33,29 +33,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
 import multiprocessing as mp
-import os
 import re
-import signal
 import sys
 import time
-import unicodedata
 from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError as FuturesTimeout
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 # pdfplumber 進子 worker 才 import (主進程不需要、加快啟動)
-# 但這裡 module-level 也先 try 一次驗證可用
-try:
-    import pdfplumber  # noqa: F401
-except ImportError:
-    sys.stderr.write(
-        "[fatal] pdfplumber not installed. Run: pip install pdfplumber\n"
-    )
-    sys.exit(2)
+# 主進程不再 module-level 驗證、避免 unused import 警告 — worker 內 import 失敗會走 error path
 
 
 # ---------------------------------------------------------------------------
@@ -446,7 +435,6 @@ def run(args: argparse.Namespace) -> int:
     err_count = 0
     needs_ocr_count = 0
     start_wall = time.monotonic()
-    last_log_at = start_wall
 
     # 開 output 用 line-buffered append (resume-safe — crash 不丟已寫的)
     out_fh = output_path.open('a', encoding='utf-8', buffering=1)
@@ -507,7 +495,6 @@ def run(args: argparse.Namespace) -> int:
                         f'ok={ok_count:,} err={err_count} needsOcr={needs_ocr_count} '
                         f'rate={rate:.1f}/s eta={eta}\n'
                     )
-                    last_log_at = now
     finally:
         out_fh.close()
         err_fh.close()

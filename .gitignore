@@ -42,3 +42,6 @@ research-notes-src/
 # Python bytecode
 scripts/__pycache__/
 *.pyc
+
+# 暫存 sample / scratch Python scripts (W2 sample-extract 類)
+scripts/_*.py
