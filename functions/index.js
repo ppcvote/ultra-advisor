@@ -6133,4 +6133,208 @@ exports.sendLifecycleEmails = functions.pubsub
     return null;
   });
 
+// ==========================================
+// 🆕 Sprint 14 W3 — Quota Usage (Agent Chat / PDF View / Missing Product Submit)
+// ==========================================
+//
+// 為什麼用 callable + client 傳 yyyymm（不是 server now()）：
+//   server 跑在 us-central1 (UTC-6/UTC-5 DST 切換)，顧問在台灣 (UTC+8)。
+//   如果用 server `new Date()` 推 yyyymm 會在 8:00 AM UTC（台灣 16:00）
+//   切月、造成顧問當天 16:00 後使用量被算進「下個月」。改由 client 用
+//   顧問本地時區算 yyyymm 並傳上來，讓 server 只負責讀 doc，避免時區漂移。
+//
+// 配額（單位：次/月）：
+//   asks                  : 100  (AI 條款問答)
+//   pdfViews              : 50   (條款 PDF 檢視)
+//   missingProductSubmits : 30   (產品 catalog 缺漏回報)
+//
+// extensionRequestable 永遠 true — 客戶端據此決定要不要顯示「申請額度」按鈕。
+//
+exports.getQuotaUsage = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', '請先登入');
+  }
+  const uid = context.auth.uid;
+
+  // client 必傳 yyyymm（避免 server 時區飄移）— 缺值/格式錯就拒絕。
+  const yyyymm = typeof data?.yyyymm === 'string' ? data.yyyymm : '';
+  if (!/^\d{6}$/.test(yyyymm)) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'yyyymm 必須為 6 位數字字串（例如 202606）',
+    );
+  }
+
+  const docRef = db.doc(`advisors/${uid}/quotaUsage/${yyyymm}`);
+  let usage;
+  try {
+    const snap = await docRef.get();
+    usage = snap.exists ? snap.data() : null;
+  } catch (err) {
+    console.error('getQuotaUsage read error', { uid, yyyymm, err: err.message });
+    throw new functions.https.HttpsError('internal', '配額查詢失敗，請稍後再試');
+  }
+
+  const used = usage || { asks: 0, pdfViews: 0, missingProductSubmits: 0 };
+
+  return {
+    yyyymm,
+    quotas: {
+      asks: { used: Number(used.asks || 0), limit: 100 },
+      pdfViews: { used: Number(used.pdfViews || 0), limit: 50 },
+      missingProductSubmits: {
+        used: Number(used.missingProductSubmits || 0),
+        limit: 30,
+      },
+    },
+    extensionRequestable: true,
+  };
+});
+
+// ==========================================
+// 📝 Sprint 14 W3 — Audit Log (logAuditEvent)
+// ==========================================
+//
+// 顧問端敏感操作（PDF view / agent ask / quota breach / missing-flag）審計。
+// 7 年保留 — 目前直寫 Firestore、Sprint 15+ 加 cron 把 12 個月前的 partition
+// export 到 GCS / BigQuery、控制 free tier 容量。
+//
+// Doc path: audit_logs/{yyyymm}/events/{eventId}
+//   - yyyymm 用 UTC 切月（server-side 一致性、配額用 client 本地時區是另一回事）
+//   - eventId = type_<epoch-ms>_<uid>_<rand4>  防碰撞
+//   - 所有時間戳必須 runtime callback 內取（HARD rule：module top-level 0 wall-clock call）
+//
+// PII redact：
+//   - 台灣身分證 / 手機 / 市話 regex redact
+//   - 中文姓名 3-4 字保守不做（撞名詞太多、誤殺）
+//   - 不動 Firestore sentinel / Date / Buffer
+//
+
+/**
+ * Sanitize PII in a free-form string.
+ */
+function sanitizePIIForAudit(text) {
+  if (typeof text !== 'string') return text;
+  return text
+    .replace(/[A-Z][12]\d{8}/g, '[ID_REDACTED]')          // 台灣身分證 (A123456789)
+    .replace(/09\d{8}/g, '[PHONE_REDACTED]')              // 台灣手機 09xxxxxxxx
+    .replace(/0\d{1,2}-?\d{7,8}/g, '[PHONE_REDACTED]');   // 市話 02-12345678 / 0212345678
+}
+
+/**
+ * Deep-sanitize an arbitrary value — walk strings, recurse plain objects + arrays.
+ * 不動 Date / Buffer / Firestore sentinel；深度上限 8 層、防環。
+ */
+function sanitizePIIDeep(value, depth, seen) {
+  if (depth === undefined) depth = 0;
+  if (seen === undefined) seen = new WeakSet();
+  if (value == null) return value;
+  if (depth > 8) return '[MAX_DEPTH]';
+
+  if (typeof value === 'string') return sanitizePIIForAudit(value);
+  if (typeof value !== 'object') return value;
+
+  if (value instanceof Date) return value;
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(value)) return value;
+
+  if (seen.has(value)) return '[CIRCULAR]';
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return value.map((v) => sanitizePIIDeep(v, depth + 1, seen));
+  }
+
+  // 只處理 plain object — class instance / FieldValue sentinel 等不動
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return value;
+
+  const out = {};
+  for (const k of Object.keys(value)) {
+    out[k] = sanitizePIIDeep(value[k], depth + 1, seen);
+  }
+  return out;
+}
+
+exports.logAuditEvent = functions.https.onCall(async (data, context) => {
+  // --- Auth gate ---
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', '請先登入');
+  }
+
+  // --- Input validation ---
+  if (!data || typeof data !== 'object') {
+    throw new functions.https.HttpsError('invalid-argument', 'data 必須是物件');
+  }
+  const type = data.type;
+  if (!type || typeof type !== 'string' || type.length > 64) {
+    throw new functions.https.HttpsError('invalid-argument', 'type 必填且 <= 64 字元');
+  }
+  if (!/^[a-z][a-z0-9_.-]*$/i.test(type)) {
+    throw new functions.https.HttpsError('invalid-argument', 'type 格式不符 (a-z0-9_.-)');
+  }
+
+  const uid = context.auth.uid;
+
+  // --- Time + eventId（runtime callback 內取、不在 module top-level）---
+  const nowMs = Date.now();
+  const nowDate = new Date(nowMs);
+  const yyyymm =
+    nowDate.getUTCFullYear().toString() +
+    String(nowDate.getUTCMonth() + 1).padStart(2, '0');
+  const randSuffix = crypto.randomBytes(4).toString('hex');
+  const eventId = `${type}_${nowMs}_${uid}_${randSuffix}`;
+
+  // --- Sanitize input ---
+  const rawContext =
+    data.context && typeof data.context === 'object' ? data.context : {};
+  const sanitizedContext = sanitizePIIDeep(rawContext);
+
+  const result =
+    typeof data.result === 'string' && data.result.length <= 64
+      ? data.result
+      : 'success';
+
+  const userAgent =
+    (typeof data.userAgent === 'string' && data.userAgent.slice(0, 512)) ||
+    context.rawRequest?.headers?.['user-agent']?.slice(0, 512) ||
+    null;
+
+  const ip =
+    context.rawRequest?.ip ||
+    context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() ||
+    null;
+
+  // --- Write audit doc ---
+  const doc = {
+    type,
+    advisorUid: uid,
+    advisorEmail: context.auth.token?.email || null,
+    ip,
+    userAgent,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    context: sanitizedContext,
+    result,
+    schemaVersion: 1,
+  };
+
+  try {
+    await db
+      .collection('audit_logs')
+      .doc(yyyymm)
+      .collection('events')
+      .doc(eventId)
+      .set(doc);
+  } catch (err) {
+    functions.logger.error('[audit] write failed', {
+      type,
+      uid,
+      eventId,
+      message: err.message,
+    });
+    throw new functions.https.HttpsError('internal', '審計寫入失敗');
+  }
+
+  return { eventId };
+});
+
 console.log('Ultra Advisor Cloud Functions loaded');
