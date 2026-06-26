@@ -7903,4 +7903,881 @@ exports.notifyConditionRevision = functions
     };
   });
 
+// ==========================================
+// Sprint 15 W3 — Task B1: sendConditionRevisionEmail callable
+// ==========================================
+//
+// 角色：把一筆 W2 扇出的 condition_alert (advisors/{advisorUid}/conditionAlerts/{alertId})
+// 透過 Resend 寄成 email，並把 sentEmailAt / emailMessageId 寫回 alert doc。
+//
+// 為何是獨立 callable (而非 W2 fanout 直接寄)：
+//   - W2 的 notifyConditionRevision 已是長 timeout (540s)、扇出 1k+ advisor 時不能再
+//     卡 SMTP；email 走分開的 cron worker (Task B3) 才能 retry 失敗的單筆而不重跑整批。
+//   - admin 也可以 dashboard 點「立即重寄」按鈕觸發本 callable single-shot (參考
+//     QuotaExtensionRequests.tsx 同 sprint 設計)。
+//
+// Idempotent 鐵則：
+//   - sentEmailAt 已存在 → return { skipped: true, reason: 'already-sent' }、不寄
+//   - 這代表本 callable 可以被 cron worker 安全重跑 N 次而不會重複寄信
+//   - 失敗時寫 emailSendError 但不 throw — cron 下次 tick 會挑回 sentEmailAt=null 的
+//
+// PII 鐵則（Sprint 15 通則）：
+//   - email payload 不含客戶姓名 / ID / 電話 — 只放 affectedClientCount (數量)
+//   - templates 已 enforce、本 callable 只負責路由 alert.affectedClients.length 進去
+//
+// 與 W2 alert doc 形狀對齊（不可改、parser 已 freeze）：
+//   - alert.productName / oldVersion / newVersion / diffSummary
+//   - alert.importantChanges (Array<{category, change, impact}>)
+//   - alert.severity ('high' | 'medium' | 'low')
+//   - alert.affectedClients (Array — 取 length 即可、不展開姓名)
+//   - alert.sentEmailAt (null → ready, Timestamp → already-sent)
+//
+// dryRun 模式：
+//   - data.dryRun === true → render payload 但不 call Resend、不 update sentEmailAt
+//   - admin 可以 preview email 內容、再決定要不要正式寄
+//
+// Resend pattern 對齊既有 Sprint 11 lifecycle email：
+//   - process.env.RESEND_API_KEY (Sprint 11 已用、cloud function secret 已綁)
+//   - axios.post 'https://api.resend.com/emails' (top-of-file 已 require axios)
+//   - 不引入新 npm dep (戰略邊界 HARD)
+//   - from: 'Ultra Advisor <noreply@ultra-advisor.tw>' (per spec — 跟 lifecycle 的
+//     hello@ultra-advisor.tw 分開 transactional vs marketing reputation)
+
+const SEND_CONDITION_EMAIL_FROM = 'Ultra Advisor <noreply@ultra-advisor.tw>';
+const SEND_CONDITION_EMAIL_AUDIT_TYPE = 'condition_alert_email_sent';
+
+/**
+ * Look up the advisor's email address from users/{advisorUid}.email.
+ * Returns null if doc missing, email missing, or not a string.
+ * Caller decides skip vs send based on null.
+ */
+async function _readAdvisorEmail(advisorUid) {
+  try {
+    const userSnap = await db.collection('users').doc(advisorUid).get();
+    if (!userSnap.exists) return { email: null, displayName: '' };
+    const u = userSnap.data() || {};
+    const email =
+      typeof u.email === 'string' && u.email.trim() ? u.email.trim() : null;
+    const displayName =
+      typeof u.displayName === 'string' && u.displayName.trim()
+        ? u.displayName.trim()
+        : '';
+    return { email, displayName };
+  } catch (err) {
+    functions.logger.warn('[sendConditionRevisionEmail] readAdvisor failed', {
+      advisorUid,
+      message: err?.message,
+    });
+    return { email: null, displayName: '' };
+  }
+}
+
+/**
+ * sendConditionRevisionEmail — Resend dispatcher for a single condition alert.
+ *
+ * Input:
+ *   {
+ *     alertId: string,        // advisors/{advisorUid}/conditionAlerts/{alertId}
+ *     advisorUid: string,
+ *     dryRun?: boolean,       // true → 不真寄、回 rendered payload
+ *   }
+ *
+ * Output:
+ *   { sent: true, messageId, alertId, advisorUid, dryRun: false }
+ *   { skipped: true, reason: 'already-sent' | 'no-email' | 'dry-run-no-key' | 'alert-not-found', alertId }
+ *   { sent: false, error: string, alertId }    ← worker 下次重試
+ *   { dryRun: true, payload: {...}, alertId }  ← dryRun preview
+ */
+exports.sendConditionRevisionEmail = functions
+  .runWith({ timeoutSeconds: 60, memory: '512MB' })
+  .https.onCall(async (data, context) => {
+    // --- Auth gate ---
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', '請先登入');
+    }
+    const isUserAdmin = await isAdmin(context.auth.uid);
+    if (!isUserAdmin) {
+      throw new functions.https.HttpsError('permission-denied', '無管理員權限');
+    }
+
+    // --- Input validation ---
+    if (!data || typeof data !== 'object') {
+      throw new functions.https.HttpsError('invalid-argument', 'data 必須是物件');
+    }
+    const alertId = typeof data.alertId === 'string' ? data.alertId.trim() : '';
+    const advisorUid =
+      typeof data.advisorUid === 'string' ? data.advisorUid.trim() : '';
+    const dryRun = data.dryRun === true;
+
+    if (!alertId || !/^[\w.-]{1,200}$/.test(alertId)) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'alertId 必填且格式不符',
+      );
+    }
+    if (!advisorUid || !/^[A-Za-z0-9_-]{1,128}$/.test(advisorUid)) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'advisorUid 必填且格式不符',
+      );
+    }
+
+    // --- Runtime timestamps (HARD rule: callback 內取) ---
+    const callbackStartedAtMs = Date.now();
+    const callbackStartedDate = new Date(callbackStartedAtMs);
+    const yyyymm =
+      callbackStartedDate.getUTCFullYear().toString() +
+      String(callbackStartedDate.getUTCMonth() + 1).padStart(2, '0');
+
+    // --- Lazy require templates inside handler so test envs without the
+    // mirror file can still load index.js (defensive; lib/ always shipped). ---
+    const {
+      renderConditionRevisionNotify,
+      buildDashboardAlertUrl,
+    } = require('./lib/condition-notify-templates');
+
+    const alertRef = db
+      .collection('advisors')
+      .doc(advisorUid)
+      .collection('conditionAlerts')
+      .doc(alertId);
+
+    // --- Step 1: read alert doc ---
+    let alertSnap;
+    try {
+      alertSnap = await alertRef.get();
+    } catch (err) {
+      functions.logger.error('[sendConditionRevisionEmail] alert read failed', {
+        alertId,
+        advisorUid,
+        message: err?.message,
+      });
+      // worker can retry on next tick — return error not throw
+      return {
+        sent: false,
+        alertId,
+        advisorUid,
+        error: `alert 讀取失敗：${err?.message || err}`,
+      };
+    }
+
+    if (!alertSnap.exists) {
+      // alert 不存在 — 可能 admin 已刪、不該重試
+      functions.logger.warn('[sendConditionRevisionEmail] alert missing', {
+        alertId,
+        advisorUid,
+      });
+      return { skipped: true, reason: 'alert-not-found', alertId, advisorUid };
+    }
+
+    const alert = alertSnap.data() || {};
+
+    // --- Step 2: idempotent guard — sentEmailAt 已存在 = 已寄、不重寄 ---
+    if (alert.sentEmailAt) {
+      functions.logger.info('[sendConditionRevisionEmail] skip already-sent', {
+        alertId,
+        advisorUid,
+      });
+      return {
+        skipped: true,
+        reason: 'already-sent',
+        alertId,
+        advisorUid,
+      };
+    }
+
+    // --- Step 3: read advisor email ---
+    const { email: toEmail, displayName: advisorDisplayName } =
+      await _readAdvisorEmail(advisorUid);
+
+    if (!toEmail) {
+      // 沒 email — 寫 emailSendError 防 cron 反覆撈、回 skipped
+      try {
+        await alertRef.set(
+          {
+            emailSendError: 'no-email',
+            emailLastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+      } catch (e) {
+        functions.logger.warn(
+          '[sendConditionRevisionEmail] alert patch (no-email) failed',
+          { alertId, advisorUid, message: e?.message },
+        );
+      }
+      return { skipped: true, reason: 'no-email', alertId, advisorUid };
+    }
+
+    // --- Step 4: build template payload ---
+    const props = {
+      advisorName: advisorDisplayName || '顧問',
+      productName:
+        typeof alert.productName === 'string' && alert.productName
+          ? alert.productName
+          : (typeof alert.productId === 'string' ? alert.productId : ''),
+      oldVersion:
+        typeof alert.oldVersion === 'string' ? alert.oldVersion : '',
+      newVersion:
+        typeof alert.newVersion === 'string' ? alert.newVersion : '',
+      diffSummary:
+        typeof alert.diffSummary === 'string' ? alert.diffSummary : '',
+      importantChanges: Array.isArray(alert.importantChanges)
+        ? alert.importantChanges
+        : [],
+      severity:
+        alert.severity === 'high' ||
+        alert.severity === 'medium' ||
+        alert.severity === 'low'
+          ? alert.severity
+          : 'medium',
+      affectedClientCount: Array.isArray(alert.affectedClients)
+        ? alert.affectedClients.length
+        : 0,
+      alertId,
+      dashboardUrl: buildDashboardAlertUrl(alertId),
+    };
+
+    const rendered = renderConditionRevisionNotify(props);
+
+    // --- Step 5: dry-run path — don't send, return payload preview ---
+    if (dryRun) {
+      functions.logger.info('[sendConditionRevisionEmail] dry-run', {
+        alertId,
+        advisorUid,
+        toEmail,
+        subject: rendered.subject,
+      });
+      return {
+        dryRun: true,
+        alertId,
+        advisorUid,
+        payload: {
+          to: toEmail,
+          subject: rendered.subject,
+          // NOTE: returning text only; html 可能上 KB、admin UI 用 text preview 即可
+          text: rendered.text,
+        },
+      };
+    }
+
+    // --- Step 6: real send via Resend ---
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    if (!RESEND_API_KEY) {
+      // 跟 lifecycle email 同樣：未設 key → DRY-RUN log、不 throw
+      functions.logger.info(
+        '[sendConditionRevisionEmail] DRY-RUN (RESEND_API_KEY unset)',
+        { alertId, advisorUid, toEmail, subject: rendered.subject },
+      );
+      return {
+        skipped: true,
+        reason: 'dry-run-no-key',
+        alertId,
+        advisorUid,
+      };
+    }
+
+    let messageId = '';
+    try {
+      const resp = await axios.post(
+        'https://api.resend.com/emails',
+        {
+          from: SEND_CONDITION_EMAIL_FROM,
+          to: toEmail,
+          subject: rendered.subject,
+          html: rendered.html,
+          text: rendered.text,
+          headers: {
+            'X-Entity-Ref-ID': `cond-alert-${alertId}`,
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 10_000,
+        },
+      );
+      messageId =
+        (resp && resp.data && typeof resp.data.id === 'string'
+          ? resp.data.id
+          : '') || '';
+    } catch (err) {
+      // 失敗 — 不 throw、寫 emailSendError 給 cron 下輪 retry
+      const errMsg = String(
+        (err && err.response && err.response.data && err.response.data.message) ||
+          (err && err.message) ||
+          err,
+      ).slice(0, 500);
+      functions.logger.error('[sendConditionRevisionEmail] resend error', {
+        alertId,
+        advisorUid,
+        status: err?.response?.status,
+        data: err?.response?.data,
+        message: errMsg,
+      });
+      try {
+        await alertRef.set(
+          {
+            emailSendError: errMsg,
+            emailLastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+      } catch (e) {
+        functions.logger.warn(
+          '[sendConditionRevisionEmail] alert patch (error) failed',
+          { alertId, advisorUid, message: e?.message },
+        );
+      }
+      return {
+        sent: false,
+        alertId,
+        advisorUid,
+        error: errMsg,
+      };
+    }
+
+    // --- Step 7: success — mark sentEmailAt + clear prior error ---
+    try {
+      await alertRef.set(
+        {
+          sentEmailAt: admin.firestore.FieldValue.serverTimestamp(),
+          emailMessageId: messageId || null,
+          emailSendError: admin.firestore.FieldValue.delete(),
+          emailLastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } catch (err) {
+      // 已寄出但寫 sentEmailAt 失敗 — 可能下次 cron 重寄一次、advisor 看到兩封
+      // 機率低、但記下 error log 給 ops
+      functions.logger.error(
+        '[sendConditionRevisionEmail] alert patch (success) failed',
+        {
+          alertId,
+          advisorUid,
+          messageId,
+          message: err?.message,
+        },
+      );
+    }
+
+    // --- Step 8: audit log ---
+    try {
+      const auditEventId =
+        `${SEND_CONDITION_EMAIL_AUDIT_TYPE}_${callbackStartedAtMs}_${context.auth.uid}_` +
+        crypto.randomBytes(4).toString('hex');
+      await db
+        .collection('audit_logs')
+        .doc(yyyymm)
+        .collection('events')
+        .doc(auditEventId)
+        .set({
+          type: SEND_CONDITION_EMAIL_AUDIT_TYPE,
+          advisorUid: context.auth.uid,   // 觸發的 admin (非 alert owner)
+          advisorEmail: context.auth.token?.email || null,
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          timestampMs: callbackStartedAtMs,
+          context: {
+            alertId,
+            targetAdvisorUid: advisorUid,  // alert owner — 真收信人
+            productId:
+              typeof alert.productId === 'string' ? alert.productId : '',
+            oldVersion:
+              typeof alert.oldVersion === 'string' ? alert.oldVersion : '',
+            newVersion:
+              typeof alert.newVersion === 'string' ? alert.newVersion : '',
+            severity:
+              alert.severity === 'high' ||
+              alert.severity === 'medium' ||
+              alert.severity === 'low'
+                ? alert.severity
+                : 'medium',
+            affectedClientCount: props.affectedClientCount,
+            messageId: messageId || null,
+            source: 'tii',
+          },
+          result: 'success',
+          schemaVersion: 1,
+        });
+    } catch (err) {
+      // 不 fail callable — alert 已寄出是真實價值
+      functions.logger.warn('[sendConditionRevisionEmail] audit write failed', {
+        alertId,
+        advisorUid,
+        message: err?.message,
+      });
+    }
+
+    functions.logger.info('[sendConditionRevisionEmail] sent', {
+      alertId,
+      advisorUid,
+      toEmail,
+      messageId,
+    });
+
+    return {
+      sent: true,
+      alertId,
+      advisorUid,
+      messageId,
+      dryRun: false,
+    };
+  });
+
+// ==========================================
+// Sprint 15 W3 — Task B2: sendConditionRevisionLine callable
+// ==========================================
+//
+// 觸發點：cron worker (processConditionAlertsQueue, Task B3) 每小時掃
+//   advisors/{uid}/conditionAlerts where sentLineAt == null + status == 'pending'
+//   對每筆 doc call 本 callable 完成 LINE push。
+//   admin 也可在 ConditionAlerts.tsx 手動 retry。
+//
+// 為什麼 callable 而非 onCreate trigger：
+//   - 解耦：email (B1) / LINE (B2) / 將來 SMS 各自獨立 retry path、cron 控節奏
+//   - admin 可以單獨手動補送 (重複 call 因 sentLineAt idempotent 安全)
+//   - B1 sendConditionRevisionEmail 已是 callable、保持一致 surface
+//
+// 鐵則（Sprint 15 W3 戰略邊界 HARD）：
+//   - 不引入新 npm dep — 用 global fetch (Node 18+)、不裝 @line/bot-sdk
+//   - LINE message body 不含客戶 PII (姓名/ID/電話) — 只 affectedClientCount
+//   - LINE deep link 必走 Pin-auth signPinAuthUrl — 不直接 raw URL
+//   - Idempotent：若 sentLineAt 已存在、直接 skip 不重送
+//   - 失敗不 throw — 寫 lineSendError 欄位、回 { ok:false, reason }
+//     避免 cron worker 因單筆 fail 整批 retry 風暴
+//   - LINE_CHANNEL_TOKEN 從 process.env 取、缺則 throw 'messaging-not-configured'
+//     (有意義 error code 給 admin debug、跟 'internal' 區分)
+//   - 所有 wall-clock (Date.now / new Date) 必須 callback 內取 (對齊
+//     notifyConditionRevision rule、避免 cold-start 時鐘不對齊)
+//   - sentLineAt 用 serverTimestamp 寫 (避免 cron worker 時鐘漂移)
+
+const COND_LINE_AUDIT_TYPE = 'condition_alert_line_sent';
+const COND_LINE_API_URL = 'https://api.line.me/v2/bot/message/push';
+const COND_LINE_TIMEOUT_MS = 10_000;  // fetch 沒原生 timeout — AbortController 補
+
+/** Resolve advisor's LINE userId. Returns null if not bound. */
+async function _readAdvisorLineUserId(advisorUid) {
+  if (!advisorUid || typeof advisorUid !== 'string') return null;
+  try {
+    const snap = await db.collection('users').doc(advisorUid).get();
+    if (!snap.exists) return null;
+    const data = snap.data() || {};
+    // 主路徑：users/{uid}.lineUserId (Pin 綁定時寫入)
+    if (typeof data.lineUserId === 'string' && data.lineUserId.trim()) {
+      return data.lineUserId.trim();
+    }
+    // 備援：users/{uid}.pin.lineUserId (舊版 Pin 結構)
+    if (
+      data.pin &&
+      typeof data.pin.lineUserId === 'string' &&
+      data.pin.lineUserId.trim()
+    ) {
+      return data.pin.lineUserId.trim();
+    }
+    return null;
+  } catch (err) {
+    functions.logger.warn('[sendConditionRevisionLine] read lineUserId failed', {
+      advisorUid,
+      message: err?.message,
+    });
+    return null;
+  }
+}
+
+/** Resolve advisor display name for LINE greeting. Falls back to "顧問".
+ *  不含 PII、用於 greeting 行。 */
+async function _readAdvisorDisplayNameForLine(advisorUid) {
+  if (!advisorUid || typeof advisorUid !== 'string') return '顧問';
+  try {
+    const snap = await db.collection('users').doc(advisorUid).get();
+    if (!snap.exists) return '顧問';
+    const data = snap.data() || {};
+    const name =
+      (typeof data.displayName === 'string' && data.displayName.trim()) ||
+      (typeof data.name === 'string' && data.name.trim()) ||
+      '';
+    return name || '顧問';
+  } catch (err) {
+    functions.logger.warn(
+      '[sendConditionRevisionLine] read displayName failed',
+      {
+        advisorUid,
+        message: err?.message,
+      },
+    );
+    return '顧問';
+  }
+}
+
+/**
+ * sendConditionRevisionLine — push LINE notification for a single alert doc.
+ *
+ * Input:
+ *   {
+ *     alertId: string,        // advisors/{advisorUid}/conditionAlerts/{alertId}
+ *     advisorUid: string,
+ *     dryRun?: boolean,       // true → 不真送、回 rendered payload (with masked userId)
+ *   }
+ *
+ * Output:
+ *   { ok: true, runId, lineMessageId?, textLength }
+ *   { ok: true, reason: 'already-sent' | 'dry-run', runId }
+ *   { ok: false, reason: 'no-line-id' | 'template-error' | 'line-api-error', runId, ... }
+ *
+ * Throws (only for fatal precondition):
+ *   - HttpsError('unauthenticated' | 'permission-denied' | 'invalid-argument' | 'not-found')
+ *   - HttpsError('failed-precondition', 'messaging-not-configured') 當 LINE token 未配置
+ */
+exports.sendConditionRevisionLine = functions
+  .runWith({ timeoutSeconds: 60, memory: '512MB' })
+  .https.onCall(async (data, context) => {
+    // --- Auth gate (admin-only — cron worker 用 admin SDK 觸發) ---
+    await verifyAdminAccess(context);
+
+    // --- Input validation ---
+    if (!data || typeof data !== 'object') {
+      throw new functions.https.HttpsError('invalid-argument', 'data 必須是物件');
+    }
+    const alertId = typeof data.alertId === 'string' ? data.alertId.trim() : '';
+    const advisorUid =
+      typeof data.advisorUid === 'string' ? data.advisorUid.trim() : '';
+    const dryRun = data.dryRun === true;
+
+    if (!alertId || !/^[\w.-]{1,200}$/.test(alertId)) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'alertId 必填且格式不符',
+      );
+    }
+    if (!advisorUid || !/^[\w.-]{1,128}$/.test(advisorUid)) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'advisorUid 必填且格式不符',
+      );
+    }
+
+    // --- Runtime token check (HARD: callback 內取、不在 module top) ---
+    // 優先 process.env.LINE_CHANNEL_TOKEN (Sprint 15 W3 spec)、
+    // 退到 functions.config().line.channel_access_token (Sprint 11 既有、相容)
+    const lineToken =
+      (typeof process.env.LINE_CHANNEL_TOKEN === 'string' &&
+        process.env.LINE_CHANNEL_TOKEN.trim()) ||
+      functions.config().line?.channel_access_token ||
+      LINE_CHANNEL_ACCESS_TOKEN ||
+      '';
+    if (!lineToken) {
+      // 'failed-precondition' + 'messaging-not-configured' — admin debug 友善
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'messaging-not-configured',
+      );
+    }
+
+    // --- Runtime timestamps (HARD: callback 內取) ---
+    const callbackStartedAtMs = Date.now();
+    const callbackStartedDate = new Date(callbackStartedAtMs);
+    const yyyymm =
+      callbackStartedDate.getUTCFullYear().toString() +
+      String(callbackStartedDate.getUTCMonth() + 1).padStart(2, '0');
+    const runId =
+      `line_${callbackStartedAtMs}_${crypto.randomBytes(4).toString('hex')}`;
+
+    functions.logger.info('[sendConditionRevisionLine] start', {
+      runId,
+      alertId,
+      advisorUid,
+      adminUid: context.auth.uid,
+      dryRun,
+    });
+
+    // --- Read alert doc ---
+    const alertRef = db
+      .collection('advisors')
+      .doc(advisorUid)
+      .collection('conditionAlerts')
+      .doc(alertId);
+    let alertSnap;
+    try {
+      alertSnap = await alertRef.get();
+    } catch (err) {
+      functions.logger.error('[sendConditionRevisionLine] alert read failed', {
+        runId,
+        alertId,
+        advisorUid,
+        message: err?.message,
+      });
+      throw new functions.https.HttpsError(
+        'internal',
+        `讀取 alert 失敗：${err?.message || err}`,
+      );
+    }
+    if (!alertSnap.exists) {
+      throw new functions.https.HttpsError(
+        'not-found',
+        `alert ${alertId} 不存在於 advisors/${advisorUid}/conditionAlerts`,
+      );
+    }
+    const alertData = alertSnap.data() || {};
+
+    // --- Idempotent guard: 已送過則 skip ---
+    if (alertData.sentLineAt) {
+      functions.logger.info(
+        '[sendConditionRevisionLine] already sent, skipping',
+        { runId, alertId, advisorUid },
+      );
+      return { ok: true, reason: 'already-sent', runId };
+    }
+
+    // --- Resolve advisor LINE userId ---
+    const lineUserId = await _readAdvisorLineUserId(advisorUid);
+    if (!lineUserId) {
+      // 寫 skip 標記、避免 cron 一直 retry no-line-id 顧問
+      try {
+        await alertRef.set(
+          {
+            lineSendSkippedAt: admin.firestore.FieldValue.serverTimestamp(),
+            lineSendSkipReason: 'no-line-id',
+          },
+          { merge: true },
+        );
+      } catch (err) {
+        functions.logger.warn('[sendConditionRevisionLine] skip mark failed', {
+          runId,
+          alertId,
+          message: err?.message,
+        });
+      }
+      functions.logger.info('[sendConditionRevisionLine] skipped no-line-id', {
+        runId,
+        alertId,
+        advisorUid,
+      });
+      return { ok: false, reason: 'no-line-id', runId };
+    }
+
+    // --- Build payload via template helper ---
+    const advisorName = await _readAdvisorDisplayNameForLine(advisorUid);
+    // Pin-auth signed deep-link (HARD rule)。signPinAuthUrl 內建 24h HMAC + tab；
+    // 缺 PIN_AUTH_SECRET 時自動 fall back 到 plain login URL — 仍然要登入、不裸露。
+    const dashboardUrl = signPinAuthUrl(advisorUid, 'condition-alerts');
+
+    const templateProps = {
+      advisorName,
+      productName:
+        typeof alertData.productName === 'string' && alertData.productName
+          ? alertData.productName
+          : typeof alertData.productId === 'string'
+            ? alertData.productId
+            : '未知商品',
+      oldVersion:
+        typeof alertData.oldVersion === 'string' ? alertData.oldVersion : 'v?',
+      newVersion:
+        typeof alertData.newVersion === 'string' ? alertData.newVersion : 'v?',
+      diffSummary:
+        typeof alertData.diffSummary === 'string' ? alertData.diffSummary : '',
+      importantChanges: Array.isArray(alertData.importantChanges)
+        ? alertData.importantChanges
+        : [],
+      severity:
+        alertData.severity === 'high' ||
+        alertData.severity === 'medium' ||
+        alertData.severity === 'low'
+          ? alertData.severity
+          : 'medium',
+      affectedClientCount: Array.isArray(alertData.affectedClients)
+        ? alertData.affectedClients.length
+        : 0,
+      alertId,
+      dashboardUrl,
+    };
+
+    // lazy-require — pattern aligns with lifecycle-email-templates.js
+    const conditionTemplates = require('./lib/condition-notify-templates');
+    let lineText;
+    try {
+      lineText = conditionTemplates.buildConditionLineMessage(templateProps);
+    } catch (err) {
+      functions.logger.error(
+        '[sendConditionRevisionLine] template build failed',
+        { runId, alertId, message: err?.message },
+      );
+      return { ok: false, reason: 'template-error', runId };
+    }
+
+    // 雙保險 — LINE push 限制 5000 chars、template 已 cap 4900、再 cap 一次
+    if (lineText.length > 4900) {
+      lineText = lineText.slice(0, 4895) + '…';
+    }
+
+    // --- dryRun: return payload without sending ---
+    if (dryRun) {
+      functions.logger.info('[sendConditionRevisionLine] dryRun', {
+        runId,
+        alertId,
+        lineUserIdMasked: lineUserId.slice(0, 4) + '...',
+        textLength: lineText.length,
+      });
+      return {
+        ok: true,
+        reason: 'dry-run',
+        runId,
+        payload: {
+          to: lineUserId.slice(0, 4) + '...',  // mask response 也不洩 PII
+          messages: [{ type: 'text', text: lineText }],
+        },
+      };
+    }
+
+    // --- Send LINE push (global fetch, Node 18+, no @line/bot-sdk) ---
+    let lineMessageId = '';
+    let httpStatus = 0;
+    let lineErrorBody = '';
+    try {
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), COND_LINE_TIMEOUT_MS);
+      let resp;
+      try {
+        resp = await fetch(COND_LINE_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${lineToken}`,
+          },
+          body: JSON.stringify({
+            to: lineUserId,
+            messages: [{ type: 'text', text: lineText }],
+          }),
+          signal: ac.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+      httpStatus = resp.status;
+      // 成功回 200 + {} body；request-id 在 response header
+      lineMessageId =
+        resp.headers.get('x-line-request-id') ||
+        resp.headers.get('X-Line-Request-Id') ||
+        '';
+
+      if (!resp.ok) {
+        try {
+          lineErrorBody = (await resp.text()).slice(0, 500);
+        } catch (_) {
+          lineErrorBody = '';
+        }
+        throw new Error(
+          `LINE push HTTP ${httpStatus}: ${lineErrorBody.slice(0, 200)}`,
+        );
+      }
+    } catch (err) {
+      const errMsg = String(err?.message || err).slice(0, 500);
+      functions.logger.error('[sendConditionRevisionLine] LINE push failed', {
+        runId,
+        alertId,
+        advisorUid,
+        httpStatus,
+        message: errMsg,
+      });
+      // 寫錯誤標記、不 throw (避免 cron worker 整批 retry 風暴)
+      try {
+        await alertRef.set(
+          {
+            lineSendError: errMsg,
+            lineSendErrorAt: admin.firestore.FieldValue.serverTimestamp(),
+            lineSendHttpStatus: httpStatus || null,
+          },
+          { merge: true },
+        );
+      } catch (markErr) {
+        functions.logger.warn(
+          '[sendConditionRevisionLine] error mark failed',
+          { runId, alertId, message: markErr?.message },
+        );
+      }
+      return { ok: false, reason: 'line-api-error', runId, httpStatus };
+    }
+
+    // --- Success: stamp sentLineAt (serverTimestamp 避免時鐘漂移) ---
+    try {
+      await alertRef.set(
+        {
+          sentLineAt: admin.firestore.FieldValue.serverTimestamp(),
+          lineMessageId: lineMessageId || null,
+          lineSendError: admin.firestore.FieldValue.delete(),
+          lineSendErrorAt: admin.firestore.FieldValue.delete(),
+          lineSendHttpStatus: admin.firestore.FieldValue.delete(),
+        },
+        { merge: true },
+      );
+    } catch (err) {
+      // 已送成功但寫 stamp 失敗 — 下次 cron 會重送 (advisor 收兩次)
+      // 寧可 log 也不 throw、否則整 callable 失敗 admin 以為 LINE 也失敗
+      functions.logger.error(
+        '[sendConditionRevisionLine] sentLineAt write failed',
+        { runId, alertId, advisorUid, message: err?.message },
+      );
+    }
+
+    // --- Audit log (no PII — 不寫 lineUserId 全文) ---
+    try {
+      const auditEventId =
+        `${COND_LINE_AUDIT_TYPE}_${callbackStartedAtMs}_${context.auth.uid}_` +
+        crypto.randomBytes(4).toString('hex');
+      await db
+        .collection('audit_logs')
+        .doc(yyyymm)
+        .collection('events')
+        .doc(auditEventId)
+        .set({
+          type: COND_LINE_AUDIT_TYPE,
+          advisorUid,                       // alert owner — 真收 LINE 的人
+          triggeredBy: context.auth.uid,    // 觸發的 admin (或 cron worker admin SDK)
+          triggeredByEmail: context.auth.token?.email || null,
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          timestampMs: callbackStartedAtMs,
+          context: {
+            runId,
+            alertId,
+            lineMessageId: lineMessageId || null,
+            textLength: lineText.length,
+            productId:
+              typeof alertData.productId === 'string' ? alertData.productId : '',
+            oldVersion:
+              typeof alertData.oldVersion === 'string' ? alertData.oldVersion : '',
+            newVersion:
+              typeof alertData.newVersion === 'string' ? alertData.newVersion : '',
+            severity: templateProps.severity,
+            affectedClientCount: templateProps.affectedClientCount,
+            source: 'tii',
+          },
+          result: 'success',
+          schemaVersion: 1,
+        });
+    } catch (err) {
+      functions.logger.warn('[sendConditionRevisionLine] audit write failed', {
+        runId,
+        alertId,
+        message: err?.message,
+      });
+    }
+
+    functions.logger.info('[sendConditionRevisionLine] done', {
+      runId,
+      alertId,
+      advisorUid,
+      lineMessageId: lineMessageId || '(none)',
+      textLength: lineText.length,
+    });
+
+    return {
+      ok: true,
+      runId,
+      lineMessageId: lineMessageId || null,
+      textLength: lineText.length,
+    };
+  });
+
 console.log('Ultra Advisor Cloud Functions loaded');
