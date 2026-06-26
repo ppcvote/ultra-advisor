@@ -2,7 +2,7 @@
  * OCR 保單上傳元件
  * 拍照/上傳 → base64 編碼 → Cloud Function (Gemini Vision) 解析
  */
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera, Upload, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase';
@@ -15,14 +15,35 @@ interface OcrUploaderProps {
   onClose: () => void;
 }
 
-type OcrStatus = 'idle' | 'preprocessing' | 'uploading' | 'parsing' | 'done' | 'error';
+// Critic B 必修：刪掉 dead 'uploading' state（從未被 setStatus 寫入）。
+// 真實流程只有 preprocessing → parsing → done/error。
+type OcrStatus = 'idle' | 'preprocessing' | 'parsing' | 'done' | 'error';
 
 export default function OcrUploader({ userId, familyMemberId, onParsed, onClose }: OcrUploaderProps) {
   const [status, setStatus] = useState<OcrStatus>('idle');
   const [preview, setPreview] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  // Critic B 必修 #1: parsing 階段第 15 秒切換文案為「比對商品 Catalog...」、
+  // 給顧問「事情還在跑」的訊號。catalog match 注入後總時間 11-30s、原本
+  // 「10-20 秒」的文案會在第 21 秒讓顧問懷疑卡死。
+  const [parseStartedAt, setParseStartedAt] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // 1Hz tick while parsing so the loading copy can shift at the 15s mark.
+  // 鐵則: 現在時間在 callback 內讀、不在 module top-level 拿。
+  useEffect(() => {
+    if (status !== 'parsing') {
+      setNowTick(0);
+      return;
+    }
+    const id = window.setInterval(() => {
+      // 讀 Date.now() 在 setInterval callback 內、合規。
+      setNowTick(Date.now());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [status]);
 
   // 將 HEIC/HEIF 或其他不支援的格式轉為 JPEG（透過 canvas）
   function convertToJpeg(file: File): Promise<{ base64: string; mimeType: string }> {
@@ -95,6 +116,8 @@ export default function OcrUploader({ userId, familyMemberId, onParsed, onClose 
       // 2. 呼叫 Cloud Function（Gemini Vision 直接辨識圖片）
       currentStep = 'AI 辨識解析';
       setStatus('parsing');
+      // Critic B 修法：記錄 parsing 起始時間（callback scope）以供文案切換。
+      setParseStartedAt(Date.now());
       console.log('[OCR] Step 2: calling parseInsuranceOCR with base64');
       const parseOcr = httpsCallable(functions, 'parseInsuranceOCR', { timeout: 120000 });
       const result = await parseOcr({
@@ -148,11 +171,20 @@ export default function OcrUploader({ userId, familyMemberId, onParsed, onClose 
     if (file) processImage(file);
   };
 
+  // Critic B 必修 #1：
+  //   - 文案調整為「約 15-30 秒」(加上 catalog match 0.3-1.5s × N coverage)
+  //   - 第 15 秒後切換為「比對商品 Catalog…」表示還在跑 (cf. nowTick 1Hz)
+  //   - 刪掉 dead 'uploading' state (從未被 setStatus 寫入)
+  const parsingElapsedSec =
+    parseStartedAt && nowTick ? Math.floor((nowTick - parseStartedAt) / 1000) : 0;
+  const parsingCopy =
+    parsingElapsedSec >= 15
+      ? `比對 35,000+ 商品 Catalog…（已耗時 ${parsingElapsedSec} 秒）`
+      : 'AI 辨識解析中（約 15-30 秒）...';
   const statusText: Record<OcrStatus, string> = {
     idle: '',
     preprocessing: '讀取圖片中...',
-    uploading: '上傳中...',
-    parsing: 'AI 辨識解析中（約 10-20 秒）...',
+    parsing: parsingCopy,
     done: '解析完成！',
     error: '解析失敗',
   };
@@ -216,7 +248,7 @@ export default function OcrUploader({ userId, familyMemberId, onParsed, onClose 
       )}
 
       {/* 處理中 */}
-      {['preprocessing', 'uploading', 'parsing'].includes(status) && (
+      {(status === 'preprocessing' || status === 'parsing') && (
         <div className="text-center py-12">
           {preview && (
             <img
