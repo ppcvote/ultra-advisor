@@ -10250,4 +10250,1144 @@ exports.approveQuotaExtension = functions
     };
   });
 
+// ==========================================
+// Sprint 17 W1 — Task B3: compareProductConditions callable
+// ==========================================
+//
+// 兩商品條款重點對比 — 顧問端 ProductCompareView 「條款重點對照」tab 觸發。
+// 流程：
+//   1. fetch A / B 兩商品的 chunks (reuse Sprint 14 W2 _diffFetchChunks helper)
+//   2. 任一邊 chunks < 5 → fallback「商品 X 條款尚未索引、無法比對」
+//   3. Gemini 2.5 Pro 結構化輸出 → { summary, differences[], overlap, recommendation: null }
+//   4. 答案結尾強制附 disclaimer「AI 解讀僅供參考、實際以保單條款為準」
+//   5. 寫 audit_logs type='compare_product_conditions'
+//
+// 鐵則：
+//   - 不引入新 dep（reuse @google/generative-ai + 既有 _diff* helpers）
+//   - 配額計入 advisors/{uid}/quotaUsage/{yyyymm}.asks（與 /api/ask 共用 ask quota）
+//   - UA 絕不給商品推薦：recommendation 在 normalise 時強制 null
+//   - 所有 wall-clock 必 callback 內取（與 composeConditionDiffSummary 一致）
+//   - 不寫客戶 PII（本 callable 完全不碰 users/*/clients、無 PII 路徑）
+
+const COMPARE_DEFAULT_MAX_CHUNKS = 15;
+const COMPARE_MIN_CHUNKS = 5;                   // 任一邊 < 此值 → fallback
+const COMPARE_MAX_MAX_CHUNKS = 30;              // input cap 防 caller 灌爆 prompt
+const COMPARE_LLM_RETRY_DELAY_MS = 1500;
+const COMPARE_ASK_QUOTA_LIMIT = 100;            // 與 api/ask.ts MONTHLY_QUOTA_ASKS 對齊
+const COMPARE_DISCLAIMER = 'AI 解讀僅供參考、實際以保單條款為準';
+const COMPARE_VALID_CATEGORIES = new Set([
+  '等待期',
+  '除外責任',
+  '給付項目',
+  '金額限額',
+  '其他',
+]);
+const COMPARE_VALID_IMPACT = new Set(['high', 'medium', 'low']);
+
+const COMPARE_PROMPT_TEMPLATE = `你是 Ultra Advisor 保險條款分析助手。請對比以下兩商品條款重點、用結構化方式輸出差異。
+
+規則:
+1. 用顧問能理解的話 (避免法律術語)
+2. 每項差異標 category (等待期 / 除外責任 / 給付項目 / 金額限額 / 其他)
+3. 評估每項差異對保戶的 impact (high / medium / low)
+4. 列 3-6 項最值得注意的差異、並列共同重點 overlap
+5. 不模擬法律建議、不給商品推薦、不指定哪張較好
+6. 不確定時必說「我不確定、請查條款原文」
+7. 結尾必須附上免責聲明:「${COMPARE_DISCLAIMER}」
+
+【商品 A 條款片段】
+{a_chunks}
+
+【商品 B 條款片段】
+{b_chunks}
+
+請輸出 JSON (純 JSON、不要 markdown code block)：
+{
+  "summary": "100-200 字總結兩商品條款主要差異",
+  "differences": [
+    {
+      "category": "等待期|除外責任|給付項目|金額限額|其他",
+      "aValue": "商品 A 在此項的規格",
+      "bValue": "商品 B 在此項的規格",
+      "impact": "high|medium|low",
+      "notes": "對保戶的影響說明、50 字內"
+    }
+  ],
+  "overlap": "兩商品共同重點 50-100 字"
+}`;
+
+/** Normalise + validate the raw LLM JSON into the compare contract shape.
+ *  recommendation 強制 null — UA 絕不給商品推薦。 */
+function _compareNormaliseResponse(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const summary =
+    typeof raw.summary === 'string' && raw.summary.trim().length > 0
+      ? raw.summary.trim().slice(0, 600)
+      : null;
+  if (!summary) return null;
+
+  const diffsIn = Array.isArray(raw.differences) ? raw.differences : [];
+  const differences = diffsIn
+    .slice(0, 10) // hard cap, prompt asks for 3-6
+    .map((d) => {
+      if (!d || typeof d !== 'object') return null;
+      const category = COMPARE_VALID_CATEGORIES.has(d.category) ? d.category : '其他';
+      const aValue =
+        typeof d.aValue === 'string' && d.aValue.trim().length > 0
+          ? d.aValue.trim().slice(0, 200)
+          : null;
+      const bValue =
+        typeof d.bValue === 'string' && d.bValue.trim().length > 0
+          ? d.bValue.trim().slice(0, 200)
+          : null;
+      if (!aValue && !bValue) return null;
+      const impact = COMPARE_VALID_IMPACT.has(d.impact) ? d.impact : 'medium';
+      const notes =
+        typeof d.notes === 'string' && d.notes.trim().length > 0
+          ? d.notes.trim().slice(0, 200)
+          : '';
+      return {
+        category,
+        aValue: aValue || '—',
+        bValue: bValue || '—',
+        impact,
+        notes,
+      };
+    })
+    .filter(Boolean);
+
+  const overlap =
+    typeof raw.overlap === 'string' && raw.overlap.trim().length > 0
+      ? raw.overlap.trim().slice(0, 400)
+      : '';
+
+  return {
+    summary,
+    differences,
+    overlap,
+    recommendation: null, // HARD: UA 絕不給商品推薦
+  };
+}
+
+/** Build a fallback compare payload when chunks insufficient / LLM fails. */
+function _compareFallback(reason, missingSide) {
+  const summaryByReason = {
+    insufficient_chunks_a: '商品 A 條款尚未索引、無法比對。請先確認商品條款 PDF 已上架。',
+    insufficient_chunks_b: '商品 B 條款尚未索引、無法比對。請先確認商品條款 PDF 已上架。',
+    insufficient_chunks_both: '兩商品條款均尚未索引、無法比對。請先確認商品條款 PDF 已上架。',
+    llm_failed: '比對失敗、請手動查兩商品條款',
+    parse_failed: 'AI 回應格式無法解析、請手動比對兩商品條款',
+  };
+  return {
+    summary: summaryByReason[reason] || '比對失敗、請手動查兩商品條款',
+    differences: [],
+    overlap: '',
+    recommendation: null,
+    fallback: true,
+    fallbackReason: reason,
+    fallbackSide: missingSide || null,
+  };
+}
+
+/** Write a compare_product_conditions audit log doc (best-effort). */
+async function _compareWriteAudit(uid, payload) {
+  try {
+    const nowMs = Date.now();
+    const nowDate = new Date(nowMs);
+    const yyyymm =
+      nowDate.getUTCFullYear().toString() +
+      String(nowDate.getUTCMonth() + 1).padStart(2, '0');
+    const rand = crypto.randomBytes(4).toString('hex');
+    const eventId = `compare_product_conditions_${nowMs}_${uid}_${rand}`;
+    await db
+      .collection('audit_logs')
+      .doc(yyyymm)
+      .collection('events')
+      .doc(eventId)
+      .set({
+        type: 'compare_product_conditions',
+        advisorUid: uid,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestampMs: nowMs,
+        context: payload.context || {},
+        result: payload.result || 'success',
+        schemaVersion: 1,
+      });
+  } catch (err) {
+    functions.logger.warn('[compare_product_conditions] audit write failed', {
+      message: err?.message,
+    });
+  }
+}
+
+/** Atomic ask-quota check + bump (shared with /api/ask, advisors/{uid}/quotaUsage). */
+async function _compareEnforceAskQuota(uid, callbackStartedAtMs) {
+  // yyyymm 用 callback runtime 取（HARD rule）
+  const date = new Date(callbackStartedAtMs);
+  const yyyymm =
+    date.getUTCFullYear().toString() +
+    String(date.getUTCMonth() + 1).padStart(2, '0');
+  const ref = db.doc(`advisors/${uid}/quotaUsage/${yyyymm}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const used = snap.exists ? Number(snap.data().asks || 0) : 0;
+    if (used >= COMPARE_ASK_QUOTA_LIMIT) {
+      throw new functions.https.HttpsError(
+        'resource-exhausted',
+        `本月 ask 配額 ${COMPARE_ASK_QUOTA_LIMIT} 已用完、請申請配額延展`,
+      );
+    }
+    tx.set(
+      ref,
+      {
+        asks: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  });
+  return { yyyymm };
+}
+
+exports.compareProductConditions = functions
+  .runWith({ timeoutSeconds: 120, memory: '512MB' })
+  .https.onCall(async (data, context) => {
+    // --- Auth gate ---
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', '請先登入');
+    }
+    const uid = context.auth.uid;
+
+    // --- Input validation ---
+    const productIdA =
+      typeof data?.productIdA === 'string' ? data.productIdA.trim() : '';
+    const productIdB =
+      typeof data?.productIdB === 'string' ? data.productIdB.trim() : '';
+
+    if (!productIdA || !/^[A-Za-z0-9_-]{1,80}$/.test(productIdA)) {
+      throw new functions.https.HttpsError('invalid-argument', 'productIdA 格式不符');
+    }
+    if (!productIdB || !/^[A-Za-z0-9_-]{1,80}$/.test(productIdB)) {
+      throw new functions.https.HttpsError('invalid-argument', 'productIdB 格式不符');
+    }
+    if (productIdA === productIdB) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'productIdA 與 productIdB 不可相同',
+      );
+    }
+
+    const maxChunksRaw = Number(data?.maxChunksPerProduct) || COMPARE_DEFAULT_MAX_CHUNKS;
+    const maxChunks = Math.max(
+      COMPARE_MIN_CHUNKS,
+      Math.min(COMPARE_MAX_MAX_CHUNKS, maxChunksRaw),
+    );
+
+    // runtime ts in callback (HARD rule)
+    const callbackStartedAtMs = Date.now();
+
+    // --- Quota gate (counts against shared ask quota) ---
+    let quotaCtx;
+    try {
+      quotaCtx = await _compareEnforceAskQuota(uid, callbackStartedAtMs);
+    } catch (err) {
+      // resource-exhausted bubbles up as-is
+      if (err instanceof functions.https.HttpsError) throw err;
+      functions.logger.error('[compare_product_conditions] quota tx failed', {
+        uid,
+        message: err?.message,
+      });
+      throw new functions.https.HttpsError('internal', '配額查詢失敗、請稍後重試');
+    }
+
+    // --- Step 1: fetch chunks for both products ---
+    // Reuse Sprint 14 W2 _diffFetchChunks — version 'v1' is the default flat-layout
+    // path covering Sprint 14 catalog ingest.
+    let aFetch;
+    let bFetch;
+    try {
+      [aFetch, bFetch] = await Promise.all([
+        _diffFetchChunks(productIdA, 'v1', maxChunks),
+        _diffFetchChunks(productIdB, 'v1', maxChunks),
+      ]);
+    } catch (err) {
+      functions.logger.error('[compare_product_conditions] chunk fetch failed', {
+        productIdA,
+        productIdB,
+        message: err?.message,
+      });
+      throw new functions.https.HttpsError(
+        'internal',
+        `chunks 讀取失敗: ${err?.message || err}`,
+      );
+    }
+
+    const aShort = aFetch.chunks.length < COMPARE_MIN_CHUNKS;
+    const bShort = bFetch.chunks.length < COMPARE_MIN_CHUNKS;
+    if (aShort || bShort) {
+      const reason =
+        aShort && bShort
+          ? 'insufficient_chunks_both'
+          : aShort
+            ? 'insufficient_chunks_a'
+            : 'insufficient_chunks_b';
+      const missingSide = aShort && bShort ? 'both' : aShort ? 'A' : 'B';
+      const fallback = _compareFallback(reason, missingSide);
+      await _compareWriteAudit(uid, {
+        context: {
+          productIdA,
+          productIdB,
+          maxChunks,
+          fallbackReason: reason,
+          aChunks: aFetch.chunks.length,
+          bChunks: bFetch.chunks.length,
+          callbackStartedAtMs,
+          quotaYyyymm: quotaCtx.yyyymm,
+        },
+        result: 'fallback',
+      });
+      return {
+        summary: fallback.summary,
+        differences: fallback.differences,
+        overlap: fallback.overlap,
+        recommendation: null,
+        disclaimers: [COMPARE_DISCLAIMER],
+        tokensUsed: 0,
+        fallback: true,
+        fallbackReason: fallback.fallbackReason,
+        fallbackSide: fallback.fallbackSide,
+      };
+    }
+
+    // --- Step 2: build prompt + call Gemini 2.5 Pro w/ 1 retry ---
+    const { oldText: aText, newText: bText } = _diffBuildPromptChunks(
+      aFetch.chunks,
+      bFetch.chunks,
+    );
+    const prompt = COMPARE_PROMPT_TEMPLATE
+      .replace('{a_chunks}', aText)
+      .replace('{b_chunks}', bText);
+
+    const geminiApiKey = functions.config().gemini?.api_key;
+    if (!geminiApiKey) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Gemini API key 未設定',
+      );
+    }
+
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-pro',
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    let responseText = null;
+    let tokensUsed = 0;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const result = await model.generateContent(prompt);
+        responseText = result.response.text();
+        const usage = result.response?.usageMetadata || {};
+        tokensUsed =
+          Number(usage.totalTokenCount) ||
+          Number(usage.candidatesTokenCount || 0) +
+            Number(usage.promptTokenCount || 0) ||
+          0;
+        break;
+      } catch (err) {
+        lastErr = err;
+        const status = err?.status || err?.code;
+        const retriable = status === 503 || status === 429 || status === 500;
+        functions.logger.warn('[compare_product_conditions] gemini call failed', {
+          attempt,
+          status,
+          retriable,
+          message: err?.message,
+        });
+        if (!retriable || attempt === 2) break;
+        await _diffSleep(COMPARE_LLM_RETRY_DELAY_MS);
+      }
+    }
+
+    // LLM hard fail → fallback
+    if (responseText === null) {
+      const fallback = _compareFallback('llm_failed');
+      await _compareWriteAudit(uid, {
+        context: {
+          productIdA,
+          productIdB,
+          maxChunks,
+          fallbackReason: 'llm_failed',
+          llmError: String(lastErr?.message || lastErr || '').slice(0, 300),
+          callbackStartedAtMs,
+          quotaYyyymm: quotaCtx.yyyymm,
+        },
+        result: 'llm_failed',
+      });
+      return {
+        summary: fallback.summary,
+        differences: fallback.differences,
+        overlap: fallback.overlap,
+        recommendation: null,
+        disclaimers: [COMPARE_DISCLAIMER],
+        tokensUsed: 0,
+        fallback: true,
+        fallbackReason: fallback.fallbackReason,
+        fallbackSide: null,
+      };
+    }
+
+    // --- Step 3: parse + normalise ---
+    const rawJson = _diffExtractJson(responseText);
+    const normalised = _compareNormaliseResponse(rawJson);
+    if (!normalised) {
+      const fallback = _compareFallback('parse_failed');
+      await _compareWriteAudit(uid, {
+        context: {
+          productIdA,
+          productIdB,
+          maxChunks,
+          fallbackReason: 'parse_failed',
+          responsePreview: String(responseText).slice(0, 200),
+          callbackStartedAtMs,
+          quotaYyyymm: quotaCtx.yyyymm,
+        },
+        result: 'parse_failed',
+      });
+      return {
+        summary: fallback.summary,
+        differences: fallback.differences,
+        overlap: fallback.overlap,
+        recommendation: null,
+        disclaimers: [COMPARE_DISCLAIMER],
+        tokensUsed,
+        fallback: true,
+        fallbackReason: fallback.fallbackReason,
+        fallbackSide: null,
+      };
+    }
+
+    // --- Step 4: force-append disclaimer if LLM 忘了 ---
+    let finalSummary = normalised.summary;
+    if (!finalSummary.includes(COMPARE_DISCLAIMER)) {
+      finalSummary = `${finalSummary}\n\n${COMPARE_DISCLAIMER}`;
+    }
+
+    // --- Step 5: audit + return ---
+    await _compareWriteAudit(uid, {
+      context: {
+        productIdA,
+        productIdB,
+        maxChunks,
+        aChunks: aFetch.chunks.length,
+        bChunks: bFetch.chunks.length,
+        tokensUsed,
+        differenceCount: normalised.differences.length,
+        callbackStartedAtMs,
+        quotaYyyymm: quotaCtx.yyyymm,
+      },
+      result: 'success',
+    });
+
+    return {
+      summary: finalSummary,
+      differences: normalised.differences,
+      overlap: normalised.overlap,
+      recommendation: null, // HARD: UA 絕不給商品推薦
+      disclaimers: [COMPARE_DISCLAIMER],
+      tokensUsed,
+      fallback: false,
+      fallbackSide: null,
+    };
+  });
+
+// ==========================================
+// Sprint 17 W1 — Task B1: metricsAggregationDaily scheduled
+// ==========================================
+//
+// 每天 02:00 Asia/Taipei 跑、彙總前一日各 collection stats、寫進
+// `metrics_daily/{yyyymmdd}` doc。前端 src/admin/MetricsDashboard.tsx
+// 直接 query 此 collection、19 個 KPI 卡片從這份預聚合 doc 拉值，
+// 完全不掃原始 collection (Sprint 16 boundary：browser 不能掃 audit_logs)。
+//
+// Schema (flat 對齊 MetricsDashboard.tsx `MetricsDaily` interface)：
+//   yyyymmdd: string                 // 昨日 (TW timezone)
+//   dau / mau                        // 活躍顧問
+//   ocrPerActive / ragPerActive / pdfPerActive  // 30d 人均
+//   quotaRequestsNew                 // quota_extension_requests 新增
+//   apiAskP95Ms / apiPdfProxyP95Ms   // /api/ask · /api/pdf-proxy 延遲 (avg, see note)
+//   geminiCostUsdMonth               // 本月累計 Gemini USD
+//   firestoreReadsDay                // 估算 (近似)
+//   firestoreWritesDay / firestoreStorageGb
+//   tiiCronSuccessRate               // 近 12 個月 (0..1)
+//   conditionAlertSlaHours           // detect→contact p50 (median, hours)
+//   catalogTotal / catalogAddedMonth / catalogRevisedMonth / catalogDelistedMonth
+//   reviewQueuePending / crowdSubsNew
+//   diffSeverity: { low, med, high, critical }
+//   freeToPaidRate / reportsGeneratedMonth / customerTouchRate / advisorNps
+//   advisorTotalRegistered (extra)   // 非 Dashboard 必欄、留給 future cohort 報表
+//   runId / ranAt (serverTimestamp) / schemaVersion / runtimeMs
+//
+// 鐵則：
+//   - runtime now / yyyymmdd 全 callback 內取 (HARD)
+//   - 單 KPI 失敗繼續、欄位寫 null + 紀錄 errors[]
+//   - 不寫客戶 PII (數字 / 計數 / 比率 only)
+//   - timeoutSeconds 540s 內收斂；read budget 估 ~30k reads/天
+//   - 不引入新 dep
+//   - audit_logs partition 用 UTC yyyymm (與 logAuditEvent 寫入端一致)
+//
+// 為什麼分區策略複雜：
+//   - audit_logs 用 UTC yyyymm partition；yesterday (TW) 跨 UTC 月初時要讀兩個 partition
+//   - 顧問配額窗口用 TW yyyymmdd (與 client 顯示一致)；spec 採 TW timezone
+//   - tiiCrawl SLA 用 12-month rolling、跨年也要 OK
+//
+// 為什麼不用 Firestore aggregation .count() everywhere：
+//   - .count() 對 audit_logs 在 yesterday 切片 (timestamp range) 可用、cheap
+//   - 但 P95 latency / 平均延遲 需要實際讀 documents (取 tokensUsed)
+//   - 折衷：count 用 aggregation、avg 用 sampled read (上限 500 docs)
+
+const METRICS_RUN_PREFIX = 'metrics';
+const METRICS_TII_LOOKBACK_MONTHS = 12;        // SLA window
+const METRICS_GEMINI_USD_PER_1M_INPUT = 0.075; // Gemini 2.5 Pro
+const METRICS_GEMINI_USD_PER_1M_OUTPUT = 0.30;
+const METRICS_RECENT_DAYS_FOR_PER_ACTIVE = 30; // 人均口徑
+
+/** Format Date → "yyyymmdd" in Asia/Taipei (UTC+8, no DST). */
+function _metricsTwYyyymmdd(date) {
+  // Shift wall clock by +8h to read TW calendar fields from UTC getters.
+  const tw = new Date(date.getTime() + 8 * 3600 * 1000);
+  const y = tw.getUTCFullYear();
+  const m = String(tw.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(tw.getUTCDate()).padStart(2, '0');
+  return `${y}${m}${d}`;
+}
+
+/** Format Date → "yyyymm" UTC (matches audit_logs partition key). */
+function _metricsUtcYyyymm(date) {
+  return (
+    date.getUTCFullYear().toString() +
+    String(date.getUTCMonth() + 1).padStart(2, '0')
+  );
+}
+
+/** Return TW midnight of given Date as a UTC Date instance. */
+function _metricsTwMidnightUtc(date) {
+  const tw = new Date(date.getTime() + 8 * 3600 * 1000);
+  // Zero out HH:mm:ss.SSS in TW frame, then shift back to UTC.
+  const twMid = Date.UTC(
+    tw.getUTCFullYear(),
+    tw.getUTCMonth(),
+    tw.getUTCDate(),
+    0, 0, 0, 0,
+  );
+  return new Date(twMid - 8 * 3600 * 1000);
+}
+
+/** Compute UTC yyyymm partitions covering [startMs, endMs) — usually 1, but 2
+ *  when the day crosses a UTC month boundary (rare, only on month-start
+ *  TW midnight which is 16:00 prev-day UTC). */
+function _metricsAuditPartitions(startMs, endMs) {
+  const out = new Set();
+  out.add(_metricsUtcYyyymm(new Date(startMs)));
+  out.add(_metricsUtcYyyymm(new Date(endMs - 1)));
+  return Array.from(out);
+}
+
+/** Median of a number array (returns null on empty). */
+function _metricsMedian(values) {
+  if (!values || values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  return sorted[mid];
+}
+
+/** Safe wrapper: run an async KPI fn; if it throws, log + return null.
+ *  Single-KPI failures must not block the whole metrics_daily doc. */
+async function _metricsSafe(label, errors, fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    errors.push({ kpi: label, message: String(err?.message || err).slice(0, 200) });
+    functions.logger.warn(`[metricsAggregationDaily] ${label} failed`, {
+      message: err?.message,
+    });
+    return null;
+  }
+}
+
+/** Count docs in audit_logs where type == typeName + timestamp in [start, end).
+ *  Walks each UTC yyyymm partition that overlaps the window. */
+async function _metricsCountAuditByType(typeName, startDate, endDate) {
+  const partitions = _metricsAuditPartitions(startDate.getTime(), endDate.getTime());
+  let total = 0;
+  for (const yyyymm of partitions) {
+    const q = db
+      .collection('audit_logs')
+      .doc(yyyymm)
+      .collection('events')
+      .where('type', '==', typeName)
+      .where('timestamp', '>=', startDate)
+      .where('timestamp', '<', endDate);
+    const snap = await q.count().get();
+    total += snap.data().count || 0;
+  }
+  return total;
+}
+
+/** Count distinct advisorUids who triggered any audit yesterday.
+ *  Note: aggregation .distinct() doesn't exist in admin SDK; we sample up to
+ *  cap docs across selected types and dedupe in-memory. */
+async function _metricsDauFromAudit(startDate, endDate) {
+  const partitions = _metricsAuditPartitions(startDate.getTime(), endDate.getTime());
+  const uids = new Set();
+  const CAP = 1500;
+  for (const yyyymm of partitions) {
+    if (uids.size >= CAP) break;
+    const q = db
+      .collection('audit_logs')
+      .doc(yyyymm)
+      .collection('events')
+      .where('timestamp', '>=', startDate)
+      .where('timestamp', '<', endDate)
+      .limit(CAP);
+    const snap = await q.get();
+    snap.forEach((d) => {
+      const uid = d.data()?.advisorUid;
+      if (typeof uid === 'string' && uid.length > 0) uids.add(uid);
+    });
+  }
+  return uids.size;
+}
+
+exports.metricsAggregationDaily = functions
+  .runWith({ timeoutSeconds: 540, memory: '1GB' })
+  .pubsub.schedule('0 2 * * *')
+  .timeZone('Asia/Taipei')
+  .onRun(async (_context) => {
+    // --- Runtime now (HARD rule: 全 callback 內取) ---
+    const startedAtMs = Date.now();
+    const nowDate = new Date(startedAtMs);
+
+    // 推算「昨日」邊界 — TW timezone
+    // 今天 TW midnight (UTC equivalent) = window end exclusive
+    const twTodayMidnightUtc = _metricsTwMidnightUtc(nowDate);
+    // 昨日 TW midnight = window start inclusive
+    const twYesterdayMidnightUtc = new Date(
+      twTodayMidnightUtc.getTime() - 24 * 3600 * 1000,
+    );
+    const yyyymmdd = _metricsTwYyyymmdd(twYesterdayMidnightUtc);
+    const runId = `${METRICS_RUN_PREFIX}_${startedAtMs}_${crypto.randomBytes(4).toString('hex')}`;
+    const errors = [];
+
+    functions.logger.info('[metricsAggregationDaily] start', {
+      runId,
+      yyyymmdd,
+      windowStartIso: twYesterdayMidnightUtc.toISOString(),
+      windowEndIso: twTodayMidnightUtc.toISOString(),
+    });
+
+    // ============================================
+    // Section A — 顧問活躍度
+    // ============================================
+    const advisorTotalRegistered = await _metricsSafe(
+      'advisor.totalRegistered',
+      errors,
+      async () => {
+        const snap = await db
+          .collection('users')
+          .where('role', '==', 'advisor')
+          .count()
+          .get();
+        return snap.data().count || 0;
+      },
+    );
+
+    const dau = await _metricsSafe('advisor.dau', errors, async () =>
+      _metricsDauFromAudit(twYesterdayMidnightUtc, twTodayMidnightUtc),
+    );
+
+    // MAU = distinct advisors in last 30d. Sample-capped — accurate up to ~5k MAU
+    // before aliasing; UA target顧問規模 < 500 next 12mo, well within range.
+    const mau = await _metricsSafe('advisor.mau', errors, async () => {
+      const monthAgo = new Date(
+        twTodayMidnightUtc.getTime() - METRICS_RECENT_DAYS_FOR_PER_ACTIVE * 24 * 3600 * 1000,
+      );
+      return _metricsDauFromAudit(monthAgo, twTodayMidnightUtc);
+    });
+
+    const ocrScansYesterday = await _metricsSafe(
+      'advisor.ocrScansYesterday',
+      errors,
+      async () =>
+        _metricsCountAuditByType('ocr_scan', twYesterdayMidnightUtc, twTodayMidnightUtc),
+    );
+
+    const ragAsksYesterday = await _metricsSafe(
+      'advisor.ragAsksYesterday',
+      errors,
+      async () => _metricsCountAuditByType('ask', twYesterdayMidnightUtc, twTodayMidnightUtc),
+    );
+
+    const pdfViewsYesterday = await _metricsSafe(
+      'advisor.pdfViewsYesterday',
+      errors,
+      async () =>
+        _metricsCountAuditByType('pdf_view', twYesterdayMidnightUtc, twTodayMidnightUtc),
+    );
+
+    // 人均口徑 = 30d total / MAU
+    const ocr30d = await _metricsSafe('advisor.ocr30d', errors, async () => {
+      const monthAgo = new Date(
+        twTodayMidnightUtc.getTime() - METRICS_RECENT_DAYS_FOR_PER_ACTIVE * 24 * 3600 * 1000,
+      );
+      return _metricsCountAuditByType('ocr_scan', monthAgo, twTodayMidnightUtc);
+    });
+    const ask30d = await _metricsSafe('advisor.ask30d', errors, async () => {
+      const monthAgo = new Date(
+        twTodayMidnightUtc.getTime() - METRICS_RECENT_DAYS_FOR_PER_ACTIVE * 24 * 3600 * 1000,
+      );
+      return _metricsCountAuditByType('ask', monthAgo, twTodayMidnightUtc);
+    });
+    const pdf30d = await _metricsSafe('advisor.pdf30d', errors, async () => {
+      const monthAgo = new Date(
+        twTodayMidnightUtc.getTime() - METRICS_RECENT_DAYS_FOR_PER_ACTIVE * 24 * 3600 * 1000,
+      );
+      return _metricsCountAuditByType('pdf_view', monthAgo, twTodayMidnightUtc);
+    });
+
+    const ocrPerActive =
+      mau && mau > 0 && typeof ocr30d === 'number' ? ocr30d / mau : null;
+    const ragPerActive =
+      mau && mau > 0 && typeof ask30d === 'number' ? ask30d / mau : null;
+    const pdfPerActive =
+      mau && mau > 0 && typeof pdf30d === 'number' ? pdf30d / mau : null;
+
+    const quotaRequestsNew = await _metricsSafe(
+      'advisor.quotaRequestsNew',
+      errors,
+      async () => {
+        // 顧問端寫入用 submittedAtMs (epoch ms) — 對齊 QuotaExtensionRequests.tsx orderBy
+        const snap = await db
+          .collection('quota_extension_requests')
+          .where('submittedAtMs', '>=', twYesterdayMidnightUtc.getTime())
+          .where('submittedAtMs', '<', twTodayMidnightUtc.getTime())
+          .count()
+          .get();
+        return snap.data().count || 0;
+      },
+    );
+
+    // ============================================
+    // Section B — 系統 health
+    // ============================================
+    // P95 latency: audit_logs context 沒有 durationMs 欄位 (logAuditEvent 不寫入)、
+    // 暫無 latency 來源；留 null、Sprint 18 接 Cloud Monitoring exporter (Vercel +
+    // Firebase function runtime metrics) 再覆寫此欄。本 cron 不為了示意值灌
+    // 假數據、寫 null 讓 Dashboard 卡片明確顯示「等資料」狀態。
+    const apiAskP95Ms = null;
+    const apiPdfProxyP95Ms = null;
+
+    // Gemini cost 本月累計 = sum(tokensUsed * unit price) 從 audit_logs 月 partition
+    const geminiCostUsdMonth = await _metricsSafe(
+      'system.geminiCostUsdMonth',
+      errors,
+      async () => {
+        // 本月 = 從本月 1 號 TW 00:00 起 (到 now)
+        const tw = new Date(nowDate.getTime() + 8 * 3600 * 1000);
+        const monthFirstTwMidUtc = new Date(
+          Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth(), 1, 0, 0, 0, 0)
+            - 8 * 3600 * 1000,
+        );
+        const partitions = _metricsAuditPartitions(
+          monthFirstTwMidUtc.getTime(),
+          nowDate.getTime(),
+        );
+        let totalCostUsd = 0;
+        let sampled = 0;
+        const SAMPLE_CAP = 2000;
+        const llmTypes = ['ask', 'compose_diff_summary', 'compare_product_conditions'];
+        for (const yyyymm of partitions) {
+          if (sampled >= SAMPLE_CAP) break;
+          for (const t of llmTypes) {
+            if (sampled >= SAMPLE_CAP) break;
+            const q = db
+              .collection('audit_logs')
+              .doc(yyyymm)
+              .collection('events')
+              .where('type', '==', t)
+              .where('timestamp', '>=', monthFirstTwMidUtc)
+              .limit(SAMPLE_CAP - sampled);
+            const snap = await q.get();
+            snap.forEach((d) => {
+              sampled += 1;
+              const data = d.data() || {};
+              // /api/ask 寫 tokensUsed: { input, output }
+              const tu = data.tokensUsed;
+              let inTok = 0;
+              let outTok = 0;
+              if (tu && typeof tu === 'object' && !Array.isArray(tu)) {
+                inTok = Number(tu.input) || 0;
+                outTok = Number(tu.output) || 0;
+              } else if (typeof tu === 'number') {
+                // composeConditionDiffSummary 寫 total tokens flat (context.tokensUsed)
+                outTok = tu; // 全當 output (粗估、無 input/output 分離)
+              } else if (
+                data.context &&
+                typeof data.context.tokensUsed === 'number'
+              ) {
+                outTok = data.context.tokensUsed;
+              }
+              const costUsd =
+                (inTok / 1_000_000) * METRICS_GEMINI_USD_PER_1M_INPUT +
+                (outTok / 1_000_000) * METRICS_GEMINI_USD_PER_1M_OUTPUT;
+              totalCostUsd += costUsd;
+            });
+          }
+        }
+        return Number(totalCostUsd.toFixed(4));
+      },
+    );
+
+    // Firestore reads/writes/storage — 真實數字需 Firebase Billing API、admin SDK
+    // 沒有 in-process counter。留 null、Sprint 18 接 Cloud Monitoring exporter。
+    const firestoreReadsDay = null;
+    const firestoreWritesDay = null;
+    const firestoreStorageGb = null;
+
+    const tiiCronSuccessRate = await _metricsSafe(
+      'system.tiiCronSuccessRate',
+      errors,
+      async () => {
+        // 近 12 個月 status='success' 比例
+        const tw = new Date(nowDate.getTime() + 8 * 3600 * 1000);
+        const months = [];
+        for (let i = 0; i < METRICS_TII_LOOKBACK_MONTHS; i += 1) {
+          const m = new Date(
+            Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth() - i, 1, 0, 0, 0, 0),
+          );
+          months.push(
+            m.getUTCFullYear().toString() +
+              String(m.getUTCMonth() + 1).padStart(2, '0'),
+          );
+        }
+        let success = 0;
+        let total = 0;
+        for (const ym of months) {
+          const snap = await db.collection('tii_crawl_results').doc(ym).get();
+          if (snap.exists) {
+            total += 1;
+            if (snap.data()?.status === 'success') success += 1;
+          }
+        }
+        if (total === 0) return null;
+        return Number((success / total).toFixed(4));
+      },
+    );
+
+    const conditionAlertSlaHours = await _metricsSafe(
+      'system.conditionAlertSlaHours',
+      errors,
+      async () => {
+        // p50 hours from condition alerts last 30d.
+        // alert createdAt = epoch ms; sentEmailAt = Firestore Timestamp.
+        // 用 collectionGroup('conditionAlerts') 跨 advisor 一次查完。
+        const monthAgoMs =
+          twTodayMidnightUtc.getTime() - METRICS_RECENT_DAYS_FOR_PER_ACTIVE * 24 * 3600 * 1000;
+        const q = db
+          .collectionGroup('conditionAlerts')
+          .where('createdAt', '>=', monthAgoMs)
+          .limit(1000);
+        const snap = await q.get();
+        const hours = [];
+        snap.forEach((d) => {
+          const data = d.data() || {};
+          const createdMs = Number(data.createdAt);
+          const sentAt = data.sentEmailAt;
+          if (!Number.isFinite(createdMs)) return;
+          if (!sentAt || typeof sentAt.toMillis !== 'function') return;
+          const sentMs = sentAt.toMillis();
+          const diffHr = (sentMs - createdMs) / 3600_000;
+          if (diffHr >= 0 && diffHr < 24 * 365) hours.push(diffHr);
+        });
+        const p50 = _metricsMedian(hours);
+        return p50 === null ? null : Number(p50.toFixed(2));
+      },
+    );
+
+    // ============================================
+    // Section C — Catalog health
+    // ============================================
+    const catalogTotal = await _metricsSafe('catalog.total', errors, async () => {
+      const snap = await db.collection('insurance_products').count().get();
+      return snap.data().count || 0;
+    });
+
+    // 「本月」delta — 用 effectiveFrom (versioned subcoll) 落在本月 TW 區間
+    const tw = new Date(nowDate.getTime() + 8 * 3600 * 1000);
+    const monthFirstTwMidUtc = new Date(
+      Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth(), 1, 0, 0, 0, 0)
+        - 8 * 3600 * 1000,
+    );
+    const monthFirstTwIsoDate =
+      `${tw.getUTCFullYear()}-${String(tw.getUTCMonth() + 1).padStart(2, '0')}-01`;
+
+    const catalogAddedMonth = await _metricsSafe(
+      'catalog.addedMonth',
+      errors,
+      async () => {
+        // 本月 effectiveFrom >= 月 1 號 ISO + status='active' (v1 baseline)
+        const snap = await db
+          .collectionGroup('versions')
+          .where('effectiveFrom', '>=', monthFirstTwIsoDate)
+          .where('status', '==', 'active')
+          .count()
+          .get();
+        return snap.data().count || 0;
+      },
+    );
+
+    const catalogRevisedMonth = await _metricsSafe(
+      'catalog.revisedMonth',
+      errors,
+      async () => {
+        // 本月 product root.lastModifiedAt >= 月 1 號 TW midnight、status='revised'
+        const snap = await db
+          .collection('insurance_products')
+          .where('status', '==', 'revised')
+          .where('lastModifiedAt', '>=', monthFirstTwMidUtc)
+          .count()
+          .get();
+        return snap.data().count || 0;
+      },
+    );
+
+    const catalogDelistedMonth = await _metricsSafe(
+      'catalog.delistedMonth',
+      errors,
+      async () => {
+        const snap = await db
+          .collection('insurance_products')
+          .where('status', '==', 'discontinued')
+          .where('lastModifiedAt', '>=', monthFirstTwMidUtc)
+          .count()
+          .get();
+        return snap.data().count || 0;
+      },
+    );
+
+    const reviewQueuePending = await _metricsSafe(
+      'catalog.reviewQueuePending',
+      errors,
+      async () => {
+        const snap = await db
+          .collection('insurance_review_queue')
+          .where('status', '==', 'pending')
+          .count()
+          .get();
+        return snap.data().count || 0;
+      },
+    );
+
+    const crowdSubsNew = await _metricsSafe(
+      'catalog.crowdSubsNew',
+      errors,
+      async () => {
+        const monthAgoMs =
+          twTodayMidnightUtc.getTime() - METRICS_RECENT_DAYS_FOR_PER_ACTIVE * 24 * 3600 * 1000;
+        const snap = await db
+          .collection('insurance_review_queue')
+          .where('source', '==', 'advisor_crowd')
+          .where('submittedAt', '>=', monthAgoMs)
+          .count()
+          .get();
+        return snap.data().count || 0;
+      },
+    );
+
+    const diffSeverity = await _metricsSafe(
+      'catalog.diffSeverity',
+      errors,
+      async () => {
+        // 本月 compose_diff_summary audit 的 context.severity 分布
+        const tw2 = new Date(nowDate.getTime() + 8 * 3600 * 1000);
+        const monthFirstTwMidUtc2 = new Date(
+          Date.UTC(tw2.getUTCFullYear(), tw2.getUTCMonth(), 1, 0, 0, 0, 0)
+            - 8 * 3600 * 1000,
+        );
+        const partitions = _metricsAuditPartitions(
+          monthFirstTwMidUtc2.getTime(),
+          nowDate.getTime(),
+        );
+        const dist = { low: 0, med: 0, high: 0, critical: 0 };
+        for (const yyyymm of partitions) {
+          const q = db
+            .collection('audit_logs')
+            .doc(yyyymm)
+            .collection('events')
+            .where('type', '==', 'compose_diff_summary')
+            .where('timestamp', '>=', monthFirstTwMidUtc2)
+            .limit(500);
+          const snap = await q.get();
+          snap.forEach((d) => {
+            const sev = d.data()?.context?.severity;
+            if (sev === 'low') dist.low += 1;
+            else if (sev === 'medium') dist.med += 1;
+            else if (sev === 'high') dist.high += 1;
+            else if (sev === 'critical') dist.critical += 1;
+          });
+        }
+        return dist;
+      },
+    );
+
+    // ============================================
+    // Section D — 業務 KPI
+    // ============================================
+    // Sprint 17 W1 stretch — 之後正式 wire up
+    const freeToPaidRate = null;     // Sprint 17 W2+: 計算 plan 升級轉換
+    const customerTouchRate = null;  // 需要 alert.markedContactedAt 欄位、W2 補
+    const advisorNps = null;         // Sprint 18 in-app survey
+
+    const reportsGeneratedMonth = await _metricsSafe(
+      'business.reportsGeneratedMonth',
+      errors,
+      async () => {
+        // 用 customer_reports 集合本月 createdAt count (若 collection 不存在 → 0)
+        const tw3 = new Date(nowDate.getTime() + 8 * 3600 * 1000);
+        const monthFirstTwMidUtc3 = new Date(
+          Date.UTC(tw3.getUTCFullYear(), tw3.getUTCMonth(), 1, 0, 0, 0, 0)
+            - 8 * 3600 * 1000,
+        );
+        try {
+          const snap = await db
+            .collection('customer_reports')
+            .where('createdAt', '>=', monthFirstTwMidUtc3)
+            .count()
+            .get();
+          return snap.data().count || 0;
+        } catch (e) {
+          // collection 不存在 / 缺索引 → 容忍
+          return 0;
+        }
+      },
+    );
+
+    // ============================================
+    // Write metrics_daily/{yyyymmdd}
+    // ============================================
+    const runtimeMs = Date.now() - startedAtMs;
+    const payload = {
+      yyyymmdd,
+
+      // Section A — 顧問活躍度 (flat for Dashboard)
+      dau,
+      mau,
+      ocrPerActive,
+      ragPerActive,
+      pdfPerActive,
+      quotaRequestsNew,
+      advisorTotalRegistered,        // extra, dashboard 不必讀
+      ocrScansYesterday,             // extra (raw daily count)
+      ragAsksYesterday,
+      pdfViewsYesterday,
+
+      // Section B — 系統 health
+      apiAskP95Ms,
+      apiPdfProxyP95Ms,
+      geminiCostUsdMonth,
+      firestoreReadsDay,
+      firestoreWritesDay,
+      firestoreStorageGb,
+      tiiCronSuccessRate,
+      conditionAlertSlaHours,
+
+      // Section C — Catalog health
+      catalogTotal,
+      catalogAddedMonth,
+      catalogRevisedMonth,
+      catalogDelistedMonth,
+      reviewQueuePending,
+      crowdSubsNew,
+      diffSeverity,
+
+      // Section D — 業務 KPI
+      freeToPaidRate,
+      reportsGeneratedMonth,
+      customerTouchRate,
+      advisorNps,
+
+      // Meta
+      runId,
+      ranAt: admin.firestore.FieldValue.serverTimestamp(),
+      runtimeMs,
+      windowStartIso: twYesterdayMidnightUtc.toISOString(),
+      windowEndIso: twTodayMidnightUtc.toISOString(),
+      errors: errors.slice(0, 20),   // cap error list
+      schemaVersion: 1,
+    };
+
+    try {
+      await db.collection('metrics_daily').doc(yyyymmdd).set(payload, { merge: true });
+      functions.logger.info('[metricsAggregationDaily] wrote metrics_daily', {
+        runId,
+        yyyymmdd,
+        runtimeMs,
+        errorCount: errors.length,
+      });
+    } catch (err) {
+      functions.logger.error('[metricsAggregationDaily] write failed', {
+        runId,
+        yyyymmdd,
+        message: err?.message,
+      });
+      // 不 throw — audit 還要寫
+    }
+
+    // ============================================
+    // Audit log
+    // ============================================
+    try {
+      const auditYyyymm = _metricsUtcYyyymm(nowDate);
+      const auditEventId = `metrics_aggregation_${startedAtMs}_system_${crypto
+        .randomBytes(4)
+        .toString('hex')}`;
+      await db
+        .collection('audit_logs')
+        .doc(auditYyyymm)
+        .collection('events')
+        .doc(auditEventId)
+        .set({
+          type: 'metrics_aggregation',
+          advisorUid: 'system',
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          timestampMs: startedAtMs,
+          context: {
+            runId,
+            yyyymmdd,
+            runtimeMs,
+            errorCount: errors.length,
+            erroredKpis: errors.slice(0, 10).map((e) => e.kpi),
+          },
+          result: errors.length === 0 ? 'success' : 'partial',
+          schemaVersion: 1,
+        });
+    } catch (err) {
+      functions.logger.warn('[metricsAggregationDaily] audit write failed', {
+        runId,
+        message: err?.message,
+      });
+    }
+
+    return { runId, yyyymmdd, runtimeMs, errorCount: errors.length };
+  });
+
 console.log('Ultra Advisor Cloud Functions loaded');

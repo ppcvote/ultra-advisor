@@ -1,22 +1,26 @@
 /**
- * ProductCompareView — Sprint 16 scaffold
+ * ProductCompareView — Sprint 16 scaffold + Sprint 17 W1 條款對照 (B3)
  * --------------------------------------------------------------------------
- * 顧問端「比較兩張保單」三欄面板。Sprint 16 W1 ship 規格對照 (catalog
- * 已有的欄位、不接 backend)；條款對照 + 試算對照 留 Sprint 17 後接
- * (LLM diff backend / 保費粗估器整合)。
+ * 顧問端「比較兩張保單」三欄面板。
  *
- * 戰略邊界 (Sprint 16 HARD)
- *   1. 不引入新 npm 依賴 — Tailwind + lucide-react only。
- *   2. 純 UI scaffold — 規格對照接 catalog (Sprint 12 `getProductById`)，
- *      條款 / 試算 對照僅 placeholder。Sprint 17 才接 RAG diff。
- *   3. 不對外宣稱資料來源 — 不出現 TII / 保險贏家 / 昇華科技 / cloudwinner /
+ *   - Sprint 16 W1: ship 規格對照 (catalog 已有的欄位)
+ *   - Sprint 17 W1 (B3): 條款對照 tab 真接 backend
+ *     (compareProductConditions callable + Gemini 2.5 Pro 結構化輸出)
+ *   - 試算對照仍為 placeholder (Sprint 17 W2-W3 接保費粗估器)
+ *
+ * 戰略邊界 (HARD — Sprint 16 + 17 W1)
+ *   1. 不引入新 npm 依賴 — Tailwind + lucide-react + firebase/functions only。
+ *   2. 不對外宣稱資料來源 — 不出現 TII / 保險贏家 / 昇華科技 / cloudwinner /
  *      gouptech / insurance_winner 等任何 source provenance 字串。
  *      catalog 內部欄位 `source` / `sourceUrl` 一律 NOT 顯示。
- *   4. PdfViewer reuse — 點「查條款原文」沿用 Sprint 14 W3 既有 component。
+ *   3. PdfViewer reuse — 點「查條款原文」沿用 Sprint 14 W3 既有 component。
  *      此檔不重新實作 watermark / quota / proxy。
- *   5. Wall-clock time 不在 module top-level 取 — 跟 Sprint 12-14 約定一致，
+ *   4. Wall-clock time 不在 module top-level 取 — 跟 Sprint 12-14 約定一致，
  *      此檔不用 Date.now() / new Date() 在 render path 外。
- *   6. Mobile responsive — sm 斷點下三欄 stack 為單欄 (A → 對照 → B)。
+ *   5. Mobile responsive — sm 斷點下三欄 stack 為單欄 (A → 對照 → B)。
+ *   6. UA 絕不給商品推薦 — 條款對照 callable 回傳 recommendation 永遠 null、
+ *      此 UI 也不顯示任何「哪張比較好」的字眼。
+ *   7. 「AI 解讀僅供參考」disclaimer sticky bottom — 條款 tab 在 view 時必出現。
  *
  * UX:
  *   - 三欄 layout (lg+): [A 卡片] | [中間 sticky 對照表] | [B 卡片]
@@ -25,17 +29,24 @@
  *   - 規格對照: 公司 / 商品代碼 / 大分類 / 細類 / 終身/定期 / 主/附約 /
  *               保額範圍 / 最高投保年齡 / 銷售狀態 / 生效日。
  *               同欄不同 → red 框 + ⚠ icon。
- *   - 條款重點對照: placeholder「Sprint 17 後即可比較條款」 + 可開 PdfViewer。
+ *   - 條款重點對照:
+ *      - summary banner top
+ *      - differences table: category badge / A 規格 / B 規格 / impact dot / notes
+ *      - 「查條款原文 A / B」按鈕 (PdfViewer reuse)
+ *      - loading / error / fallback states
+ *      - DisclaimerBar sticky bottom
  *   - 試算對照: placeholder「Sprint 17 接保費粗估器」。
  *
- * 不破壞 Sprint 13/14/15 — 此 component 自包含、no side effects、不寫 Firestore。
+ * 不破壞 Sprint 13/14/15/16 — 此 component 自包含、僅多了 callable 呼叫 (lazy on demand)。
  * --------------------------------------------------------------------------
  */
-import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   X, Loader2, AlertTriangle, FileText, Calculator, ListChecks, ShieldCheck,
-  ChevronLeft,
+  ChevronLeft, RefreshCw, Info,
 } from 'lucide-react';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../firebase';
 import {
   getProductById,
   type InsuranceProduct,
@@ -45,6 +56,36 @@ import { CATEGORY_LABEL_ZH } from '../../lib/insuranceCategoryLabels';
 
 // PdfViewer 已存在 Sprint 14 W3 — 條款原文 modal、自帶浮水印 + quota
 const PdfViewer = lazy(() => import('./PdfViewer'));
+
+// ---------------------------------------------------------------------------
+// Sprint 17 W1 — Clause compare callable contract
+// 與 functions/index.js compareProductConditions 對齊
+// ---------------------------------------------------------------------------
+
+type CompareImpact = 'high' | 'medium' | 'low';
+type CompareCategory = '等待期' | '除外責任' | '給付項目' | '金額限額' | '其他';
+
+interface CompareDifference {
+  category: CompareCategory | string;
+  aValue: string;
+  bValue: string;
+  impact: CompareImpact;
+  notes: string;
+}
+
+interface CompareResult {
+  summary: string;
+  differences: CompareDifference[];
+  overlap: string;
+  recommendation: null;
+  disclaimers: string[];
+  tokensUsed: number;
+  fallback: boolean;
+  fallbackReason?: string;
+  fallbackSide?: 'A' | 'B' | 'both' | null;
+}
+
+const COMPARE_DISCLAIMER = 'AI 解讀僅供參考、實際以保單條款為準';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -217,6 +258,183 @@ const ProductCard: React.FC<{
 };
 
 // ---------------------------------------------------------------------------
+// Sprint 17 W1 — Clause compare sub-components
+// ---------------------------------------------------------------------------
+
+function impactDotColor(impact: CompareImpact): string {
+  switch (impact) {
+    case 'high':
+      return 'bg-red-500';
+    case 'medium':
+      return 'bg-amber-500';
+    case 'low':
+    default:
+      return 'bg-emerald-500';
+  }
+}
+
+function impactLabel(impact: CompareImpact): string {
+  switch (impact) {
+    case 'high':
+      return '高影響';
+    case 'medium':
+      return '中影響';
+    case 'low':
+    default:
+      return '低影響';
+  }
+}
+
+function categoryBadgeColor(category: string): string {
+  switch (category) {
+    case '等待期':
+      return 'bg-blue-50 text-blue-700 border-blue-200';
+    case '除外責任':
+      return 'bg-red-50 text-red-700 border-red-200';
+    case '給付項目':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    case '金額限額':
+      return 'bg-amber-50 text-amber-700 border-amber-200';
+    case '其他':
+    default:
+      return 'bg-slate-50 text-slate-600 border-slate-200';
+  }
+}
+
+const ClauseCompareBody: React.FC<{
+  result: CompareResult;
+  onOpenPdfA: () => void;
+  onOpenPdfB: () => void;
+  onRetry: () => void;
+}> = ({ result, onOpenPdfA, onOpenPdfB, onRetry }) => {
+  const { summary, differences, overlap, fallback, fallbackReason } = result;
+
+  return (
+    <div>
+      {/* Summary banner */}
+      {summary && (
+        <div
+          className={
+            'rounded-lg px-3 py-2.5 mb-4 text-sm leading-relaxed ' +
+            (fallback
+              ? 'bg-amber-50 border border-amber-200 text-amber-800'
+              : 'bg-slate-50 border border-slate-200 text-slate-700')
+          }
+        >
+          {fallback && (
+            <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 mb-1">
+              <AlertTriangle size={12} />
+              {fallbackReason === 'insufficient_chunks_a' ||
+              fallbackReason === 'insufficient_chunks_b' ||
+              fallbackReason === 'insufficient_chunks_both'
+                ? '條款資料不足'
+                : 'AI 比對未完成'}
+            </div>
+          )}
+          <div className="whitespace-pre-wrap">{summary}</div>
+        </div>
+      )}
+
+      {/* Action row — open PDFs */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <button
+          type="button"
+          onClick={onOpenPdfA}
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors"
+        >
+          <FileText size={12} />
+          查條款原文 A
+        </button>
+        <button
+          type="button"
+          onClick={onOpenPdfB}
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 transition-colors"
+        >
+          <FileText size={12} />
+          查條款原文 B
+        </button>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors ml-auto"
+          title="重新呼叫 AI 比對（會計入 ask 配額）"
+        >
+          <RefreshCw size={12} />
+          重新比對
+        </button>
+      </div>
+
+      {/* Differences table */}
+      {differences.length > 0 ? (
+        <div className="rounded-lg border border-slate-200 overflow-hidden">
+          <div className="grid grid-cols-[80px_1fr_1fr_72px] gap-2 px-3 py-2 bg-slate-50 border-b border-slate-200 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+            <div>類別</div>
+            <div className="text-blue-600">商品 A 規格</div>
+            <div className="text-violet-600">商品 B 規格</div>
+            <div className="text-center">影響</div>
+          </div>
+          <div>
+            {differences.map((d, idx) => (
+              <div
+                key={idx}
+                className="grid grid-cols-[80px_1fr_1fr_72px] gap-2 px-3 py-2.5 border-b border-slate-100 last:border-b-0 text-sm items-start"
+              >
+                <div>
+                  <span
+                    className={
+                      'inline-block text-[10px] font-medium px-1.5 py-0.5 rounded border ' +
+                      categoryBadgeColor(String(d.category))
+                    }
+                  >
+                    {d.category}
+                  </span>
+                </div>
+                <div className="text-slate-700 break-words">
+                  <div>{d.aValue}</div>
+                  {d.notes && (
+                    <div className="mt-1 text-[11px] text-slate-400 leading-snug">
+                      {d.notes}
+                    </div>
+                  )}
+                </div>
+                <div className="text-slate-700 break-words">{d.bValue}</div>
+                <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500">
+                  <span
+                    className={
+                      'inline-block w-2 h-2 rounded-full ' + impactDotColor(d.impact)
+                    }
+                    aria-label={impactLabel(d.impact)}
+                    title={impactLabel(d.impact)}
+                  />
+                  <span>{impactLabel(d.impact)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : !fallback ? (
+        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-xs text-slate-500">
+          AI 未找出明顯差異 — 可能兩商品條款相近、建議直接看條款原文確認。
+        </div>
+      ) : null}
+
+      {/* Overlap section */}
+      {overlap && (
+        <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50/50 px-3 py-2.5">
+          <div className="text-xs font-medium text-emerald-700 mb-1 flex items-center gap-1.5">
+            <ShieldCheck size={12} />
+            兩商品共同重點
+          </div>
+          <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+            {overlap}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -232,6 +450,12 @@ const ProductCompareView: React.FC<ProductCompareViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<CompareTab>('spec');
   const [pdfOpenFor, setPdfOpenFor] = useState<'A' | 'B' | null>(null);
+
+  // Sprint 17 W1 — Clause compare state
+  const [clauseResult, setClauseResult] = useState<CompareResult | null>(null);
+  const [clauseLoading, setClauseLoading] = useState<boolean>(false);
+  const [clauseError, setClauseError] = useState<string | null>(null);
+  const [clauseFetched, setClauseFetched] = useState<boolean>(false);
 
   // Parallel fetch — fail soft (each side renders its own empty state)
   useEffect(() => {
@@ -264,6 +488,54 @@ const ProductCompareView: React.FC<ProductCompareViewProps> = ({
       cancelled = true;
     };
   }, [productIdA, productIdB]);
+
+  // ---------------------------------------------------------------------------
+  // Sprint 17 W1 — Clause compare fetch (lazy, triggered when tab='clause')
+  // ---------------------------------------------------------------------------
+  const fetchClauseCompare = useCallback(async () => {
+    setClauseLoading(true);
+    setClauseError(null);
+    try {
+      const fn = httpsCallable<
+        { productIdA: string; productIdB: string },
+        CompareResult
+      >(functions, 'compareProductConditions');
+      const res = await fn({ productIdA, productIdB });
+      setClauseResult(res.data);
+      setClauseFetched(true);
+    } catch (err) {
+      const e = err as { code?: string; message?: string };
+      let msg = '條款比對失敗、請稍後重試。';
+      if (e?.code === 'functions/resource-exhausted') {
+        msg = '本月 AI 詢問配額已用完、請至「配額管理」申請延展。';
+      } else if (e?.code === 'functions/unauthenticated') {
+        msg = '請先登入後再使用條款比對。';
+      } else if (e?.code === 'functions/invalid-argument') {
+        msg = '商品代碼格式不正確、無法進行比對。';
+      } else if (e?.code === 'functions/failed-precondition') {
+        msg = '比對服務暫不可用（AI 設定錯誤）、請通知管理員。';
+      }
+      setClauseError(msg);
+      setClauseFetched(true);
+    } finally {
+      setClauseLoading(false);
+    }
+  }, [productIdA, productIdB]);
+
+  // 第一次切到「條款重點對照」tab 時自動 fetch；productId 變動時重置已 fetched 旗標
+  useEffect(() => {
+    setClauseResult(null);
+    setClauseError(null);
+    setClauseFetched(false);
+  }, [productIdA, productIdB]);
+
+  useEffect(() => {
+    if (tab !== 'clause') return;
+    if (clauseFetched || clauseLoading) return;
+    // 雙商品都已載入完成才允許呼叫 (節省 quota — 缺一邊也會 fallback、不浪費)
+    if (!a || !b) return;
+    void fetchClauseCompare();
+  }, [tab, clauseFetched, clauseLoading, a, b, fetchClauseCompare]);
 
   const specRows = useMemo<RowProps[]>(() => {
     return [
@@ -376,7 +648,7 @@ const ProductCompareView: React.FC<ProductCompareViewProps> = ({
             <ProductCard product={a} side="A" onOpenPdf={() => a && setPdfOpenFor('A')} />
 
             {/* Middle compare panel */}
-            <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+            <div className="relative rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
               {tab === 'spec' && (
                 <>
                   <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
@@ -402,22 +674,74 @@ const ProductCompareView: React.FC<ProductCompareViewProps> = ({
               )}
 
               {tab === 'clause' && (
-                <div>
+                <div className="pb-14">{/* room for DisclaimerBar */}
                   <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                     <ShieldCheck size={14} className="text-slate-400" />
                     條款重點對照
                   </h4>
                   <p className="text-xs text-slate-400 mb-4">
-                    等待期 / 除外責任 / 給付條件 / 復效條款 / 解約金 比例。
+                    等待期 / 除外責任 / 給付項目 / 金額限額 — 由 AI 結構化解讀兩商品差異。
                   </p>
-                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
-                    <ShieldCheck size={20} className="mx-auto text-slate-400 mb-2" />
-                    <div className="text-sm text-slate-600 font-medium mb-1">Sprint 17 後即可比較條款</div>
-                    <div className="text-xs text-slate-400 leading-relaxed max-w-md mx-auto">
-                      條款 diff 需要先把兩張條款 PDF 跑過 RAG pipeline、由 LLM 比對重點段落差異。
-                      目前可先點上方「查條款原文」逐張閱讀。
+
+                  {/* Loading */}
+                  {clauseLoading && (
+                    <div className="flex items-center justify-center py-12 text-slate-500">
+                      <Loader2 size={20} className="animate-spin mr-2" />
+                      <span className="text-sm">AI 正在比對條款重點…（約 5-15 秒）</span>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Error */}
+                  {!clauseLoading && clauseError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 mb-4">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-red-700 font-medium mb-1">無法完成條款比對</div>
+                          <div className="text-xs text-red-600 mb-2">{clauseError}</div>
+                          <button
+                            type="button"
+                            onClick={() => fetchClauseCompare()}
+                            className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded border border-red-300 bg-white hover:bg-red-50 text-red-700 transition-colors"
+                          >
+                            <RefreshCw size={12} />
+                            重試
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Result */}
+                  {!clauseLoading && !clauseError && clauseResult && (
+                    <ClauseCompareBody
+                      result={clauseResult}
+                      onOpenPdfA={() => a && setPdfOpenFor('A')}
+                      onOpenPdfB={() => b && setPdfOpenFor('B')}
+                      onRetry={() => fetchClauseCompare()}
+                    />
+                  )}
+
+                  {/* Idle — happens when products haven't loaded yet but tab opened */}
+                  {!clauseLoading && !clauseError && !clauseResult && (
+                    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+                      <ShieldCheck size={20} className="mx-auto text-slate-400 mb-2" />
+                      <div className="text-sm text-slate-600 font-medium mb-1">準備中…</div>
+                      <div className="text-xs text-slate-400 leading-relaxed max-w-md mx-auto">
+                        等兩張商品資料載入完成後會自動開始 AI 條款比對。
+                      </div>
+                    </div>
+                  )}
+
+                  {/* DisclaimerBar — sticky bottom (within compare panel) */}
+                  {(clauseResult || clauseLoading) && (
+                    <div className="absolute left-0 right-0 bottom-0 mx-4 sm:mx-5 mb-3">
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800 flex items-center gap-1.5 shadow-sm">
+                        <Info size={11} className="shrink-0" />
+                        <span>{COMPARE_DISCLAIMER}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
