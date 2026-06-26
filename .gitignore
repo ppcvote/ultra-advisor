@@ -38,3 +38,7 @@ research-notes-src/
 * copy.js
 *\ copy.tsx
 *\ copy.jsx
+
+# Python bytecode
+scripts/__pycache__/
+*.pyc
