@@ -88,6 +88,14 @@ const ConditionAlerts = lazy(() => import('./dashboard/ConditionAlerts'));
 // `admins/{uid}` Firestore read (rules are the real boundary; the client
 // check just avoids loading the admin chunk for non-admins).
 const QuotaExtensionRequests = lazy(() => import('./admin/QuotaExtensionRequests'));
+// Sprint 16 — admin-only operational metrics dashboard scaffold. Same admin
+// gate as the other /admin/* routes; data wires up in Sprint 17 once the
+// metrics_daily aggregation cron has accumulated points.
+const MetricsDashboard = lazy(() => import('./admin/MetricsDashboard'));
+// Sprint 16 — advisor-only catalog compare view. URL form:
+//   /checkup/compare?a=<productIdA>&b=<productIdB>
+// Lazy so the WarRoom shell stays slim for advisors who never open compare.
+const ProductCompareView = lazy(() => import('./components/insurance/ProductCompareView'));
 
 // 🆕 主題切換
 import { ThemeProvider } from './context/ThemeContext';
@@ -221,6 +229,14 @@ export default function App() {
   // Sprint 15 W3 — /admin/quota-extension-requests (admin-only)
   const [isQuotaExtensionRoute, setIsQuotaExtensionRoute] = useState(() =>
     window.location.pathname === '/admin/quota-extension-requests'
+  );
+  // Sprint 16 — /admin/metrics (admin-only)
+  const [isMetricsRoute, setIsMetricsRoute] = useState(() =>
+    window.location.pathname === '/admin/metrics'
+  );
+  // Sprint 16 W1 — /checkup/compare?a=...&b=... (advisor-only, public-safe shell)
+  const [isCompareRoute, setIsCompareRoute] = useState(() =>
+    window.location.pathname === '/checkup/compare'
   );
   // Sprint 15 W2 — /dashboard/condition-alerts(/{id}) (advisor-only)
   // Matches both bare path and deeplink form so an email/LINE link can drop
@@ -465,11 +481,13 @@ export default function App() {
       setIsCustomerReportRoute(path.startsWith('/r/')); // Sprint 7 F
       setIsInsuranceReviewRoute(path === '/admin/insurance-review-queue'); // Sprint 15 W1
       setIsQuotaExtensionRoute(path === '/admin/quota-extension-requests'); // Sprint 15 W3
+      setIsMetricsRoute(path === '/admin/metrics'); // Sprint 16
+      setIsCompareRoute(path === '/checkup/compare'); // Sprint 16 W1
       setIsConditionAlertsRoute(
         path === '/dashboard/condition-alerts' ||
         path.startsWith('/dashboard/condition-alerts/')
       ); // Sprint 15 W2
-      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); setIsPrivacyRoute(false); setIsTermsRoute(false); setIsCustomerReportRoute(false); setIsInsuranceReviewRoute(false); setIsQuotaExtensionRoute(false); setIsConditionAlertsRoute(false); }
+      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); setIsPrivacyRoute(false); setIsTermsRoute(false); setIsCustomerReportRoute(false); setIsInsuranceReviewRoute(false); setIsQuotaExtensionRoute(false); setIsMetricsRoute(false); setIsCompareRoute(false); setIsConditionAlertsRoute(false); }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -494,6 +512,8 @@ export default function App() {
     else if (path.startsWith('/r/')) setIsCustomerReportRoute(true); // Sprint 7 F
     else if (path === '/admin/insurance-review-queue') setIsInsuranceReviewRoute(true); // Sprint 15 W1
     else if (path === '/admin/quota-extension-requests') setIsQuotaExtensionRoute(true); // Sprint 15 W3
+    else if (path === '/admin/metrics') setIsMetricsRoute(true); // Sprint 16
+    else if (path === '/checkup/compare') setIsCompareRoute(true); // Sprint 16 W1
     else if (
       path === '/dashboard/condition-alerts' ||
       path.startsWith('/dashboard/condition-alerts/')
@@ -616,11 +636,11 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
-  // Sprint 15 W1 + W3 — lazy admin check (fires when any /admin/* route is active).
-  // Reads `admins/{uid}` doc; rules already gate the actual queue data, this
-  // client check just avoids rendering the queue UI for non-admins.
+  // Sprint 15 W1 + W3 + Sprint 16 — lazy admin check (fires when any /admin/*
+  // route is active). Reads `admins/{uid}` doc; rules already gate the actual
+  // queue data, this client check just avoids rendering admin UI for non-admins.
   useEffect(() => {
-    if (!isInsuranceReviewRoute && !isQuotaExtensionRoute) return;
+    if (!isInsuranceReviewRoute && !isQuotaExtensionRoute && !isMetricsRoute) return;
     if (!user) { setIsAdminUser(false); return; }
     let cancelled = false;
     (async () => {
@@ -635,7 +655,7 @@ export default function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isInsuranceReviewRoute, isQuotaExtensionRoute, user]);
+  }, [isInsuranceReviewRoute, isQuotaExtensionRoute, isMetricsRoute, user]);
 
   // 🆕 升級引導處理
   const handleUpgradeClick = (tool: Tool) => {
@@ -1049,6 +1069,98 @@ export default function App() {
     return (
       <Suspense fallback={<SplashScreen />}>
         <QuotaExtensionRequests />
+      </Suspense>
+    );
+  }
+
+  // Sprint 16 — admin-only metrics dashboard scaffold. Same pattern as the
+  // other /admin/* routes: bypass splash for admins, hard-block non-admins,
+  // bounce unauthed users to /login. Data wires up in Sprint 17.
+  if (isMetricsRoute || window.location.pathname === '/admin/metrics') {
+    if (loading) return <SplashScreen />;
+    if (!user) {
+      window.history.replaceState({}, '', '/login');
+      setIsMetricsRoute(false);
+      setIsLoginRoute(true);
+      return <SplashScreen />;
+    }
+    if (isAdminUser === null) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">
+          <div className="text-center">
+            <div className="w-8 h-8 mx-auto mb-3 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+            驗證管理權限…
+          </div>
+        </div>
+      );
+    }
+    if (isAdminUser === false) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+          <div className="max-w-sm text-center">
+            <div className="text-4xl mb-3">🔒</div>
+            <h1 className="text-lg font-bold text-slate-800 mb-1">需要管理權限</h1>
+            <p className="text-sm text-slate-500 mb-5">此頁面僅限管理員存取。</p>
+            <button
+              onClick={() => {
+                window.history.pushState({}, '', '/');
+                setIsMetricsRoute(false);
+                window.location.reload();
+              }}
+              className="text-sm font-medium text-blue-600 hover:underline"
+            >
+              ← 返回戰情室
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <Suspense fallback={<SplashScreen />}>
+        <MetricsDashboard />
+      </Suspense>
+    );
+  }
+
+  // Sprint 16 W1 — advisor-only product compare view.
+  //   URL: /checkup/compare?a=<productIdA>&b=<productIdB>
+  // Renders before the splash gate so deep-links from PolicyForm /
+  // ProductPicker open straight into the diff (no 3-second blackout). Unauthed
+  // → bounce to /login; the planner shell is not required because compare is
+  // a self-contained surface that only reads `insurance_products` catalog docs.
+  if (isCompareRoute || window.location.pathname === '/checkup/compare') {
+    if (loading) return <SplashScreen />;
+    if (!user) {
+      window.history.replaceState({}, '', '/login');
+      setIsCompareRoute(false);
+      setIsLoginRoute(true);
+      return <SplashScreen />;
+    }
+    // Parse ?a= / ?b= inside the route gate so we don't add yet another
+    // top-level useEffect. Falls back gracefully via ProductCompareView's
+    // own empty-state when either id is missing / unknown.
+    let qa = '';
+    let qb = '';
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      qa = sp.get('a') || '';
+      qb = sp.get('b') || '';
+    } catch { /* ignore */ }
+    return (
+      <Suspense fallback={<SplashScreen />}>
+        <ProductCompareView
+          productIdA={qa}
+          productIdB={qb}
+          advisorEmail={user?.email ?? undefined}
+          onClose={() => {
+            setIsCompareRoute(false);
+            window.history.pushState({}, '', '/');
+            // Soft reload so WarRoom (lazy chunk) takes over cleanly without
+            // having to mount inline here; matches the existing pattern used
+            // by /booking and other public-route exits.
+            window.location.reload();
+          }}
+        />
       </Suspense>
     );
   }
