@@ -75,6 +75,10 @@ const TermsPage = lazy(() => import('./pages/TermsPage'));
 // Sprint 7 F: customer-facing share link target. Lazy so the public route
 // chunk stays isolated from the logged-in advisor bundle.
 const CustomerReportPage = lazy(() => import('./pages/CustomerReportPage'));
+// Sprint 15 W1 — admin-only insurance review queue. Route gated by an
+// `admins/{uid}` Firestore read (rules are the real boundary; the client
+// check just avoids loading the admin chunk for non-admins).
+const InsuranceReviewQueue = lazy(() => import('./admin/InsuranceReviewQueue'));
 
 // 🆕 主題切換
 import { ThemeProvider } from './context/ThemeContext';
@@ -201,6 +205,14 @@ export default function App() {
   // Public (no auth), bypasses splash so the client opening from LINE doesn't
   // see the advisor-side Ultra Advisor splash screen first.
   const [isCustomerReportRoute, setIsCustomerReportRoute] = useState(() => window.location.pathname.startsWith('/r/'));
+  // Sprint 15 W1 — /admin/insurance-review-queue (admin-only)
+  const [isInsuranceReviewRoute, setIsInsuranceReviewRoute] = useState(() =>
+    window.location.pathname === '/admin/insurance-review-queue'
+  );
+  // Cached admin check — null = unknown, false = not admin, true = admin.
+  // Populated lazily when entering an /admin/* route to avoid an extra
+  // Firestore read for every non-admin session.
+  const [isAdminUser, setIsAdminUser] = useState<boolean | null>(null);
   const [clientLoading, setClientLoading] = useState(false); 
   const [currentClient, setCurrentClient] = useState<any>(null);
   // Sprint 6: mirror currentClient → store. Read-only bridge for tool chips.
@@ -431,7 +443,8 @@ export default function App() {
       setIsPrivacyRoute(path === '/privacy');
       setIsTermsRoute(path === '/terms');
       setIsCustomerReportRoute(path.startsWith('/r/')); // Sprint 7 F
-      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); setIsPrivacyRoute(false); setIsTermsRoute(false); setIsCustomerReportRoute(false); }
+      setIsInsuranceReviewRoute(path === '/admin/insurance-review-queue'); // Sprint 15 W1
+      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); setIsPrivacyRoute(false); setIsTermsRoute(false); setIsCustomerReportRoute(false); setIsInsuranceReviewRoute(false); }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -454,6 +467,7 @@ export default function App() {
     else if (path === '/privacy') setIsPrivacyRoute(true);
     else if (path === '/terms') setIsTermsRoute(true);
     else if (path.startsWith('/r/')) setIsCustomerReportRoute(true); // Sprint 7 F
+    else if (path === '/admin/insurance-review-queue') setIsInsuranceReviewRoute(true); // Sprint 15 W1
 
     // 🆕 SplashScreen 只在這個 session 第一次進入時顯示
     if (sessionStorage.getItem('splash_shown') !== 'true') {
@@ -571,6 +585,27 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [user]);
+
+  // Sprint 15 W1 — lazy admin check (only fires when admin route is active).
+  // Reads `admins/{uid}` doc; rules already gate the actual queue data, this
+  // client check just avoids rendering the queue UI for non-admins.
+  useEffect(() => {
+    if (!isInsuranceReviewRoute) return;
+    if (!user) { setIsAdminUser(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'admins', user.uid));
+        if (!cancelled) setIsAdminUser(snap.exists());
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('[admin] isAdmin check failed:', err);
+          setIsAdminUser(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isInsuranceReviewRoute, user]);
 
   // 🆕 升級引導處理
   const handleUpgradeClick = (tool: Tool) => {
@@ -884,6 +919,57 @@ export default function App() {
             window.location.reload();
           }}
         />
+      </Suspense>
+    );
+  }
+
+  // Sprint 15 W1 — admin-only review queue. Render before splash gate so
+  // admins don't sit through the 3-second splash on every navigation.
+  if (isInsuranceReviewRoute || window.location.pathname === '/admin/insurance-review-queue') {
+    if (loading) return <SplashScreen />;
+    if (!user) {
+      // Not signed in — bounce to login. Preserve the deep link via pushState
+      // so post-login navigation can return here in a future iteration.
+      window.history.replaceState({}, '', '/login');
+      setIsInsuranceReviewRoute(false);
+      setIsLoginRoute(true);
+      return <SplashScreen />;
+    }
+    if (isAdminUser === null) {
+      // Check still in flight — short spinner instead of full splash.
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">
+          <div className="text-center">
+            <div className="w-8 h-8 mx-auto mb-3 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+            驗證管理權限…
+          </div>
+        </div>
+      );
+    }
+    if (isAdminUser === false) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+          <div className="max-w-sm text-center">
+            <div className="text-4xl mb-3">🔒</div>
+            <h1 className="text-lg font-bold text-slate-800 mb-1">需要管理權限</h1>
+            <p className="text-sm text-slate-500 mb-5">此頁面僅限管理員存取。</p>
+            <button
+              onClick={() => {
+                window.history.pushState({}, '', '/');
+                setIsInsuranceReviewRoute(false);
+                window.location.reload();
+              }}
+              className="text-sm font-medium text-blue-600 hover:underline"
+            >
+              ← 返回戰情室
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <Suspense fallback={<SplashScreen />}>
+        <InsuranceReviewQueue />
       </Suspense>
     );
   }
