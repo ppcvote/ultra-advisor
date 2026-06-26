@@ -84,6 +84,10 @@ const InsuranceReviewQueue = lazy(() => import('./admin/InsuranceReviewQueue'));
 // deeplinks from email / LINE notifications). Auth-gated like the rest of
 // the planner shell; firestore.rules enforce the per-advisor boundary.
 const ConditionAlerts = lazy(() => import('./dashboard/ConditionAlerts'));
+// Sprint 15 W3 — admin-only quota extension review queue. Route gated by an
+// `admins/{uid}` Firestore read (rules are the real boundary; the client
+// check just avoids loading the admin chunk for non-admins).
+const QuotaExtensionRequests = lazy(() => import('./admin/QuotaExtensionRequests'));
 
 // 🆕 主題切換
 import { ThemeProvider } from './context/ThemeContext';
@@ -213,6 +217,10 @@ export default function App() {
   // Sprint 15 W1 — /admin/insurance-review-queue (admin-only)
   const [isInsuranceReviewRoute, setIsInsuranceReviewRoute] = useState(() =>
     window.location.pathname === '/admin/insurance-review-queue'
+  );
+  // Sprint 15 W3 — /admin/quota-extension-requests (admin-only)
+  const [isQuotaExtensionRoute, setIsQuotaExtensionRoute] = useState(() =>
+    window.location.pathname === '/admin/quota-extension-requests'
   );
   // Sprint 15 W2 — /dashboard/condition-alerts(/{id}) (advisor-only)
   // Matches both bare path and deeplink form so an email/LINE link can drop
@@ -456,11 +464,12 @@ export default function App() {
       setIsTermsRoute(path === '/terms');
       setIsCustomerReportRoute(path.startsWith('/r/')); // Sprint 7 F
       setIsInsuranceReviewRoute(path === '/admin/insurance-review-queue'); // Sprint 15 W1
+      setIsQuotaExtensionRoute(path === '/admin/quota-extension-requests'); // Sprint 15 W3
       setIsConditionAlertsRoute(
         path === '/dashboard/condition-alerts' ||
         path.startsWith('/dashboard/condition-alerts/')
       ); // Sprint 15 W2
-      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); setIsPrivacyRoute(false); setIsTermsRoute(false); setIsCustomerReportRoute(false); setIsInsuranceReviewRoute(false); setIsConditionAlertsRoute(false); }
+      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); setIsPrivacyRoute(false); setIsTermsRoute(false); setIsCustomerReportRoute(false); setIsInsuranceReviewRoute(false); setIsQuotaExtensionRoute(false); setIsConditionAlertsRoute(false); }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -484,6 +493,7 @@ export default function App() {
     else if (path === '/terms') setIsTermsRoute(true);
     else if (path.startsWith('/r/')) setIsCustomerReportRoute(true); // Sprint 7 F
     else if (path === '/admin/insurance-review-queue') setIsInsuranceReviewRoute(true); // Sprint 15 W1
+    else if (path === '/admin/quota-extension-requests') setIsQuotaExtensionRoute(true); // Sprint 15 W3
     else if (
       path === '/dashboard/condition-alerts' ||
       path.startsWith('/dashboard/condition-alerts/')
@@ -606,11 +616,11 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
-  // Sprint 15 W1 — lazy admin check (only fires when admin route is active).
+  // Sprint 15 W1 + W3 — lazy admin check (fires when any /admin/* route is active).
   // Reads `admins/{uid}` doc; rules already gate the actual queue data, this
   // client check just avoids rendering the queue UI for non-admins.
   useEffect(() => {
-    if (!isInsuranceReviewRoute) return;
+    if (!isInsuranceReviewRoute && !isQuotaExtensionRoute) return;
     if (!user) { setIsAdminUser(false); return; }
     let cancelled = false;
     (async () => {
@@ -625,7 +635,7 @@ export default function App() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isInsuranceReviewRoute, user]);
+  }, [isInsuranceReviewRoute, isQuotaExtensionRoute, user]);
 
   // 🆕 升級引導處理
   const handleUpgradeClick = (tool: Tool) => {
@@ -990,6 +1000,55 @@ export default function App() {
     return (
       <Suspense fallback={<SplashScreen />}>
         <InsuranceReviewQueue />
+      </Suspense>
+    );
+  }
+
+  // Sprint 15 W3 — admin-only quota extension review queue. Pattern mirrors
+  // /admin/insurance-review-queue: skip splash for admins, hard-block non-
+  // admins, redirect unauthed → /login.
+  if (isQuotaExtensionRoute || window.location.pathname === '/admin/quota-extension-requests') {
+    if (loading) return <SplashScreen />;
+    if (!user) {
+      window.history.replaceState({}, '', '/login');
+      setIsQuotaExtensionRoute(false);
+      setIsLoginRoute(true);
+      return <SplashScreen />;
+    }
+    if (isAdminUser === null) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">
+          <div className="text-center">
+            <div className="w-8 h-8 mx-auto mb-3 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+            驗證管理權限…
+          </div>
+        </div>
+      );
+    }
+    if (isAdminUser === false) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+          <div className="max-w-sm text-center">
+            <div className="text-4xl mb-3">🔒</div>
+            <h1 className="text-lg font-bold text-slate-800 mb-1">需要管理權限</h1>
+            <p className="text-sm text-slate-500 mb-5">此頁面僅限管理員存取。</p>
+            <button
+              onClick={() => {
+                window.history.pushState({}, '', '/');
+                setIsQuotaExtensionRoute(false);
+                window.location.reload();
+              }}
+              className="text-sm font-medium text-blue-600 hover:underline"
+            >
+              ← 返回戰情室
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <Suspense fallback={<SplashScreen />}>
+        <QuotaExtensionRequests />
       </Suspense>
     );
   }

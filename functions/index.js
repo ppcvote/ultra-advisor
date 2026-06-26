@@ -9857,4 +9857,397 @@ exports.processConditionAlertsQueue = functions
     return null;
   });
 
+// ==========================================
+// Sprint 15 W3 — approveQuotaExtension (Task B5)
+// ==========================================
+//
+// Admin 審核 quota_extension_requests 入口（Sprint 14 W2 顧問端 form 已寫入）。
+// 流程：
+//   1. admin 從 /admin/quota-extension-requests 看 pending list
+//   2. 點 Approve / Reject
+//   3. 此 callable 處理：
+//      - approve → 增加 advisors/{requesterUid}/quotaUsage/{yyyymm} 的 limit
+//        (asks +50 / pdfViews +25 預設、可 admin 客製 extensionAmount)
+//      - reject → 不動 quotaUsage、寫 reason
+//      - 任一 path 都 notify requester via Resend email + 寫 audit_logs
+//
+// 鐵則：
+//   - 不引入新 npm dep（Resend 走既有 axios pattern、Sprint 11 sendLifecycleEmail 已用）
+//   - 所有「現在時間」runtime callback 內取（HARD rule、Sprint 12 onwards）
+//   - 重複決定守門：status != 'pending' → throw 'already-decided'（防 admin race）
+//   - email 內文不含 PII：只說「您的配額延伸申請」+ 增加額度數字 + 月份
+//   - audit log type: 'quota_extension_decided'、走 Sprint 14 W3 audit_logs/{yyyymm}/events shape
+//   - extensionAmount.asks / pdfViews：admin 沒填則用預設（asks +50 / pdfViews +25）
+//   - yyyymm 用 request.targetYyyymm（顧問當初送 form 時記錄的本地時區月份）；
+//     缺值就 fall back 用 callback 內 UTC 推算（與 logAuditEvent 一致）
+
+const QUOTA_EXTENSION_DEFAULTS = {
+  asks: 50,
+  pdfViews: 25,
+};
+
+const QUOTA_EXTENSION_MAX = {
+  asks: 500,
+  pdfViews: 250,
+};
+
+/**
+ * Resend 寄通知 — 不含 PII，只說明配額決定 + 月份 + 增量。
+ * 與 sendLifecycleEmail 同樣 DRY-RUN 安全（RESEND_API_KEY 未設則 logger.info）。
+ */
+async function sendQuotaExtensionDecisionEmail({ toEmail, decision, yyyymm, extensionAmount, reason }) {
+  if (!toEmail || typeof toEmail !== 'string') {
+    return { dryRun: false, sent: false, error: 'no_recipient' };
+  }
+  const RESEND_API_KEY = process.env.RESEND_API_KEY;
+  const FROM = 'Ultra Advisor <hello@ultra-advisor.tw>';
+
+  const monthLabel = `${yyyymm.slice(0, 4)} 年 ${yyyymm.slice(4)} 月`;
+  const subject =
+    decision === 'approve'
+      ? `[Ultra Advisor] 您的配額延伸申請已通過 (${monthLabel})`
+      : `[Ultra Advisor] 您的配額延伸申請審核結果 (${monthLabel})`;
+
+  const lines =
+    decision === 'approve'
+      ? [
+          '您好，',
+          '',
+          `您於 ${monthLabel} 提出的配額延伸申請已通過。`,
+          '',
+          '本月已為您增加：',
+          `  • AI 條款問答：+${extensionAmount.asks} 次`,
+          `  • 條款 PDF 檢視：+${extensionAmount.pdfViews} 次`,
+          '',
+          '請登入 Ultra Advisor 即可繼續使用。',
+          '',
+          '— Ultra Advisor 團隊',
+        ]
+      : [
+          '您好，',
+          '',
+          `您於 ${monthLabel} 提出的配額延伸申請未通過本次審核。`,
+          '',
+          reason ? `審核備註：${reason}` : '如有疑問請與我們聯繫：support@ultralab.tw',
+          '',
+          '— Ultra Advisor 團隊',
+        ];
+
+  const text = lines.join('\n');
+  const html = `<div style="font-family:sans-serif;line-height:1.6;color:#1f2937">${lines
+    .map((l) => (l === '' ? '<br/>' : `<p style="margin:0 0 4px 0">${l.replace(/</g, '&lt;')}</p>`))
+    .join('')}</div>`;
+
+  if (!RESEND_API_KEY) {
+    functions.logger.info('[quotaExtension] email DRY-RUN (RESEND_API_KEY unset)', {
+      to: toEmail,
+      decision,
+      yyyymm,
+    });
+    return { dryRun: true, sent: false };
+  }
+  try {
+    await axios.post(
+      'https://api.resend.com/emails',
+      {
+        from: FROM,
+        to: toEmail,
+        subject,
+        html,
+        text,
+        headers: {
+          'X-Entity-Ref-ID': `quota-ext-${decision}-${Date.now()}`,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 10_000,
+      },
+    );
+    functions.logger.info('[quotaExtension] email sent', { to: toEmail, decision });
+    return { dryRun: false, sent: true };
+  } catch (err) {
+    functions.logger.error('[quotaExtension] resend error', {
+      to: toEmail,
+      decision,
+      status: err.response?.status,
+      data: err.response?.data,
+      message: err.message,
+    });
+    return { dryRun: false, sent: false, error: err.message };
+  }
+}
+
+/**
+ * Sprint 15 W3 — approveQuotaExtension callable.
+ *
+ * Input:
+ *   { requestId, decision: 'approve'|'reject',
+ *     extensionAmount?: { asks?, pdfViews? },  // approve 才看
+ *     reason?: string }                         // reject 必填、approve 選填
+ *
+ * Output:
+ *   { ok, requestId, decision, extensionAmount?, yyyymm,
+ *     emailDispatched: { dryRun, sent, error? } }
+ */
+exports.approveQuotaExtension = functions
+  .runWith({ timeoutSeconds: 60, memory: '256MB' })
+  .https.onCall(async (data, context) => {
+    // --- Auth + admin gate ---
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', '請先登入');
+    }
+    const isUserAdmin = await isAdmin(context.auth.uid);
+    if (!isUserAdmin) {
+      throw new functions.https.HttpsError('permission-denied', '無管理員權限');
+    }
+    const adminUid = context.auth.uid;
+
+    // --- Input validation ---
+    const requestId = typeof data?.requestId === 'string' ? data.requestId.trim() : '';
+    if (!requestId || !/^[A-Za-z0-9_-]{1,80}$/.test(requestId)) {
+      throw new functions.https.HttpsError('invalid-argument', 'requestId 格式不符');
+    }
+    const decision = data?.decision;
+    if (decision !== 'approve' && decision !== 'reject') {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        "decision 必須為 'approve' 或 'reject'",
+      );
+    }
+    const reason =
+      typeof data?.reason === 'string' ? data.reason.trim().slice(0, 500) : '';
+    if (decision === 'reject' && !reason) {
+      throw new functions.https.HttpsError('invalid-argument', '退回需附理由 (reason)');
+    }
+
+    // approve 才解析 extensionAmount、reject 一律忽略
+    const extensionAmount = { ...QUOTA_EXTENSION_DEFAULTS };
+    if (decision === 'approve') {
+      const ea = data?.extensionAmount;
+      if (ea && typeof ea === 'object') {
+        if (ea.asks !== undefined) {
+          const n = Number(ea.asks);
+          if (!Number.isFinite(n) || n <= 0) {
+            throw new functions.https.HttpsError('invalid-argument', 'extensionAmount.asks 必須 > 0');
+          }
+          extensionAmount.asks = Math.min(QUOTA_EXTENSION_MAX.asks, Math.floor(n));
+        }
+        if (ea.pdfViews !== undefined) {
+          const n = Number(ea.pdfViews);
+          if (!Number.isFinite(n) || n <= 0) {
+            throw new functions.https.HttpsError('invalid-argument', 'extensionAmount.pdfViews 必須 > 0');
+          }
+          extensionAmount.pdfViews = Math.min(QUOTA_EXTENSION_MAX.pdfViews, Math.floor(n));
+        }
+      }
+    }
+
+    // runtime ts 在 callback 內取 (HARD rule)
+    const callbackStartedAtMs = Date.now();
+    const callbackStartedAt = new Date(callbackStartedAtMs);
+    const fallbackYyyymm =
+      callbackStartedAt.getUTCFullYear().toString() +
+      String(callbackStartedAt.getUTCMonth() + 1).padStart(2, '0');
+
+    // --- Read request doc ---
+    const requestRef = db.collection('quota_extension_requests').doc(requestId);
+    let requestSnap;
+    try {
+      requestSnap = await requestRef.get();
+    } catch (err) {
+      functions.logger.error('[approveQuotaExtension] read failed', {
+        requestId,
+        message: err?.message,
+      });
+      throw new functions.https.HttpsError('internal', '讀取申請紀錄失敗');
+    }
+    if (!requestSnap.exists) {
+      throw new functions.https.HttpsError('not-found', '找不到該申請紀錄');
+    }
+    const request = requestSnap.data() || {};
+    if (request.status && request.status !== 'pending') {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'already-decided',
+      );
+    }
+    const requesterUid =
+      typeof request.requesterUid === 'string' ? request.requesterUid : '';
+    if (!requesterUid) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        '申請紀錄缺 requesterUid',
+      );
+    }
+    // 顧問端送 form 時用顧問本地時區算的 yyyymm；缺值才回退 UTC 推算
+    const yyyymm =
+      typeof request.targetYyyymm === 'string' && /^\d{6}$/.test(request.targetYyyymm)
+        ? request.targetYyyymm
+        : fallbackYyyymm;
+
+    // --- approve path: 寫 quotaUsage limit + 標記 request ---
+    if (decision === 'approve') {
+      const quotaRef = db.doc(`advisors/${requesterUid}/quotaUsage/${yyyymm}`);
+      try {
+        await db.runTransaction(async (tx) => {
+          const cur = await tx.get(quotaRef);
+          const data0 = cur.exists ? cur.data() || {} : {};
+
+          // 既有結構：欄位可能是 number（used count）或 { used, limit } object（Sprint 14 W3 後）。
+          // 一律 normalize 成 object。
+          const normalize = (raw, defaultLimit) => {
+            if (raw && typeof raw === 'object') {
+              return {
+                used: Number(raw.used || 0),
+                limit: Number(raw.limit || defaultLimit),
+              };
+            }
+            return { used: Number(raw || 0), limit: defaultLimit };
+          };
+          const asksCur = normalize(data0.asks, 100);
+          const pdfCur = normalize(data0.pdfViews, 50);
+          const mpsCur = normalize(data0.missingProductSubmits, 30);
+
+          tx.set(
+            quotaRef,
+            {
+              asks: { used: asksCur.used, limit: asksCur.limit + extensionAmount.asks },
+              pdfViews: { used: pdfCur.used, limit: pdfCur.limit + extensionAmount.pdfViews },
+              missingProductSubmits: { used: mpsCur.used, limit: mpsCur.limit },
+              lastExtendedAt: admin.firestore.FieldValue.serverTimestamp(),
+              lastExtendedByRequestId: requestId,
+            },
+            { merge: true },
+          );
+
+          tx.set(
+            requestRef,
+            {
+              status: 'approved',
+              approvedBy: adminUid,
+              approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+              approvedAtMs: callbackStartedAtMs,
+              extensionAmount,
+              targetYyyymm: yyyymm,
+              reason: reason || null,
+            },
+            { merge: true },
+          );
+        });
+      } catch (err) {
+        functions.logger.error('[approveQuotaExtension] approve tx failed', {
+          requestId,
+          requesterUid,
+          message: err?.message,
+        });
+        throw new functions.https.HttpsError('internal', '審核寫入失敗');
+      }
+    } else {
+      // reject path
+      try {
+        await requestRef.set(
+          {
+            status: 'rejected',
+            rejectedBy: adminUid,
+            rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+            rejectedAtMs: callbackStartedAtMs,
+            reason,
+            targetYyyymm: yyyymm,
+          },
+          { merge: true },
+        );
+      } catch (err) {
+        functions.logger.error('[approveQuotaExtension] reject write failed', {
+          requestId,
+          message: err?.message,
+        });
+        throw new functions.https.HttpsError('internal', '退回寫入失敗');
+      }
+    }
+
+    // --- Resolve requester email（不寫進 audit context；只用來寄信）---
+    let requesterEmail =
+      typeof request.requesterEmail === 'string' ? request.requesterEmail : '';
+    if (!requesterEmail) {
+      try {
+        const userSnap = await db.collection('users').doc(requesterUid).get();
+        if (userSnap.exists) {
+          requesterEmail = userSnap.data()?.email || '';
+        }
+      } catch (err) {
+        functions.logger.warn('[approveQuotaExtension] requester email lookup failed', {
+          requestId,
+          message: err?.message,
+        });
+      }
+    }
+
+    // --- Email 通知 ---
+    const emailDispatched = await sendQuotaExtensionDecisionEmail({
+      toEmail: requesterEmail,
+      decision,
+      yyyymm,
+      extensionAmount,
+      reason,
+    });
+
+    // --- Audit log (audit_logs/{yyyymm}/events/{eventId}) ---
+    // 用 callback runtime 推 yyyymm（與 logAuditEvent 一致）、不用 quotaUsage 的 targetYyyymm
+    try {
+      const auditNowMs = callbackStartedAtMs;
+      const auditDate = new Date(auditNowMs);
+      const auditYyyymm =
+        auditDate.getUTCFullYear().toString() +
+        String(auditDate.getUTCMonth() + 1).padStart(2, '0');
+      const randSuffix = crypto.randomBytes(4).toString('hex');
+      const eventId = `quota_extension_decided_${auditNowMs}_${adminUid}_${randSuffix}`;
+      await db
+        .collection('audit_logs')
+        .doc(auditYyyymm)
+        .collection('events')
+        .doc(eventId)
+        .set({
+          type: 'quota_extension_decided',
+          advisorUid: adminUid,
+          advisorEmail: context.auth.token?.email || null,
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          timestampMs: auditNowMs,
+          context: {
+            requestId,
+            requesterUid,
+            decision,
+            targetYyyymm: yyyymm,
+            extensionAmount: decision === 'approve' ? extensionAmount : null,
+            reasonProvided: Boolean(reason),
+            emailDispatched: {
+              dryRun: emailDispatched.dryRun,
+              sent: emailDispatched.sent,
+              error: emailDispatched.error || null,
+            },
+          },
+          result: 'success',
+          schemaVersion: 1,
+        });
+    } catch (err) {
+      // audit 失敗不該 fail 整個 callable — 決定已 commit
+      functions.logger.warn('[approveQuotaExtension] audit write failed', {
+        requestId,
+        message: err?.message,
+      });
+    }
+
+    return {
+      ok: true,
+      requestId,
+      decision,
+      extensionAmount: decision === 'approve' ? extensionAmount : null,
+      yyyymm,
+      emailDispatched,
+    };
+  });
+
 console.log('Ultra Advisor Cloud Functions loaded');
