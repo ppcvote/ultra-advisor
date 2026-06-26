@@ -31,6 +31,7 @@ import {
   ShieldAlert, Sparkles, ChevronDown, ChevronUp, Quote,
 } from 'lucide-react';
 import { auth } from '../../firebase';
+import PdfViewer from './PdfViewer';
 
 // ---------------------------------------------------------------------------
 // Types — keep local; backend shape is loose, narrow at parse time
@@ -56,6 +57,8 @@ interface Citation {
   sectionHeader?: string;     // e.g. "第三章 給付項目"
   citationLabel: string;      // e.g. "第 17 條"
   pageNum?: number;
+  // Sprint 14 W3：可選的 productId — 若後端不回則 fallback 用 chat-level productId
+  productId?: string;
   // Sprint 14 W3 才會用：原文片段（現階段後端可能不回）
   snippet?: string;
 }
@@ -133,7 +136,11 @@ function confidenceLabel(c: Confidence): { tag: string; cls: string } {
 // ---------------------------------------------------------------------------
 // Sub-component: citation list (collapsed by default)
 // ---------------------------------------------------------------------------
-const CitationList: React.FC<{ citations: Citation[] }> = ({ citations }) => {
+const CitationList: React.FC<{
+  citations: Citation[];
+  onOpenViewer: (c: Citation) => void;
+  viewerEnabled: boolean;
+}> = ({ citations, onOpenViewer, viewerEnabled }) => {
   const [open, setOpen] = useState(false);
   if (!citations || citations.length === 0) return null;
   return (
@@ -162,18 +169,24 @@ const CitationList: React.FC<{ citations: Citation[] }> = ({ citations }) => {
                   <span className="text-[10px] text-slate-400 font-mono">p.{c.pageNum}</span>
                 )}
               </div>
-              {/* Sprint 14 W3 才實作的「查條款原文」— 現留 disabled 佔位 */}
+              {/* Sprint 14 W3：「查條款原文」開 PdfViewer modal */}
               <button
                 type="button"
-                disabled
-                className="mt-1 inline-flex items-center gap-1 text-[11px] text-slate-400 cursor-not-allowed"
-                title="條款原文檢視 — Sprint 14 W3 即將推出"
+                disabled={!viewerEnabled}
+                onClick={() => viewerEnabled && onOpenViewer(c)}
+                className={`mt-1 inline-flex items-center gap-1 text-[11px] ${
+                  viewerEnabled
+                    ? 'text-indigo-700 hover:text-indigo-900 hover:underline cursor-pointer'
+                    : 'text-slate-400 cursor-not-allowed'
+                }`}
+                title={
+                  viewerEnabled
+                    ? '開啟條款原文（帶浮水印）'
+                    : '需登入並有 productId 才能檢視原文'
+                }
               >
                 <FileText size={11} />
                 查條款原文
-                <span className="text-[9px] uppercase tracking-wider bg-slate-100 text-slate-500 px-1 py-0.5 rounded">
-                  即將推出
-                </span>
               </button>
             </li>
           ))}
@@ -189,7 +202,9 @@ const CitationList: React.FC<{ citations: Citation[] }> = ({ citations }) => {
 const MessageBubble: React.FC<{
   msg: ChatMessage;
   onRetry?: () => void;
-}> = ({ msg, onRetry }) => {
+  onOpenViewer: (c: Citation) => void;
+  viewerEnabled: boolean;
+}> = ({ msg, onRetry, onOpenViewer, viewerEnabled }) => {
   if (msg.role === 'user') {
     return (
       <div className="flex justify-end">
@@ -258,7 +273,11 @@ const MessageBubble: React.FC<{
                   <span className="text-[10px] text-slate-400 italic">無引用 — 僅供參考</span>
                 )}
               </div>
-              <CitationList citations={msg.citations} />
+              <CitationList
+                citations={msg.citations}
+                onOpenViewer={onOpenViewer}
+                viewerEnabled={viewerEnabled}
+              />
             </>
           )}
         </div>
@@ -277,6 +296,16 @@ const AgentChat: React.FC<AgentChatProps> = ({ productId, policyContext, classNa
   const [quotaRemaining, setQuotaRemaining] = useState<number | null>(null);
   const [quotaTotal] = useState<number>(100); // 顯示「47/100 次」用、後端可改傳
   const [authed, setAuthed] = useState<boolean>(!!auth.currentUser);
+  const [advisorEmail, setAdvisorEmail] = useState<string | null>(
+    auth.currentUser?.email ?? null,
+  );
+
+  // Sprint 14 W3 — PdfViewer modal state + PDF view quota
+  // 注意：pdfQuotaRemaining 與 chat quota (quotaRemaining) 不同；50/月 上限
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerCitation, setViewerCitation] = useState<Citation | null>(null);
+  const [pdfQuotaRemaining, setPdfQuotaRemaining] = useState<number | null>(null);
+  const PDF_QUOTA_TOTAL = 50;
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -285,6 +314,7 @@ const AgentChat: React.FC<AgentChatProps> = ({ productId, policyContext, classNa
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((u) => {
       setAuthed(!!u);
+      setAdvisorEmail(u?.email ?? null);
     });
     return () => unsub();
   }, []);
@@ -313,6 +343,34 @@ const AgentChat: React.FC<AgentChatProps> = ({ productId, policyContext, classNa
     if (quotaRemaining == null) return '本月配額 100 次';
     return `本月剩 ${Math.max(0, quotaRemaining)}/${quotaTotal} 次`;
   }, [quotaRemaining, quotaTotal]);
+
+  // PDF 檢視 quota — 後端 onQuotaUpdate 回填、未呼叫前不顯示具體數
+  const pdfQuotaText = useMemo(() => {
+    if (pdfQuotaRemaining == null) return `本月可看 ${PDF_QUOTA_TOTAL} 份 PDF`;
+    return `本月剩 ${Math.max(0, pdfQuotaRemaining)}/${PDF_QUOTA_TOTAL} 份 PDF`;
+  }, [pdfQuotaRemaining]);
+
+  // 「查條款原文」按鈕是否可用：必須 authed + 有 advisorEmail + 該 citation 或 chat 有 productId
+  const viewerEnabled = !!authed && !!advisorEmail;
+
+  // ---- Sprint 14 W3: 開啟 PdfViewer modal ----
+  const handleOpenViewer = useCallback((c: Citation) => {
+    // citation 自帶 productId 優先、否則 fallback 用 chat-level productId
+    const pid = c.productId || productId;
+    if (!pid || !advisorEmail) return;
+    setViewerCitation({ ...c, productId: pid });
+    setViewerOpen(true);
+  }, [productId, advisorEmail]);
+
+  const handleCloseViewer = useCallback(() => {
+    setViewerOpen(false);
+    // citation 不立刻清、避免 close 動畫期間 props 變成 null 閃爍
+    // PdfViewer unmount 由 viewerOpen=false 控制
+  }, []);
+
+  const handleViewerQuotaUpdate = useCallback((remaining: number) => {
+    setPdfQuotaRemaining(remaining);
+  }, []);
 
   // ---- core: submit a question ----
   const submitQuestion = useCallback(
@@ -564,7 +622,10 @@ const AgentChat: React.FC<AgentChatProps> = ({ productId, policyContext, classNa
             </div>
           </div>
         </div>
-        <div className="text-[11px] font-mono text-slate-500 shrink-0">{headerQuotaText}</div>
+        <div className="flex flex-col items-end shrink-0 leading-tight">
+          <div className="text-[11px] font-mono text-slate-500">{headerQuotaText}</div>
+          <div className="text-[10px] font-mono text-slate-400">{pdfQuotaText}</div>
+        </div>
       </div>
 
       {/* Messages scroll area */}
@@ -584,6 +645,8 @@ const AgentChat: React.FC<AgentChatProps> = ({ productId, policyContext, classNa
             key={m.id}
             msg={m}
             onRetry={m.role === 'ai' && m.failed ? retryLast : undefined}
+            onOpenViewer={handleOpenViewer}
+            viewerEnabled={viewerEnabled}
           />
         ))}
 
@@ -662,6 +725,19 @@ const AgentChat: React.FC<AgentChatProps> = ({ productId, policyContext, classNa
           </button>
         </div>
       </div>
+
+      {/* Sprint 14 W3 — PdfViewer modal (條款原文 + 浮水印) */}
+      {viewerOpen && viewerCitation && viewerCitation.productId && advisorEmail && (
+        <PdfViewer
+          productId={viewerCitation.productId}
+          citationLabel={viewerCitation.citationLabel}
+          version="v1"
+          advisorEmail={advisorEmail}
+          initialPage={viewerCitation.pageNum}
+          onClose={handleCloseViewer}
+          onQuotaUpdate={handleViewerQuotaUpdate}
+        />
+      )}
     </div>
   );
 };
