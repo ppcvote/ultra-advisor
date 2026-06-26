@@ -827,6 +827,53 @@ async function main() {
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf8');
   log(`\n[report] wrote ${reportPath}`);
 
+  // -------------------------------------------------------------------------
+  // Sprint 15 W3 — write `tii_crawl_results/{yyyymm}` so `tiiMonthlyCrawlGuard`
+  // (functions/index.js) can detect a missing or failed monthly run on day 5.
+  //
+  // doc id = `YYYYMM` (no dash) to match the guard's `_tiiGuardFormatYyyymm`.
+  // status: 'partial' if any companies were skipped, else 'success'.
+  // Dry-run skips the write — the guard would then alert next month anyway,
+  // which is correct behaviour for a smoke run.
+  // -------------------------------------------------------------------------
+  if (!flags.dryRun) {
+    try {
+      const admin = getFirebase();
+      const db = admin.firestore();
+      const partial = state.partialCompanies.length > 0;
+      const finalStatus = partial ? 'partial' : 'success';
+      const guardYyyymm = runMonth.replace(/-/g, '');
+      const runId = `tii_monthly_${startedAt}_${guardYyyymm}`;
+      await db
+        .collection('tii_crawl_results')
+        .doc(guardYyyymm)
+        .set(
+          {
+            yyyymm: guardYyyymm,
+            runMonth, // 'YYYY-MM' (legacy, kept for human readability)
+            runId,
+            startedAt,
+            ranAt: new Date().toISOString(),
+            status: finalStatus,
+            errorCount: state.stats.errorCount || 0,
+            productsProcessed: state.stats.processedCount || 0,
+            newCount: state.stats.newCount || 0,
+            revisionCount: state.stats.revisionCount || 0,
+            discontinuedCount: state.stats.discontinuedCount || 0,
+            partialCompanyCount: state.partialCompanies.length,
+            captchaAttempts,
+            captchaHitRate,
+            schemaVersion: 1,
+          },
+          { merge: true },
+        );
+      log(`[firestore] wrote tii_crawl_results/${guardYyyymm} status=${finalStatus}`);
+    } catch (e) {
+      // Guard 看不到 doc → 下月 5 號會 alert 一次；本步驟失敗不該擋整 cron exit code.
+      console.warn(`[firestore] tii_crawl_results write failed: ${e.message}`);
+    }
+  }
+
   log('\n=== Done ===');
   log(`Stats: ${JSON.stringify(state.stats)}`);
   if (state.partialCompanies.length) {
