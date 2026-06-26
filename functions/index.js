@@ -6780,4 +6780,1127 @@ exports.backfillClientPolicyVersions = functions
     }
   });
 
+// ==========================================
+// Sprint 15 W2 — composeConditionDiffSummary (Task B2)
+// ==========================================
+//
+// 給 admin review queue 用：拿同一個 product 的舊版 + 新版 chunks，
+// 丟 Gemini 2.5 Pro 寫一份「顧問能讀懂的」自然語言 diff 摘要。
+// 後續 notifyConditionRevision (B1) 會把這份摘要嵌進通知 email / LINE。
+//
+// 鐵則 (per Sprint 15 W2 戰略邊界 + 任務 B2 spec):
+//   - 不引入新 dep — reuse @google/generative-ai (functions/package.json 既有)
+//   - Gemini key 從 functions.config().gemini.api_key (既有 pattern)
+//   - 所有「現在時間」必須 callback 內取 — 不在 module top-level 算 wall clock
+//   - 答案結尾必加 disclaimer「AI 解讀僅供參考、實際以正式條款為準」
+//     (LLM 自加 by prompt + 後處理 force-append 雙保險)
+//   - 不模擬法律建議、不給保險規劃建議 (prompt enforce)
+//   - 對外 source 永遠 'tii'
+//   - 寫 audit log type: 'compose_diff_summary' (Sprint 12 logAuditEvent doc shape)
+//
+// Fallback:
+//   - chunks 全標 productVersion='v1' / 沒分版 → 回 fallback summary (待 W3 PDF 抽取)
+//   - chunks 任一邊 < 5 筆 → fallback (語料不足、強行 LLM 會幻覺)
+//   - Gemini 503/429 → retry 1x，仍失敗 → fallback (severity='medium', 條款已修訂、請手動比對)
+//   - JSON parse 失敗 → fallback + audit log result='parse_failed'
+//
+// 成本估算：一次 compose ≈ $0.005 (Gemini 2.5 Pro, ~3K in + ~800 out)；
+// 每月 ~20 次 revisions ≈ $0.10/月，與 spec 對齊。
+
+const DIFF_DEFAULT_MAX_CHUNKS = 20;
+const DIFF_MIN_CHUNKS = 5;                  // 任一邊 < 此值 → fallback
+const DIFF_MAX_MAX_CHUNKS = 40;             // input cap 防 admin 灌爆 prompt
+const DIFF_CHUNK_TEXT_TRIM = 600;           // 每 chunk text 最多塞 600 字進 prompt (省 token)
+const DIFF_LLM_RETRY_DELAY_MS = 1500;
+const DIFF_DISCLAIMER = 'AI 解讀僅供參考、實際以正式條款為準';
+const DIFF_VALID_CATEGORIES = new Set([
+  '給付範圍',
+  '等待期',
+  '除外責任',
+  '金額限額',
+  '其他',
+]);
+const DIFF_VALID_IMPACT = new Set(['high', 'medium', 'low']);
+
+const DIFF_PROMPT_TEMPLATE = `你是 Ultra Advisor 保險條款分析助手。請比較以下舊版與新版條款內容、列出 3-5 個重點變動。
+
+規則:
+1. 用顧問能理解的話 (避免法律術語)
+2. 每個變動標 category (給付範圍 / 等待期 / 除外責任 / 金額限額 / 其他)
+3. 評估每個變動的 impact (high / medium / low)
+4. 不模擬法律建議、不給保險規劃建議
+5. 不確定時必說「我不確定、請查條款原文」
+6. 結尾必須附上免責聲明:「${DIFF_DISCLAIMER}」
+
+【舊版條款片段】
+{old_chunks}
+
+【新版條款片段】
+{new_chunks}
+
+請輸出 JSON (純 JSON、不要 markdown code block)：
+{
+  "summary": "100-200 字總結",
+  "importantChanges": [
+    {
+      "category": "給付範圍|等待期|除外責任|金額限額|其他",
+      "change": "具體變動描述",
+      "impact": "high|medium|low"
+    }
+  ],
+  "severity": "high|medium|low"
+}`;
+
+/** Compact a single chunk doc into prompt-friendly text. */
+function _diffFormatChunkForPrompt(chunkDoc) {
+  const text = String(chunkDoc.text || '').slice(0, DIFF_CHUNK_TEXT_TRIM);
+  const article = chunkDoc.articleNo ? `第${chunkDoc.articleNo}條` : '';
+  const item = chunkDoc.itemNo ? `第${chunkDoc.itemNo}項` : '';
+  const section = chunkDoc.sectionHeader || '';
+  const header = [section, article, item].filter(Boolean).join(' ');
+  return header ? `【${header}】\n${text}` : text;
+}
+
+/** Build a {prompt_old, prompt_new} pair from two chunk arrays. */
+function _diffBuildPromptChunks(oldChunks, newChunks) {
+  const fmt = (arr) =>
+    arr.map(_diffFormatChunkForPrompt).join('\n---\n');
+  return {
+    oldText: fmt(oldChunks),
+    newText: fmt(newChunks),
+  };
+}
+
+/** Fetch up to `limit` chunks for a (productId, version). Falls back to root
+ *  chunks subcollection when no version subcoll exists yet (Sprint 14 default
+ *  state — every chunk is implicitly v1, see upload-chunks-to-firestore.cjs). */
+async function _diffFetchChunks(productId, version, limit) {
+  // Preferred path: insurance_products/{id}/versions/{vN}/chunks
+  // (Sprint 15 W3 will start writing here once monthly PDF re-extract lands.)
+  const versionedRef = db
+    .collection('insurance_products')
+    .doc(productId)
+    .collection('versions')
+    .doc(version)
+    .collection('chunks');
+  const versionedSnap = await versionedRef.limit(limit).get();
+  if (versionedSnap.size > 0) {
+    return {
+      chunks: versionedSnap.docs.map((d) => d.data() || {}),
+      sourcePath: `insurance_products/${productId}/versions/${version}/chunks`,
+      versionedLayout: true,
+    };
+  }
+
+  // Fallback path: insurance_products/{id}/chunks (Sprint 14 flat layout).
+  // Filter by productVersion field if present, else accept all (v1-default).
+  const flatRef = db
+    .collection('insurance_products')
+    .doc(productId)
+    .collection('chunks');
+
+  // We can't combine "field == X OR field missing" in a single Firestore query,
+  // so do a versioned read first; if empty, fall through to "all chunks".
+  let flatSnap = await flatRef
+    .where('productVersion', '==', version)
+    .limit(limit)
+    .get();
+
+  let chunks = flatSnap.docs.map((d) => d.data() || {});
+  if (chunks.length === 0) {
+    flatSnap = await flatRef.limit(limit).get();
+    chunks = flatSnap.docs.map((d) => d.data() || {});
+  }
+
+  return {
+    chunks,
+    sourcePath: `insurance_products/${productId}/chunks`,
+    versionedLayout: false,
+  };
+}
+
+/** Best-effort extract JSON object from a Gemini text response. */
+function _diffExtractJson(responseText) {
+  if (typeof responseText !== 'string') return null;
+  const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const candidate = codeBlockMatch
+    ? codeBlockMatch[1].trim()
+    : (responseText.match(/\{[\s\S]*\}/) || [null])[0];
+  if (!candidate) return null;
+  try {
+    return JSON.parse(candidate);
+  } catch (_err) {
+    return null;
+  }
+}
+
+/** Normalise + validate a raw LLM JSON response into the contract shape. */
+function _diffNormaliseResponse(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const summary =
+    typeof raw.summary === 'string' && raw.summary.trim().length > 0
+      ? raw.summary.trim().slice(0, 600)
+      : null;
+  if (!summary) return null;
+
+  const changesIn = Array.isArray(raw.importantChanges) ? raw.importantChanges : [];
+  const importantChanges = changesIn
+    .slice(0, 8) // hard cap, prompt asks for 3-5
+    .map((c) => {
+      if (!c || typeof c !== 'object') return null;
+      const category = DIFF_VALID_CATEGORIES.has(c.category) ? c.category : '其他';
+      const change =
+        typeof c.change === 'string' && c.change.trim().length > 0
+          ? c.change.trim().slice(0, 300)
+          : null;
+      const impact = DIFF_VALID_IMPACT.has(c.impact) ? c.impact : 'medium';
+      if (!change) return null;
+      return { category, change, impact };
+    })
+    .filter(Boolean);
+
+  const severity = DIFF_VALID_IMPACT.has(raw.severity) ? raw.severity : 'medium';
+
+  return { summary, importantChanges, severity };
+}
+
+/** Build a fallback response when LLM can't / shouldn't be called. */
+function _diffFallback(reason, oldVersion, newVersion) {
+  const summaryByReason = {
+    no_version_layout: `${oldVersion} → ${newVersion} 升級、實際 diff 待 Sprint 15 W3 PDF 抽取`,
+    insufficient_chunks: '條款語料不足、無法產生 AI 摘要、請手動比對 PDF',
+    llm_failed: '條款已修訂、請手動比對',
+    parse_failed: 'AI 回應格式無法解析、請手動比對條款',
+  };
+  return {
+    summary: summaryByReason[reason] || '條款已修訂、請手動比對',
+    importantChanges: [],
+    severity: 'medium',
+    fallback: true,
+    fallbackReason: reason,
+  };
+}
+
+/** Write a compose_diff_summary audit log doc (best-effort, never throws). */
+async function _diffWriteAudit(uid, payload) {
+  try {
+    const nowMs = Date.now();
+    const nowDate = new Date(nowMs);
+    const yyyymm =
+      nowDate.getUTCFullYear().toString() +
+      String(nowDate.getUTCMonth() + 1).padStart(2, '0');
+    const rand = crypto.randomBytes(4).toString('hex');
+    const eventId = `compose_diff_summary_${nowMs}_${uid}_${rand}`;
+    await db
+      .collection('audit_logs')
+      .doc(yyyymm)
+      .collection('events')
+      .doc(eventId)
+      .set({
+        type: 'compose_diff_summary',
+        advisorUid: uid,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestampMs: nowMs,
+        context: payload.context || {},
+        result: payload.result || 'success',
+        schemaVersion: 1,
+      });
+  } catch (err) {
+    functions.logger.warn('[compose_diff_summary] audit write failed', {
+      message: err?.message,
+    });
+  }
+}
+
+/** Sleep helper used between LLM retries. */
+function _diffSleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+exports.composeConditionDiffSummary = functions
+  .runWith({ timeoutSeconds: 120, memory: '512MB' })
+  .https.onCall(async (data, context) => {
+    // --- Auth + admin gate ---
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', '請先登入');
+    }
+    const isUserAdmin = await isAdmin(context.auth.uid);
+    if (!isUserAdmin) {
+      throw new functions.https.HttpsError('permission-denied', '無管理員權限');
+    }
+    const uid = context.auth.uid;
+
+    // --- Input validation ---
+    const productId =
+      typeof data?.productId === 'string' ? data.productId.trim() : '';
+    const oldVersion =
+      typeof data?.oldVersion === 'string' ? data.oldVersion.trim() : '';
+    const newVersion =
+      typeof data?.newVersion === 'string' ? data.newVersion.trim() : '';
+
+    if (!productId || !/^[A-Za-z0-9_-]{1,80}$/.test(productId)) {
+      throw new functions.https.HttpsError('invalid-argument', 'productId 格式不符');
+    }
+    if (!oldVersion || !newVersion) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'oldVersion / newVersion 必填'
+      );
+    }
+    if (oldVersion === newVersion) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'oldVersion 與 newVersion 不可相同'
+      );
+    }
+    const maxChunksRaw = Number(data?.maxChunks) || DIFF_DEFAULT_MAX_CHUNKS;
+    const maxChunks = Math.max(
+      DIFF_MIN_CHUNKS,
+      Math.min(DIFF_MAX_MAX_CHUNKS, maxChunksRaw)
+    );
+
+    // runtime ts in callback (HARD rule — never compute wall clock at module top)
+    const callbackStartedAtMs = Date.now();
+
+    // --- Step 1: fetch chunks for both versions ---
+    let oldFetch;
+    let newFetch;
+    try {
+      [oldFetch, newFetch] = await Promise.all([
+        _diffFetchChunks(productId, oldVersion, maxChunks),
+        _diffFetchChunks(productId, newVersion, maxChunks),
+      ]);
+    } catch (err) {
+      functions.logger.error('[compose_diff_summary] chunk fetch failed', {
+        productId,
+        message: err?.message,
+      });
+      throw new functions.https.HttpsError(
+        'internal',
+        `chunks 讀取失敗: ${err?.message || err}`
+      );
+    }
+
+    // Fallback path A: Sprint 14 state — chunks not yet split by version,
+    // both sides resolve to identical flat-layout reads → can't actually diff.
+    const flatLayout =
+      !oldFetch.versionedLayout && !newFetch.versionedLayout;
+    if (flatLayout) {
+      const fallback = _diffFallback('no_version_layout', oldVersion, newVersion);
+      const disclaimers = [DIFF_DISCLAIMER];
+      await _diffWriteAudit(uid, {
+        context: {
+          productId,
+          oldVersion,
+          newVersion,
+          maxChunks,
+          fallbackReason: 'no_version_layout',
+          oldChunks: oldFetch.chunks.length,
+          newChunks: newFetch.chunks.length,
+          callbackStartedAtMs,
+        },
+        result: 'fallback',
+      });
+      return {
+        summary: fallback.summary,
+        importantChanges: fallback.importantChanges,
+        severity: fallback.severity,
+        disclaimers,
+        tokensUsed: 0,
+        fallback: true,
+        fallbackReason: fallback.fallbackReason,
+        source: 'tii', // 對外宣稱資料來源永遠 tii
+      };
+    }
+
+    // Fallback path B: too few chunks to make LLM diff trustworthy
+    if (
+      oldFetch.chunks.length < DIFF_MIN_CHUNKS ||
+      newFetch.chunks.length < DIFF_MIN_CHUNKS
+    ) {
+      const fallback = _diffFallback(
+        'insufficient_chunks',
+        oldVersion,
+        newVersion
+      );
+      const disclaimers = [DIFF_DISCLAIMER];
+      await _diffWriteAudit(uid, {
+        context: {
+          productId,
+          oldVersion,
+          newVersion,
+          maxChunks,
+          fallbackReason: 'insufficient_chunks',
+          oldChunks: oldFetch.chunks.length,
+          newChunks: newFetch.chunks.length,
+          callbackStartedAtMs,
+        },
+        result: 'fallback',
+      });
+      return {
+        summary: fallback.summary,
+        importantChanges: fallback.importantChanges,
+        severity: fallback.severity,
+        disclaimers,
+        tokensUsed: 0,
+        fallback: true,
+        fallbackReason: fallback.fallbackReason,
+        source: 'tii',
+      };
+    }
+
+    // --- Step 2: build prompt + call Gemini 2.5 Pro w/ 1 retry ---
+    const { oldText, newText } = _diffBuildPromptChunks(
+      oldFetch.chunks,
+      newFetch.chunks
+    );
+    const prompt = DIFF_PROMPT_TEMPLATE
+      .replace('{old_chunks}', oldText)
+      .replace('{new_chunks}', newText);
+
+    const geminiApiKey = functions.config().gemini?.api_key;
+    if (!geminiApiKey) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Gemini API key 未設定'
+      );
+    }
+
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-pro',
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    let responseText = null;
+    let tokensUsed = 0;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const result = await model.generateContent(prompt);
+        responseText = result.response.text();
+        const usage = result.response?.usageMetadata || {};
+        tokensUsed =
+          Number(usage.totalTokenCount) ||
+          Number(usage.candidatesTokenCount || 0) +
+            Number(usage.promptTokenCount || 0) ||
+          0;
+        break;
+      } catch (err) {
+        lastErr = err;
+        const status = err?.status || err?.code;
+        const retriable = status === 503 || status === 429 || status === 500;
+        functions.logger.warn('[compose_diff_summary] gemini call failed', {
+          attempt,
+          status,
+          retriable,
+          message: err?.message,
+        });
+        if (!retriable || attempt === 2) break;
+        await _diffSleep(DIFF_LLM_RETRY_DELAY_MS);
+      }
+    }
+
+    // LLM hard fail → fallback
+    if (responseText === null) {
+      const fallback = _diffFallback('llm_failed', oldVersion, newVersion);
+      await _diffWriteAudit(uid, {
+        context: {
+          productId,
+          oldVersion,
+          newVersion,
+          maxChunks,
+          fallbackReason: 'llm_failed',
+          llmError: String(lastErr?.message || lastErr || '').slice(0, 300),
+          callbackStartedAtMs,
+        },
+        result: 'llm_failed',
+      });
+      return {
+        summary: fallback.summary,
+        importantChanges: fallback.importantChanges,
+        severity: fallback.severity,
+        disclaimers: [DIFF_DISCLAIMER],
+        tokensUsed: 0,
+        fallback: true,
+        fallbackReason: fallback.fallbackReason,
+        source: 'tii',
+      };
+    }
+
+    // --- Step 3: parse + normalise ---
+    const rawJson = _diffExtractJson(responseText);
+    const normalised = _diffNormaliseResponse(rawJson);
+    if (!normalised) {
+      const fallback = _diffFallback('parse_failed', oldVersion, newVersion);
+      await _diffWriteAudit(uid, {
+        context: {
+          productId,
+          oldVersion,
+          newVersion,
+          maxChunks,
+          fallbackReason: 'parse_failed',
+          responsePreview: String(responseText).slice(0, 200),
+          callbackStartedAtMs,
+        },
+        result: 'parse_failed',
+      });
+      return {
+        summary: fallback.summary,
+        importantChanges: fallback.importantChanges,
+        severity: fallback.severity,
+        disclaimers: [DIFF_DISCLAIMER],
+        tokensUsed,
+        fallback: true,
+        fallbackReason: fallback.fallbackReason,
+        source: 'tii',
+      };
+    }
+
+    // --- Step 4: force-append disclaimer if LLM忘了 ---
+    let finalSummary = normalised.summary;
+    if (!finalSummary.includes(DIFF_DISCLAIMER)) {
+      finalSummary = `${finalSummary}\n\n${DIFF_DISCLAIMER}`;
+    }
+
+    // --- Step 5: audit + return ---
+    await _diffWriteAudit(uid, {
+      context: {
+        productId,
+        oldVersion,
+        newVersion,
+        maxChunks,
+        oldChunks: oldFetch.chunks.length,
+        newChunks: newFetch.chunks.length,
+        tokensUsed,
+        severity: normalised.severity,
+        changeCount: normalised.importantChanges.length,
+        callbackStartedAtMs,
+      },
+      result: 'success',
+    });
+
+    return {
+      summary: finalSummary,
+      importantChanges: normalised.importantChanges,
+      severity: normalised.severity,
+      disclaimers: [DIFF_DISCLAIMER],
+      tokensUsed,
+      fallback: false,
+      source: 'tii', // 對外宣稱資料來源永遠 tii
+    };
+  });
+
+// ==========================================
+// Sprint 15 W2 — Task B1: notifyConditionRevision callable
+// ==========================================
+//
+// 觸發點：admin/InsuranceReviewQueue.tsx 把「approve revision」按鈕接到本 callable
+// (Sprint 15 W1 留 console.log、W2 改實際呼叫；本 callable 即 B1)。
+//
+// 行為：把 (productId, oldVersion → newVersion) 修訂、扇出成 per-advisor 通知 doc，
+// 寫進 advisors/{advisorUid}/conditionAlerts/{alertId}。顧問開
+// /dashboard/condition-alerts (Task B4) 就能看到「我有 N 個客戶受影響」。
+//
+// 為什麼這 callable 不直接寄信 / 發 LINE：
+//   - email / LINE 在 W3 接（需設 LINE Channel access token），W2 只做 Firestore
+//     扇出 — 顧問端 dashboard 是真實使用者介面、寫進去就有用
+//   - 解耦：寄信走 cron 掃 conditionAlerts 中 sentEmailAt=null 的 doc、可單獨 retry
+//
+// 與 B2 (composeConditionDiffSummary) 的關係：
+//   - 正常流程：admin UI 先點「預覽 AI 摘要」call B2 → 拿回 summary/importantChanges
+//     /severity → 再點「approve & notify」call B1 並把這三個帶進去
+//   - 若 admin 跳過預覽、本 callable 自動生 fallback 摘要（與 B2 fallback 同基調）；
+//     不在 callback 內 inline 跑 Gemini — 走 LLM 路徑請先 call B2
+//
+// 鐵則（嚴守 Sprint 15 W2 戰略邊界）：
+//   - 所有 wall-clock (Date.now / new Date) 必須 callback 內取
+//   - 客戶 PII：絕不寫客戶身分證 / 電話 / 完整生日；姓名以 maskClientName 遮蔽
+//     後寫入 alert doc。顧問點客戶詳細才看到全名（讀的是
+//     users/{advisorUid}/clients/{clientId} 既有 user-scoped path、不重複寫一份）
+//   - 顧問跨界：每 advisor 只看到自己 affected clients；寫入路徑
+//     advisors/{advisorUid}/... 嚴守；跨 advisor 由 firestore.rules (Task B8) 守門
+//   - source 永遠 'tii' (Sprint 13 closed union)
+//   - LLM 摘要必標 'AI 解讀僅供參考、以正式條款為準'（disclaimer 在 alert doc 內
+//     寫死；客戶端 src/lib/conditionAlerts.ts DIFF_AI_DISCLAIMER 再 enforce 一次）
+//   - alert doc 形狀必須與 src/lib/conditionAlerts.ts `ConditionAlert` 對齊：
+//       productId / productName / companyName / oldVersion / newVersion /
+//       diffSummary / importantChanges[] / severity / affectedClients[] /
+//       createdAt (epoch ms) / status / reviewQueueId
+//     多打欄位無妨 (parser ignores)；少必欄會被 fromDoc() drop 不顯示。
+//   - clientNameMasked 演算法必須與 src/lib/conditionAlerts.ts maskName() 完全一致
+//     (parser 端 defensive re-mask、不一致只是浪費、不會洩 PII)
+
+/** Mask a client name to display-safe form for the alert payload.
+ *
+ *  演算法必須與 src/lib/conditionAlerts.ts maskName() 完全一致：
+ *    - 1 字以下：原樣回傳
+ *    - 2 字：王明 → 王O
+ *    - 3 字：王小明 → 王O明
+ *    - 4+ 字：王世明傑 → 王OO傑 (首尾留、中間全 O)
+ *  輸入為空 / 非字串 → '—'
+ */
+function maskClientName(fullName) {
+  if (typeof fullName !== 'string') return '—';
+  const s = fullName.trim();
+  if (!s) return '—';
+  if (s.length <= 1) return s;
+  if (s.length === 2) return `${s[0]}O`;
+  if (s.length === 3) return `${s[0]}O${s[2]}`;
+  const first = s[0];
+  const last = s[s.length - 1];
+  const middle = 'O'.repeat(Math.max(1, s.length - 2));
+  return `${first}${middle}${last}`;
+}
+
+/** Resolve the advisorUid that owns a given clientUid.
+ *
+ *  本 SaaS 目前 schema：每個 user = 顧問本人，客戶存在
+ *  users/{advisorUid}/clients/{clientId}（顧問擁有客戶、非客戶獨立帳號）。
+ *
+ *  本 callable 走 collectionGroup 掃 policy 時、直接從 ref.path 取 parent uid
+ *  即可，正常不會用到本 helper。本 helper 留作 future-proof：若 caller 有
+ *  raw clientUid（沒帶 policy 路徑、e.g. 從 B3 email composer 反查），就用
+ *  本 helper 從 users/{clientUid}.advisorUid 解析。
+ *
+ *  Returns null if mapping not found — 上游 caller 自己決定 fallback。
+ */
+async function getAdvisorUidForClient(clientUid) {
+  if (!clientUid || typeof clientUid !== 'string') return null;
+  try {
+    const snap = await db.collection('users').doc(clientUid).get();
+    if (!snap.exists) return null;
+    const data = snap.data() || {};
+    if (typeof data.advisorUid === 'string' && data.advisorUid) {
+      return data.advisorUid;
+    }
+    return null;
+  } catch (err) {
+    functions.logger.warn('[notifyConditionRevision] getAdvisorUidForClient failed', {
+      clientUid,
+      message: err?.message,
+    });
+    return null;
+  }
+}
+
+/** Σ coverages[].sumInsured for headline display.
+ *  Policy schema (src/types/insurance.ts) 沒有 top-level sumAssured —
+ *  保額在 coverage level。本 helper 加總、給顧問 dashboard 顯示用。
+ *  Missing / NaN → 0；UI 用 formatSumAssured 把 0 顯示成 '—'。
+ */
+function computePolicySumAssured(policyData) {
+  if (!policyData || typeof policyData !== 'object') return 0;
+  const coverages = Array.isArray(policyData.coverages) ? policyData.coverages : [];
+  let total = 0;
+  for (const cov of coverages) {
+    if (!cov || typeof cov !== 'object') continue;
+    const n = Number(cov.sumInsured);
+    if (Number.isFinite(n) && n > 0) total += n;
+  }
+  return Math.round(total);
+}
+
+/** Fallback diff summary when admin didn't pre-call B2.
+ *  Same tone as B2's `_diffFallback('llm_failed', ...)` — keep voice consistent。
+ *  必含 disclaimer 字串以對齊 src/lib/conditionAlerts.ts DIFF_AI_DISCLAIMER。
+ */
+function _notifyFallbackDiffSummary(oldVersion, newVersion) {
+  return (
+    `${oldVersion} → ${newVersion} 條款已修訂、請手動比對 PDF 條款全文。` +
+    'AI 解讀僅供參考、以正式條款為準。'
+  );
+}
+
+/** Read a client's display name from users/{advisorUid}/clients/{clientId}.
+ *
+ *  只讀 .name 欄位 — phone / birthday / id_number 等 PII 留在 client doc 內、
+ *  絕不進入 alert payload (PII guardrail)。
+ *
+ *  Returns null if missing/error → caller falls back to policy.insured。
+ */
+async function _notifyReadClientDisplayName(advisorUid, clientId) {
+  if (!advisorUid || !clientId) return null;
+  try {
+    const snap = await db
+      .collection('users')
+      .doc(advisorUid)
+      .collection('clients')
+      .doc(clientId)
+      .get();
+    if (!snap.exists) return null;
+    const data = snap.data() || {};
+    if (typeof data.name === 'string' && data.name.trim()) {
+      return data.name.trim();
+    }
+    return null;
+  } catch (err) {
+    functions.logger.warn('[notifyConditionRevision] readClientDisplayName failed', {
+      advisorUid,
+      clientId,
+      message: err?.message,
+    });
+    return null;
+  }
+}
+
+/** Chunk an array into groups of size n (preserving order). */
+function _notifyChunkArray(arr, n) {
+  if (!Array.isArray(arr) || n <= 0) return [];
+  const out = [];
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+  return out;
+}
+
+const COND_NOTIFY_MAX_AFFECTED = 50_000;            // 安全上限：單次扇出最多 5 萬 policy
+const COND_NOTIFY_CLIENTS_PER_ALERT_DOC = 50;       // 單 alert doc 最多 50 client (Firestore 1MB / UI 可讀)
+const COND_NOTIFY_AUDIT_TYPE = 'condition_revision_notify';
+const COND_NOTIFY_IMPORTANT_CHANGES_MAX = 20;       // 上限：單 alert 最多 20 條 bullet
+const COND_NOTIFY_DIFF_SUMMARY_MAX = 2000;          // diffSummary 字數上限 (Firestore 安全)
+
+/**
+ * notifyConditionRevision — 條款修訂通知 fanout。
+ *
+ * Input:
+ *   {
+ *     productId: string,                                 // catalog product id
+ *     oldVersion: string,                                // e.g. 'v2'  (regex /^v\d+$/)
+ *     newVersion: string,                                // e.g. 'v3'  (regex /^v\d+$/、!= oldVersion)
+ *     diffSummary?: string,                              // 沒帶 → fallback 摘要 (B2 prior call 為正常流)
+ *     importantChanges?: Array<{ category, change, impact: 'high'|'medium'|'low' }>,
+ *     severity?: 'high'|'medium'|'low',                  // default 'medium'
+ *     reviewQueueId: string,                             // 來自 admin queue、要 reverse-link
+ *   }
+ *
+ * Output:
+ *   {
+ *     runId,
+ *     processed,                  // 掃了幾筆 policy
+ *     notifiedAdvisors,           // 寫了幾位顧問
+ *     totalAffectedClients,       // 累計多少 client
+ *     alertDocsWritten,           // 真寫進 Firestore 的 alert doc 數 (>= notifiedAdvisors)
+ *     writeErrors,                // 前 5 筆寫入失敗樣本 (debug)
+ *     dryRun: false
+ *   }
+ */
+exports.notifyConditionRevision = functions
+  .runWith({ timeoutSeconds: 540, memory: '1GB' })
+  .https.onCall(async (data, context) => {
+    // --- Auth gate ---
+    await verifyAdminAccess(context);
+
+    // --- Input validation ---
+    if (!data || typeof data !== 'object') {
+      throw new functions.https.HttpsError('invalid-argument', 'data 必須是物件');
+    }
+    const productId = typeof data.productId === 'string' ? data.productId.trim() : '';
+    const oldVersion = typeof data.oldVersion === 'string' ? data.oldVersion.trim() : '';
+    const newVersion = typeof data.newVersion === 'string' ? data.newVersion.trim() : '';
+    const reviewQueueId =
+      typeof data.reviewQueueId === 'string' ? data.reviewQueueId.trim() : '';
+
+    if (!productId) {
+      throw new functions.https.HttpsError('invalid-argument', 'productId 必填');
+    }
+    if (!/^[\w.-]{1,128}$/.test(productId)) {
+      throw new functions.https.HttpsError('invalid-argument', 'productId 格式不符');
+    }
+    if (!oldVersion || !/^v\d+$/.test(oldVersion)) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'oldVersion 必填且需為 v<n> 格式',
+      );
+    }
+    if (!newVersion || !/^v\d+$/.test(newVersion)) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'newVersion 必填且需為 v<n> 格式',
+      );
+    }
+    if (oldVersion === newVersion) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'oldVersion 與 newVersion 不可相同',
+      );
+    }
+    if (!reviewQueueId || !/^[\w.-]{1,200}$/.test(reviewQueueId)) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'reviewQueueId 必填且格式不符',
+      );
+    }
+
+    const severityRaw = data.severity;
+    const severity =
+      severityRaw === 'high' || severityRaw === 'medium' || severityRaw === 'low'
+        ? severityRaw
+        : 'medium';
+
+    // importantChanges sanitize — 只留 impact 三選一、長度上限
+    const importantChangesRaw = Array.isArray(data.importantChanges)
+      ? data.importantChanges
+      : [];
+    const importantChanges = [];
+    for (const row of importantChangesRaw) {
+      if (!row || typeof row !== 'object') continue;
+      const impact = row.impact;
+      if (impact !== 'high' && impact !== 'medium' && impact !== 'low') continue;
+      const category =
+        typeof row.category === 'string' ? row.category.slice(0, 64).trim() : '';
+      const change =
+        typeof row.change === 'string' ? row.change.slice(0, 280).trim() : '';
+      if (!category || !change) continue;
+      importantChanges.push({ category, change, impact });
+      if (importantChanges.length >= COND_NOTIFY_IMPORTANT_CHANGES_MAX) break;
+    }
+
+    // --- Runtime timestamps (HARD rule: callback 內取) ---
+    const callbackStartedAtMs = Date.now();
+    const callbackStartedDate = new Date(callbackStartedAtMs);
+    const yyyymm =
+      callbackStartedDate.getUTCFullYear().toString() +
+      String(callbackStartedDate.getUTCMonth() + 1).padStart(2, '0');
+    const runId =
+      `notify_${callbackStartedAtMs}_${crypto.randomBytes(4).toString('hex')}`;
+
+    functions.logger.info('[notifyConditionRevision] start', {
+      runId,
+      productId,
+      oldVersion,
+      newVersion,
+      reviewQueueId,
+      adminUid: context.auth.uid,
+    });
+
+    // --- Resolve product metadata (company + productName for alert payload) ---
+    // 來源永遠 'tii' (Sprint 13 closed union)、本 callable 不重寫 source 欄位、只讀
+    let productCompany = '';
+    let productNameSnapshot = '';
+    try {
+      const prodSnap = await db.collection('insurance_products').doc(productId).get();
+      if (!prodSnap.exists) {
+        throw new functions.https.HttpsError(
+          'not-found',
+          `productId ${productId} 不在 catalog`,
+        );
+      }
+      const prodData = prodSnap.data() || {};
+      productCompany =
+        typeof prodData.company === 'string' && prodData.company
+          ? prodData.company
+          : '';
+      productNameSnapshot =
+        typeof prodData.productName === 'string' && prodData.productName
+          ? prodData.productName
+          : '';
+    } catch (err) {
+      if (err instanceof functions.https.HttpsError) throw err;
+      functions.logger.error('[notifyConditionRevision] product read failed', {
+        runId,
+        productId,
+        message: err?.message,
+      });
+      throw new functions.https.HttpsError(
+        'internal',
+        `讀取商品資料失敗：${err?.message || err}`,
+      );
+    }
+
+    // --- Compose diff summary if not provided ---
+    // 正常流：admin 先 call B2 (composeConditionDiffSummary)、把 summary 帶進來
+    // Fallback：沒帶就用 generic 提示 + disclaimer (不在本 callable inline 跑 Gemini)
+    let diffSummary =
+      typeof data.diffSummary === 'string' && data.diffSummary.trim()
+        ? data.diffSummary.trim().slice(0, COND_NOTIFY_DIFF_SUMMARY_MAX)
+        : '';
+    let diffSummaryFallback = false;
+    if (!diffSummary) {
+      diffSummary = _notifyFallbackDiffSummary(oldVersion, newVersion);
+      diffSummaryFallback = true;
+    }
+    // 雙保險：強制附 disclaimer (即便 admin 帶進來的 summary 漏掉)
+    if (!diffSummary.includes('AI 解讀僅供參考')) {
+      diffSummary = `${diffSummary}\n\nAI 解讀僅供參考、以正式條款為準。`;
+    }
+
+    // --- Scan affected policies ---
+    // collectionGroup 掃 users/*/insurancePolicies — Sprint 15 W1
+    // backfillClientPolicyVersions 已把 v1 標完、所以本查詢能命中。
+    let policyDocs = [];
+    try {
+      const snap = await db
+        .collectionGroup('insurancePolicies')
+        .where('catalogProductId', '==', productId)
+        .where('catalogProductVersion', '==', oldVersion)
+        .limit(COND_NOTIFY_MAX_AFFECTED)
+        .get();
+      policyDocs = snap.docs;
+    } catch (err) {
+      functions.logger.error('[notifyConditionRevision] policy query failed', {
+        runId,
+        productId,
+        oldVersion,
+        message: err?.message,
+      });
+      throw new functions.https.HttpsError(
+        'internal',
+        `掃 collectionGroup 失敗（可能缺 composite index：` +
+          `catalogProductId + catalogProductVersion）：${err?.message || err}`,
+      );
+    }
+
+    if (policyDocs.length >= COND_NOTIFY_MAX_AFFECTED) {
+      // 撞到安全上限 — 提示 admin 分批；不 throw、繼續處理已抓到的部分
+      functions.logger.warn('[notifyConditionRevision] hit safety limit', {
+        runId,
+        limit: COND_NOTIFY_MAX_AFFECTED,
+      });
+    }
+
+    // --- Group by advisorUid ---
+    // 取得 advisorUid 兩種來源：
+    //   (1) policy.advisorUid 欄位 (future schema — policy share 給多顧問)
+    //   (2) doc path users/{advisorUid}/insurancePolicies/{pid} parent uid (current schema)
+    /** @type {Map<string, Array<{clientId: string|null, policyId: string, sumAssured: number, insuredName: string|null}>>} */
+    const advisorBuckets = new Map();
+    let processed = 0;
+
+    for (const docSnap of policyDocs) {
+      processed += 1;
+      const policyData = docSnap.data() || {};
+      const policyId = docSnap.id;
+
+      const pathParts = docSnap.ref.path.split('/');
+      const advisorUidFromPath =
+        pathParts.length >= 4 && pathParts[0] === 'users' ? pathParts[1] : null;
+      const advisorUid =
+        (typeof policyData.advisorUid === 'string' && policyData.advisorUid) ||
+        advisorUidFromPath ||
+        null;
+
+      if (!advisorUid) {
+        // 孤兒 policy — 跳過、記 log
+        functions.logger.warn('[notifyConditionRevision] orphan policy skipped', {
+          runId,
+          path: docSnap.ref.path,
+        });
+        continue;
+      }
+
+      const clientId =
+        typeof policyData.clientId === 'string' && policyData.clientId
+          ? policyData.clientId
+          : null;
+      const sumAssured = computePolicySumAssured(policyData);
+      const insuredName =
+        typeof policyData.insured === 'string' && policyData.insured
+          ? policyData.insured
+          : typeof policyData.insuredName === 'string' && policyData.insuredName
+            ? policyData.insuredName
+            : null;
+
+      if (!advisorBuckets.has(advisorUid)) advisorBuckets.set(advisorUid, []);
+      advisorBuckets.get(advisorUid).push({
+        clientId,
+        policyId,
+        sumAssured,
+        insuredName,
+      });
+    }
+
+    // --- Resolve client display names + mask + write alert doc(s) ---
+    let notifiedAdvisors = 0;
+    let totalAffectedClients = 0;
+    let alertDocsWritten = 0;
+    const writeErrors = [];
+
+    for (const [advisorUid, affectedList] of advisorBuckets.entries()) {
+      // 為這個 advisor 解析每筆 entry 的 displayable masked name
+      // clientId 為 null → fallback 用 policy.insured 欄位 (被保險人姓名)
+      // 全部 mask、保險起見不洩 PII
+      const enriched = [];
+      for (const item of affectedList) {
+        let displayName = null;
+        if (item.clientId) {
+          displayName = await _notifyReadClientDisplayName(advisorUid, item.clientId);
+        }
+        if (!displayName) displayName = item.insuredName || '';
+        enriched.push({
+          // clientUid 對齊 src/lib/conditionAlerts.ts AffectedClient.clientUid
+          // 顧問 UI 用它 deeplink 到客戶詳細
+          clientUid: item.clientId || '',
+          clientNameMasked: maskClientName(displayName),
+          policyId: item.policyId,
+          sumAssured: item.sumAssured,
+          contactStatus: 'pending',
+        });
+        totalAffectedClients += 1;
+      }
+
+      // 切 50 一 alert doc (Firestore 1MB 限額 / UI 可讀)
+      const chunks = _notifyChunkArray(enriched, COND_NOTIFY_CLIENTS_PER_ALERT_DOC);
+      const chunkCount = chunks.length;
+
+      for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx += 1) {
+        const chunkClients = chunks[chunkIdx];
+        // alertId = alert_<callbackMs>_<advisorUid>_<productId>[_p<idx>]
+        // 跨次 fanout 因 callbackMs 不同而不撞；同次多 chunk 因 _pN suffix 不撞
+        const alertId =
+          `alert_${callbackStartedAtMs}_${advisorUid}_${productId}` +
+          (chunkCount > 1 ? `_p${chunkIdx + 1}` : '');
+
+        const alertDoc = {
+          // 必欄 — 對齊 src/lib/conditionAlerts.ts ConditionAlert
+          productId,
+          productName: productNameSnapshot || productId,
+          companyName: productCompany,
+          oldVersion,
+          newVersion,
+          diffSummary,
+          importantChanges,
+          severity,
+          affectedClients: chunkClients,
+          createdAt: callbackStartedAtMs,  // epoch ms — parser Number() cast
+          status: 'pending',
+          reviewQueueId,
+
+          // Meta (parser ignores、留給 admin debug + B3 寄信 cron 用)
+          source: 'tii',  // 鐵則：永遠 'tii'
+          runId,
+          schemaVersion: 1,
+          aiDisclaimer: 'AI 解讀僅供參考、以正式條款為準',
+          diffSummaryFallback,  // 是否走 B1 fallback 摘要 (admin 跳過 B2 預覽)
+          chunkIndex: chunkIdx + 1,
+          chunkTotal: chunkCount,
+          serverCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          // B3 寄信 cron query 用：sentEmailAt == null + status == 'pending'
+          sentEmailAt: null,
+          sentLineAt: null,
+        };
+
+        try {
+          await db
+            .collection('advisors')
+            .doc(advisorUid)
+            .collection('conditionAlerts')
+            .doc(alertId)
+            .set(alertDoc, { merge: false });
+          alertDocsWritten += 1;
+        } catch (err) {
+          if (writeErrors.length < 5) {
+            writeErrors.push({
+              advisorUid,
+              alertId,
+              message: String(err?.message || err).slice(0, 200),
+            });
+          }
+          functions.logger.error('[notifyConditionRevision] alert write failed', {
+            runId,
+            advisorUid,
+            alertId,
+            message: err?.message,
+          });
+          // 不 throw — 其他 advisor 還能繼續扇出
+        }
+      }
+
+      notifiedAdvisors += 1;
+    }
+
+    // --- Audit log (audit_logs/{yyyymm}/events/{eventId}) ---
+    // context 只放 catalog-shape 欄位、不含 PII (no client name / id / phone)
+    try {
+      const auditEventId =
+        `${COND_NOTIFY_AUDIT_TYPE}_${callbackStartedAtMs}_${context.auth.uid}_` +
+        crypto.randomBytes(4).toString('hex');
+      await db
+        .collection('audit_logs')
+        .doc(yyyymm)
+        .collection('events')
+        .doc(auditEventId)
+        .set({
+          type: COND_NOTIFY_AUDIT_TYPE,
+          advisorUid: context.auth.uid,  // 觸發的 admin
+          advisorEmail: context.auth.token?.email || null,
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          timestampMs: callbackStartedAtMs,
+          context: {
+            runId,
+            productId,
+            oldVersion,
+            newVersion,
+            reviewQueueId,
+            processed,
+            notifiedAdvisors,
+            totalAffectedClients,
+            alertDocsWritten,
+            writeErrorCount: writeErrors.length,
+            severity,
+            importantChangesCount: importantChanges.length,
+            diffSummaryFallback,
+            source: 'tii',
+          },
+          result: writeErrors.length > 0 ? 'partial' : 'success',
+          schemaVersion: 1,
+        });
+    } catch (err) {
+      // audit 失敗不該 fail 整個 fanout — 已扇出 alert 是真實價值
+      functions.logger.error('[notifyConditionRevision] audit write failed', {
+        runId,
+        message: err?.message,
+      });
+    }
+
+    // --- Update review queue status → 'merged' + counts ---
+    // 只 patch 必要欄位 (set merge: true)、避免覆蓋 admin reviewer 寫的
+    // decision/reviewedBy/reviewedAt (Task B7 admin UI 改 button 時對齊)
+    try {
+      await db
+        .collection('insurance_review_queue')
+        .doc(reviewQueueId)
+        .set(
+          {
+            status: 'merged',
+            notifiedAdvisorsCount: notifiedAdvisors,
+            notifiedAffectedClientsCount: totalAffectedClients,
+            notifiedAlertDocsCount: alertDocsWritten,
+            notifiedAtMs: callbackStartedAtMs,
+            notifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+            notifiedRunId: runId,
+          },
+          { merge: true },
+        );
+    } catch (err) {
+      // queue 更新失敗 — 已扇出 alert 仍 valid，但 admin 會看 status='pending'
+      // 不 throw；admin 可手動 retry status update
+      functions.logger.warn('[notifyConditionRevision] review queue update failed', {
+        runId,
+        reviewQueueId,
+        message: err?.message,
+      });
+    }
+
+    functions.logger.info('[notifyConditionRevision] done', {
+      runId,
+      processed,
+      notifiedAdvisors,
+      totalAffectedClients,
+      alertDocsWritten,
+      writeErrorCount: writeErrors.length,
+    });
+
+    return {
+      runId,
+      processed,
+      notifiedAdvisors,
+      totalAffectedClients,
+      alertDocsWritten,
+      writeErrors,
+      dryRun: false,
+    };
+  });
+
 console.log('Ultra Advisor Cloud Functions loaded');
