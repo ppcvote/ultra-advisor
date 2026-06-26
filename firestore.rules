@@ -173,6 +173,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Sprint 14 W2 — 條款 chunk + 768d embedding（RAG agent 用）
+    // 登入顧問可讀（前端只在 /api/ask backend 內 query；KNN 結果回傳已過濾），
+    // 僅後端 admin SDK (upload-chunks-to-firestore.cjs) 可寫。
+    match /insurance_products/{productId}/chunks/{chunkId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
     // Sprint 14 W1 — Crowd-sourced new-product补登 queue（顧問端 MissingProductModal）
     // 顧問遇到 catalog miss 時 1-click 補資料、走人工審核後納入 catalog（Sprint 15）。
     // - create: 必須登入、且 submittedBy 必須等於自己的 uid（防偽造）
@@ -183,6 +191,37 @@ service cloud.firestore {
                     && request.resource.data.submittedBy == request.auth.uid;
       allow read: if isAdmin();
       allow update, delete: if isAdmin();
+    }
+
+    // Sprint 14 W2 — RAG agent audit log（每月分桶，PII sanitized）
+    // 結構：audit_logs/{yyyymm}/events/{eventId}
+    // - read: admin only（合規稽核）
+    // - write: backend admin SDK only（顧客端不直接寫）
+    match /audit_logs/{yyyymm} {
+      allow read: if isAdmin();
+      allow write: if false;
+
+      match /events/{eventId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+    }
+
+    // Sprint 14 W2 — 顧問每月 quota 使用量（ask 100/月、PDF view 50/月 W3 加）
+    // 結構：advisors/{uid}/quotaUsage/{yyyymm}
+    // - read: 顧問自己 + admin
+    // - write: backend admin SDK only（避免顧問偽造 reset）
+    match /advisors/{uid}/quotaUsage/{yyyymm} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Sprint 14 W2 — 顧問申請 quota 加額（達上限後提交 form）
+    // - create: 登入顧問可提交
+    // - read / update / delete: 僅 admin（審核/拒絕/批准）
+    match /quota_extension_requests/{doc} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isAdmin();
     }
 
     // ============================================
