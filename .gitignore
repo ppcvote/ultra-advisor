@@ -10,6 +10,11 @@ scripts/tii-crawler-state.json
 scripts/tii-captcha-*.bmp
 scripts/tii-captcha-*.jpg
 scripts/tii-result-*.html
+
+# Sprint 13 bulk parser output (35k catalog records, ~50MB)
+scripts/ua-insurance-catalog.json
+scripts/parse-collision.txt
+
 # Sprint 12 recon HTML dumps (含 form structure / 個資 placeholder 樣本)
 tmp/
 .env
