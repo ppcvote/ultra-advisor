@@ -173,6 +173,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Sprint 14 W1 — Crowd-sourced new-product补登 queue（顧問端 MissingProductModal）
+    // 顧問遇到 catalog miss 時 1-click 補資料、走人工審核後納入 catalog（Sprint 15）。
+    // - create: 必須登入、且 submittedBy 必須等於自己的 uid（防偽造）
+    // - read / list: 僅 admin（顧問不可看別人的補登內容）
+    // - update / delete: 僅 admin（審核 / 拒絕 / 升級）
+    match /insurance_products_pending/{doc} {
+      allow create: if isSignedIn()
+                    && request.resource.data.submittedBy == request.auth.uid;
+      allow read: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
     // ============================================
     // 5. 每日市場報告（公開可讀，寫入由後端處理）
     // ============================================

@@ -4488,6 +4488,265 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
  *   2. imageUrl：從 Storage URL 下載後再傳給 Gemini
  * 輸出：{ policy: Partial<PolicyInfo> }
  */
+// ==========================================
+// Sprint 14 W1 — Catalog auto-match helper
+// ==========================================
+/**
+ * 嘗試把單一 coverage match 到 `insurance_products` collection。
+ *
+ * 三層 fuzzy 策略（命中即返回，越精準的越優先）：
+ *   P1: company + productCode exact match
+ *   P2: company + productName 字串相似度（≥5 字 substring 重疊 OR Levenshtein ≤3）
+ *   P3: company + categoryMain + sumInsured ∈ [minSumAssured, maxSumAssured]
+ *       (P3 須 catalog doc 有 min/max sum 欄位才生效；Sprint 13 WRITE_WHITELIST
+ *        目前未包含這兩欄，所以 P3 命中率為 0；helper 保留邏輯給 Sprint 15
+ *        擴充 whitelist 後立刻可用。)
+ *
+ * 失敗（admin SDK error / collection 不存在 / 無候選）回傳 null，**不 throw**
+ * — 呼叫端負責標 _catalogMissFlag。
+ *
+ * 鐵則：
+ *   - 不對外暴露 sourceNote / source / sourceUrl（呼叫端只把 catalogMetadata
+ *     寫進 coverage、不轉發給 client）。
+ *   - 「現在時間」runtime 取得：本 helper 不取 wall clock，由呼叫端在 parsing
+ *     callback 內取得 `_catalogProcessedAt`。
+ *   - 不引入新 dep — Levenshtein 用內聯 O(m·n) DP。
+ *
+ * @param {FirebaseFirestore.Firestore} adminDb — 已 init 的 admin SDK firestore
+ * @param {object} coverage — Gemini 解析出的單條險種
+ * @param {string|null} policyInsurer — policy-level insurer 名（OCR 可能帶後綴）
+ * @returns {Promise<{catalogProductId: string, catalogMetadata: object, matchedBy: 'productCode'|'productName'|'categorySum'} | null>}
+ */
+async function tryMatchProductCatalog(adminDb, coverage, policyInsurer) {
+  if (!coverage || typeof coverage !== 'object') return null;
+  if (!policyInsurer || typeof policyInsurer !== 'string') return null;
+
+  // 正規化公司名：剝掉常見後綴，提高 OCR 與 catalog `company` 對齊率
+  const normalizeInsurer = (s) => {
+    if (!s) return '';
+    return String(s)
+      .replace(/股份有限公司$/u, '')
+      .replace(/保險$/u, '')
+      .replace(/\s+/gu, '')
+      .trim();
+  };
+  const insurerKey = normalizeInsurer(policyInsurer);
+  if (!insurerKey) return null;
+
+  // catalog 端 company 寫入時即為 TII shortName（e.g. '國泰人壽'）；
+  // 我們對兩種 form 都試一次（先帶後綴、再剝後綴）。
+  const insurerCandidates = Array.from(
+    new Set([policyInsurer.trim(), insurerKey].filter(Boolean))
+  );
+
+  const COL = 'insurance_products';
+  const productCode = coverage.code && String(coverage.code).trim();
+  const productName = coverage.name && String(coverage.name).trim();
+
+  // 內聯 Levenshtein（無 dep）
+  const levenshtein = (a, b) => {
+    if (a === b) return 0;
+    const m = a.length;
+    const n = b.length;
+    if (!m) return n;
+    if (!n) return m;
+    // 早退：長度差 >3 直接拒（callers 只關心 ≤3）
+    if (Math.abs(m - n) > 3) return Math.abs(m - n);
+    const dp = new Array(n + 1);
+    for (let j = 0; j <= n; j++) dp[j] = j;
+    for (let i = 1; i <= m; i++) {
+      let prev = dp[0];
+      dp[0] = i;
+      for (let j = 1; j <= n; j++) {
+        const tmp = dp[j];
+        dp[j] = (a.charCodeAt(i - 1) === b.charCodeAt(j - 1))
+          ? prev
+          : 1 + Math.min(prev, dp[j], dp[j - 1]);
+        prev = tmp;
+      }
+    }
+    return dp[n];
+  };
+
+  // longest common substring length（用來算 ≥5 字重疊）
+  const longestCommonSubstrLen = (a, b) => {
+    if (!a || !b) return 0;
+    const m = a.length;
+    const n = b.length;
+    let best = 0;
+    let prev = new Array(n + 1).fill(0);
+    let curr = new Array(n + 1).fill(0);
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        curr[j] = (a.charCodeAt(i - 1) === b.charCodeAt(j - 1))
+          ? prev[j - 1] + 1
+          : 0;
+        if (curr[j] > best) best = curr[j];
+      }
+      [prev, curr] = [curr, prev];
+      curr.fill(0);
+    }
+    return best;
+  };
+
+  const pickMetadata = (data) => ({
+    companySlug: data.companySlug || null,
+    categoryMain: data.categoryMain || null,
+    // 下面四欄 Sprint 13 ingest WRITE_WHITELIST 未含、預期為 undefined；
+    // 留鍵以利 Sprint 15 擴充 whitelist 後 client 不用改 shape。
+    minSumAssured: typeof data.minSumAssured === 'number' ? data.minSumAssured : null,
+    maxSumAssured: typeof data.maxSumAssured === 'number' ? data.maxSumAssured : null,
+    unit: data.unit || data.displayUnit || data.currencyUnit || null,
+    isWholeLife: typeof data.isWholeLife === 'boolean' ? data.isWholeLife : null,
+    status: data.status || null,
+  });
+
+  // ── Priority 1: company + productCode exact match ──
+  if (productCode) {
+    for (const insurer of insurerCandidates) {
+      try {
+        const snap = await adminDb.collection(COL)
+          .where('company', '==', insurer)
+          .where('productCode', '==', productCode)
+          .limit(1)
+          .get();
+        if (!snap.empty) {
+          const doc = snap.docs[0];
+          return {
+            catalogProductId: doc.id,
+            catalogMetadata: pickMetadata(doc.data() || {}),
+            matchedBy: 'productCode',
+          };
+        }
+      } catch (e) {
+        // Re-throw — callers wrap整段在 try/catch、會降級為 _catalogMatchError
+        throw e;
+      }
+    }
+  }
+
+  // ── Priority 2: company + productName fuzzy ──
+  // 從同公司全部商品 pull 下來做相似度比較（單一公司商品數通常 < 500、可接受）
+  //
+  // Critic A 必修 (P3 path cost):
+  //   原本 P2 fail 後 P3 又對同 company 開新 query (limit 50)、最壞單條 coverage
+  //   reads = 1 + 500 + 50 = 551、5 條 coverage = 2755 reads/OCR。
+  //   修法: P2 候選 batch 本身已含 categoryMain / minSumAssured / maxSumAssured
+  //   (Sprint 15 之後 whitelist 擴充也只會在同個 doc shape 上加欄位)、把 P3 改成
+  //   in-memory filter 同個 candidates 陣列、0 額外 Firestore read。
+  //   單條最壞 reads 降到 1 + 500 = 501、5 條 = 2505、節省 ~10% / 攤平 admin SDK
+  //   timeout 風險。Sprint 15 補 min/maxSumAssured 後命中率立刻提升、無需改 helper。
+  //
+  // 我們也把 P2 fetch 出來的 candidates 暫存到上層作用域、供 P3 直接重用。
+  let candidates = [];
+  let candidatesFetched = false; // 標記是否真的打過 Firestore
+  if (productName) {
+    for (const insurer of insurerCandidates) {
+      try {
+        const snap = await adminDb.collection(COL)
+          .where('company', '==', insurer)
+          .limit(500)
+          .get();
+        candidatesFetched = true;
+        if (!snap.empty) {
+          snap.forEach((d) => candidates.push({ id: d.id, data: d.data() || {} }));
+          break; // 找到一組就夠
+        }
+      } catch (e) {
+        throw e;
+      }
+    }
+    if (candidates.length > 0) {
+      let bestP2 = null;
+      let bestScore = Infinity; // Levenshtein 距離（小=好）
+      for (const c of candidates) {
+        const candName = String(c.data.productName || '').trim();
+        if (!candName) continue;
+        const lcs = longestCommonSubstrLen(productName, candName);
+        if (lcs >= 5) {
+          // 5 字重疊直接命中，挑 lcs 最長的
+          if (!bestP2 || lcs > (bestP2._lcs || 0)) {
+            bestP2 = { ...c, _lcs: lcs };
+          }
+          continue;
+        }
+        // Levenshtein 後備；只在短名稱（避免 50 字長名跟 5 字名距離 ≤3 的假陽性）
+        if (Math.abs(productName.length - candName.length) <= 3) {
+          const dist = levenshtein(productName, candName);
+          if (dist <= 3 && dist < bestScore) {
+            bestScore = dist;
+            if (!bestP2) bestP2 = { ...c, _lev: dist };
+          }
+        }
+      }
+      if (bestP2) {
+        return {
+          catalogProductId: bestP2.id,
+          catalogMetadata: pickMetadata(bestP2.data),
+          matchedBy: 'productName',
+        };
+      }
+    }
+  }
+
+  // ── Priority 3: company + categoryMain + sumInsured 在 [min, max] ──
+  // Sprint 13 ingest 未寫 min/maxSumAssured 進 Firestore、此 path 目前 0 命中
+  // 率，但 helper 保留邏輯以便 Sprint 15 whitelist 擴充後立刻生效。
+  //
+  // Critic A 修法: 重用 P2 已 fetch 的 candidates。如果 P2 沒打過 query
+  // (productName 為空)、再依需要 fall back 補打一次小 query (limit 50)。
+  const sumInsured = typeof coverage.sumInsured === 'number' ? coverage.sumInsured : null;
+  const categoryHint = coverage.category || coverage.categoryMain; // OCR 通常無
+  if (sumInsured && categoryHint) {
+    // 先試 in-memory filter
+    if (candidatesFetched && candidates.length > 0) {
+      for (const c of candidates) {
+        const data = c.data || {};
+        if (data.categoryMain !== categoryHint) continue;
+        const lo = typeof data.minSumAssured === 'number' ? data.minSumAssured : null;
+        const hi = typeof data.maxSumAssured === 'number' ? data.maxSumAssured : null;
+        if (lo !== null && hi !== null && sumInsured >= lo && sumInsured <= hi) {
+          return {
+            catalogProductId: c.id,
+            catalogMetadata: pickMetadata(data),
+            matchedBy: 'categorySum',
+          };
+        }
+      }
+      // P2 已 fetch、in-memory 沒命中 → 不再開新 Firestore query (省 reads)
+      return null;
+    }
+    // P2 沒打過 (沒 productName)、只在這種邊角案例補一次小 query
+    for (const insurer of insurerCandidates) {
+      try {
+        const snap = await adminDb.collection(COL)
+          .where('company', '==', insurer)
+          .where('categoryMain', '==', categoryHint)
+          .limit(50)
+          .get();
+        if (!snap.empty) {
+          for (const d of snap.docs) {
+            const data = d.data() || {};
+            const lo = typeof data.minSumAssured === 'number' ? data.minSumAssured : null;
+            const hi = typeof data.maxSumAssured === 'number' ? data.maxSumAssured : null;
+            if (lo !== null && hi !== null && sumInsured >= lo && sumInsured <= hi) {
+              return {
+                catalogProductId: d.id,
+                catalogMetadata: pickMetadata(data),
+                matchedBy: 'categorySum',
+              };
+            }
+          }
+        }
+      } catch (e) {
+        throw e;
+      }
+    }
+  }
+
+  return null;
+}
+
 exports.parseInsuranceOCR = functions
   .runWith({ timeoutSeconds: 120, memory: '512MB' })
   .https.onCall(async (data, context) => {
@@ -4624,7 +4883,51 @@ exports.parseInsuranceOCR = functions
         }));
       }
 
-      console.log(`✅ Gemini 保單解析完成：${parsed.insurer || '未知'} / ${parsed.coverages?.length || 0} 個險種`);
+      // ── Sprint 14 W1: catalog auto-match ──
+      // 每條 coverage 跑一次 fuzzy match，命中就 attach catalogProductId +
+      // catalogMetadata、未命中就 _catalogMissFlag。任何階段 throw 都降級為
+      // _catalogMatchError，不影響 OCR 本體回傳（顧問仍可手動填）。
+      let catalogMatchCount = 0;
+      let catalogMissCount = 0;
+      try {
+        if (Array.isArray(parsed.coverages) && parsed.coverages.length > 0) {
+          // 注意：runtime「現在時間」於此 callback 內取得（不在 module top-level）
+          const processedAt = Date.now();
+          parsed._catalogProcessedAt = processedAt;
+          for (let i = 0; i < parsed.coverages.length; i++) {
+            const cov = parsed.coverages[i];
+            try {
+              const match = await tryMatchProductCatalog(db, cov, parsed.insurer);
+              if (match && match.catalogProductId) {
+                cov.catalogProductId = match.catalogProductId;
+                cov.catalogMetadata = match.catalogMetadata;
+                cov._catalogMatchedBy = match.matchedBy;
+                catalogMatchCount++;
+              } else {
+                cov._catalogMissFlag = true;
+                cov._catalogMissReason = 'no-match';
+                catalogMissCount++;
+              }
+            } catch (innerErr) {
+              // 單條 coverage 查 catalog 出錯，不影響其他條
+              console.warn(`⚠️ catalog match 單條失敗 (idx=${i}):`, innerErr.message);
+              cov._catalogMissFlag = true;
+              cov._catalogMissReason = 'lookup-error';
+              catalogMissCount++;
+            }
+          }
+        }
+        parsed._catalogMatchCount = catalogMatchCount;
+        parsed._catalogMissCount = catalogMissCount;
+      } catch (catalogErr) {
+        // collection 不存在 / admin SDK 整體故障 → 整個 catalog match 階段跳過
+        console.warn('⚠️ catalog match 階段整體失敗，跳過:', catalogErr.message);
+        parsed._catalogMatchError = catalogErr.message || 'unknown';
+        parsed._catalogMatchCount = catalogMatchCount;
+        parsed._catalogMissCount = catalogMissCount;
+      }
+
+      console.log(`✅ Gemini 保單解析完成：${parsed.insurer || '未知'} / ${parsed.coverages?.length || 0} 個險種 / catalog ${catalogMatchCount} match, ${catalogMissCount} miss`);
 
       return { policy: parsed };
     } catch (error) {

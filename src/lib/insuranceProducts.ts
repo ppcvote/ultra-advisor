@@ -255,3 +255,287 @@ export async function searchProducts(
   });
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 14 W1 — additional read helpers
+// ---------------------------------------------------------------------------
+//
+// Why these exist (and why not as variants of the originals):
+//   Sprint 14 wires OCR -> catalog match + advisor-typed autocomplete. The
+//   existing `getProductsByCompany` / `getProductsByCategory` / `searchProducts`
+//   contracts are stable and consumed by Sprint 12/13 callers, so we add new
+//   helpers rather than mutate signatures (Sprint 14 hard rule: do not change
+//   existing helper signatures).
+//
+//   Two raw fields below — `saled: boolean` and `lineOfBusiness: 'life'|'pnc'`
+//   — are present on the catalog Firestore docs (written by
+//   `scripts/parse-insurance-database.cjs`) but intentionally NOT lifted onto
+//   the `InsuranceProduct` TS interface yet. We query them as raw Firestore
+//   fields without widening the public type: that keeps Sprint 12's compliance
+//   surface (closed source union, required sourceUrl) the only thing the rest
+//   of the app sees, while still letting Sprint 14 filter by sale state and
+//   line of business. If/when those fields become part of the user-facing
+//   contract we can promote them in a single typed edit.
+
+const DEFAULT_AUTOCOMPLETE_LIMIT = 20;
+const MAX_AUTOCOMPLETE_LIMIT = 100;
+
+// Firestore range-upper-bound sentinel: U+F8FF (Private Use Area). Matches the
+// existing `searchProducts` idiom — kept as a const here so the new helpers
+// don't sprinkle the magic char inline.
+const RANGE_UPPER = '';
+
+function clampLimit(n: number | undefined, fallback = DEFAULT_AUTOCOMPLETE_LIMIT): number {
+  return Math.max(1, Math.min(n ?? fallback, MAX_AUTOCOMPLETE_LIMIT));
+}
+
+/**
+ * Lookup by `companySlug` — the kebab-case stable identifier used in doc IDs
+ * and URLs. This is the helper ProductAutocomplete should call once the
+ * advisor has picked an insurer, because the slug is collision-proof across
+ * brand renames (whereas the Chinese full name is not).
+ *
+ * `activeOnly` defaults to `true` because the picker should hide discontinued
+ * products from new-policy entry by default; legacy lookups (existing policy
+ * edit) can pass `false` to include all states.
+ */
+export async function searchProductsByCompanySlug(
+  companySlug: string,
+  opts?: { limit?: number; activeOnly?: boolean }
+): Promise<InsuranceProduct[]> {
+  const max = clampLimit(opts?.limit);
+  const activeOnly = opts?.activeOnly ?? true;
+  const constraints: any[] = [where('companySlug', '==', companySlug)];
+  if (activeOnly) constraints.push(where('status', '==', 'active'));
+  constraints.push(orderBy('productName', 'asc'));
+  constraints.push(fsLimit(max));
+  const fq = query(collection(db, COLLECTION), ...constraints);
+  const snap = await getDocs(fq);
+  const out: InsuranceProduct[] = [];
+  snap.forEach((d) => {
+    const p = fromDoc(d);
+    if (p) out.push(p);
+  });
+  return out;
+}
+
+/**
+ * Search by company full name (Chinese). Mirrors `getProductsByCompany` but
+ * adds a limit/activeOnly knob so callers can page or restrict to currently
+ * sold products without pulling 100+ rows. Kept separate from
+ * `getProductsByCompany` to honour the Sprint 14 hard rule (do not change
+ * existing helper signatures).
+ */
+export async function searchProductsByCompany(
+  company: string,
+  opts?: { limit?: number; activeOnly?: boolean }
+): Promise<InsuranceProduct[]> {
+  const max = clampLimit(opts?.limit);
+  const activeOnly = opts?.activeOnly ?? true;
+  const constraints: any[] = [where('company', '==', company)];
+  if (activeOnly) constraints.push(where('status', '==', 'active'));
+  constraints.push(orderBy('productName', 'asc'));
+  constraints.push(fsLimit(max));
+  const fq = query(collection(db, COLLECTION), ...constraints);
+  const snap = await getDocs(fq);
+  const out: InsuranceProduct[] = [];
+  snap.forEach((d) => {
+    const p = fromDoc(d);
+    if (p) out.push(p);
+  });
+  return out;
+}
+
+/**
+ * Compound filter: company + top-level category. This is the workhorse for
+ * the Sprint 14 OCR -> catalog match flow. Once OCR has identified the
+ * insurer and the rough category (e.g. Cathay Life + 'medical'), we narrow
+ * to the slim subset and let `fuzzyMatchProductLocal` do the rest
+ * client-side without burning more Firestore reads.
+ *
+ * Composite index required: (companySlug ASC, categoryMain ASC, productName ASC),
+ * plus the same with `status` if `activeOnly` is true. Firestore will surface
+ * a one-click index creation link in the console the first time it runs.
+ */
+export async function searchProductsByCompanyAndCategory(
+  companySlug: string,
+  categoryMain: InsuranceCategoryMain,
+  opts?: { activeOnly?: boolean; limit?: number }
+): Promise<InsuranceProduct[]> {
+  const max = clampLimit(opts?.limit);
+  const activeOnly = opts?.activeOnly ?? true;
+  const constraints: any[] = [
+    where('companySlug', '==', companySlug),
+    where('categoryMain', '==', categoryMain),
+  ];
+  if (activeOnly) constraints.push(where('status', '==', 'active'));
+  constraints.push(orderBy('productName', 'asc'));
+  constraints.push(fsLimit(max));
+  const fq = query(collection(db, COLLECTION), ...constraints);
+  const snap = await getDocs(fq);
+  const out: InsuranceProduct[] = [];
+  snap.forEach((d) => {
+    const p = fromDoc(d);
+    if (p) out.push(p);
+  });
+  return out;
+}
+
+/**
+ * Product-code prefix search inside one insurer.
+ *
+ * Why scoped to companySlug: product codes are NOT globally unique — TII lets
+ * each insurer name their codes freely, so 'A123' could exist at three
+ * different companies. Forcing the caller to pass companySlug keeps the
+ * results unambiguous and lets us use the same range-prefix idiom as
+ * `searchProducts`. Empty `codePrefix` returns the first N codes for the
+ * insurer (useful debugging path; intentionally not gated).
+ */
+export async function searchProductsByCodePrefix(
+  companySlug: string,
+  codePrefix: string,
+  opts?: { limit?: number }
+): Promise<InsuranceProduct[]> {
+  const max = clampLimit(opts?.limit);
+  const prefix = (codePrefix ?? '').trim();
+  let fq;
+  if (prefix.length === 0) {
+    fq = query(
+      collection(db, COLLECTION),
+      where('companySlug', '==', companySlug),
+      orderBy('productCode', 'asc'),
+      fsLimit(max)
+    );
+  } else {
+    fq = query(
+      collection(db, COLLECTION),
+      where('companySlug', '==', companySlug),
+      orderBy('productCode', 'asc'),
+      where('productCode', '>=', prefix),
+      where('productCode', '<=', prefix + RANGE_UPPER),
+      fsLimit(max)
+    );
+  }
+  const snap = await getDocs(fq);
+  const out: InsuranceProduct[] = [];
+  snap.forEach((d) => {
+    const p = fromDoc(d);
+    if (p) out.push(p);
+  });
+  return out;
+}
+
+/**
+ * Filter by raw `saled` boolean (and optionally line of business).
+ *
+ * `saled: true` mostly mirrors status 'active' on TII rows, but the crawler
+ * writes both fields and they CAN diverge (e.g. a doc still flagged
+ * `saled: true` by the source feed while we've manually marked it 'revised'
+ * locally). Sprint 14 W1 needs a way to ask the raw question — "is the
+ * insurer still selling this?" — without that local override, hence this
+ * helper exists in parallel to `activeOnly` on the others.
+ *
+ * `lineOfBusiness` is the raw TII split: 'life' (人身保險) vs 'pnc' (產險).
+ * Stays as a string parameter (not enum) because we don't want to lock that
+ * union into the public type system until the field graduates onto
+ * `InsuranceProduct`.
+ */
+export async function searchProductsBySaled(
+  saled: boolean,
+  opts?: { limit?: number; lineOfBusiness?: 'life' | 'pnc' }
+): Promise<InsuranceProduct[]> {
+  const max = clampLimit(opts?.limit);
+  const constraints: any[] = [where('saled', '==', saled)];
+  if (opts?.lineOfBusiness) {
+    constraints.push(where('lineOfBusiness', '==', opts.lineOfBusiness));
+  }
+  constraints.push(orderBy('productName', 'asc'));
+  constraints.push(fsLimit(max));
+  const fq = query(collection(db, COLLECTION), ...constraints);
+  const snap = await getDocs(fq);
+  const out: InsuranceProduct[] = [];
+  snap.forEach((d) => {
+    const p = fromDoc(d);
+    if (p) out.push(p);
+  });
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 14 W1 — client-side fuzzy match
+// ---------------------------------------------------------------------------
+//
+// This runs entirely in memory after a (cheap) Firestore narrow-by-company
+// fetch. The point is: ProductAutocomplete should NOT make a new Firestore
+// read on every keystroke — pull ~100 products for the picked insurer once,
+// debounce keystrokes, then re-rank locally. That's how we keep the 35k-row
+// catalog cheap.
+//
+// Why not Levenshtein / Fuse.js: explicit Sprint 14 hard rule — no new deps.
+// We implement a small substring + token-overlap scorer that handles the
+// actual cases advisors hit (typo on the long full name, swapped order
+// between productName and productCode, lowercase vs uppercase) without the
+// kilobytes.
+
+/** Score in [0,1]. Higher = better match. */
+function scoreField(query: string, value: string | undefined): number {
+  if (!value) return 0;
+  const q = query.toLowerCase().trim();
+  const v = value.toLowerCase().trim();
+  if (q.length === 0 || v.length === 0) return 0;
+  // Exact hit — strongest signal.
+  if (v === q) return 1;
+  // Prefix — second strongest (matches advisor typing left-to-right).
+  if (v.startsWith(q)) return 0.9;
+  // Substring anywhere — strong but not as strong as prefix.
+  if (v.includes(q)) return 0.75;
+  // Token overlap — split on whitespace + dashes + CJK punctuation; count
+  // shared tokens. Length-normalized so a short query matching a 12-char
+  // product name doesn't beat a tight 4-char match. Cheap O(n*m) on small
+  // token counts.
+  const splitRe = /[\s\-_/,]+/u;
+  const qTokens = q.split(splitRe).filter(Boolean);
+  const vTokens = v.split(splitRe).filter(Boolean);
+  if (qTokens.length === 0 || vTokens.length === 0) return 0;
+  let hits = 0;
+  for (const qt of qTokens) {
+    if (vTokens.some((vt) => vt.includes(qt) || qt.includes(vt))) hits++;
+  }
+  const overlap = hits / qTokens.length;
+  // Cap at 0.6 so token-overlap can never beat a substring hit on a related
+  // field — substring is intent-aligned (advisor really typed those chars in
+  // a row), tokens are softer signal.
+  return Math.min(0.6, overlap * 0.6);
+}
+
+/**
+ * Pure, in-memory fuzzy match. No Firestore reads, no async, no side effects.
+ *
+ * Weighting (productName 0.6 / productCode 0.3 / companySlug 0.1) reflects
+ * how advisors actually search — they type the product name most often, the
+ * code occasionally (when the OCR returned one), and the company name almost
+ * never as the discriminator (they already filtered by company elsewhere).
+ *
+ * `minScore` defaults to 0.2 to filter out near-noise; bump to 0.5+ for
+ * "confident match only" use cases (e.g. auto-fill without confirmation).
+ */
+export function fuzzyMatchProductLocal(
+  query: string,
+  products: InsuranceProduct[],
+  opts?: { limit?: number; minScore?: number }
+): InsuranceProduct[] {
+  const max = clampLimit(opts?.limit, products.length || DEFAULT_AUTOCOMPLETE_LIMIT);
+  const minScore = opts?.minScore ?? 0.2;
+  const q = (query ?? '').trim();
+  if (q.length === 0) return products.slice(0, max);
+  const scored: Array<{ p: InsuranceProduct; s: number }> = [];
+  for (const p of products) {
+    const sName = scoreField(q, p.productName) * 0.6;
+    const sCode = scoreField(q, p.productCode) * 0.3;
+    const sSlug = scoreField(q, p.companySlug) * 0.1;
+    const s = sName + sCode + sSlug;
+    if (s >= minScore) scored.push({ p, s });
+  }
+  scored.sort((a, b) => b.s - a.s);
+  return scored.slice(0, max).map((x) => x.p);
+}
