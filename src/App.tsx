@@ -79,6 +79,11 @@ const CustomerReportPage = lazy(() => import('./pages/CustomerReportPage'));
 // `admins/{uid}` Firestore read (rules are the real boundary; the client
 // check just avoids loading the admin chunk for non-admins).
 const InsuranceReviewQueue = lazy(() => import('./admin/InsuranceReviewQueue'));
+// Sprint 15 W2 — advisor-side condition revision alerts dashboard. Surfaced
+// at /dashboard/condition-alerts (+ /dashboard/condition-alerts/:alertId for
+// deeplinks from email / LINE notifications). Auth-gated like the rest of
+// the planner shell; firestore.rules enforce the per-advisor boundary.
+const ConditionAlerts = lazy(() => import('./dashboard/ConditionAlerts'));
 
 // 🆕 主題切換
 import { ThemeProvider } from './context/ThemeContext';
@@ -208,6 +213,13 @@ export default function App() {
   // Sprint 15 W1 — /admin/insurance-review-queue (admin-only)
   const [isInsuranceReviewRoute, setIsInsuranceReviewRoute] = useState(() =>
     window.location.pathname === '/admin/insurance-review-queue'
+  );
+  // Sprint 15 W2 — /dashboard/condition-alerts(/{id}) (advisor-only)
+  // Matches both bare path and deeplink form so an email/LINE link can drop
+  // the advisor straight into a single alert detail card.
+  const [isConditionAlertsRoute, setIsConditionAlertsRoute] = useState(() =>
+    window.location.pathname === '/dashboard/condition-alerts' ||
+    window.location.pathname.startsWith('/dashboard/condition-alerts/')
   );
   // Cached admin check — null = unknown, false = not admin, true = admin.
   // Populated lazily when entering an /admin/* route to avoid an extra
@@ -444,7 +456,11 @@ export default function App() {
       setIsTermsRoute(path === '/terms');
       setIsCustomerReportRoute(path.startsWith('/r/')); // Sprint 7 F
       setIsInsuranceReviewRoute(path === '/admin/insurance-review-queue'); // Sprint 15 W1
-      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); setIsPrivacyRoute(false); setIsTermsRoute(false); setIsCustomerReportRoute(false); setIsInsuranceReviewRoute(false); }
+      setIsConditionAlertsRoute(
+        path === '/dashboard/condition-alerts' ||
+        path.startsWith('/dashboard/condition-alerts/')
+      ); // Sprint 15 W2
+      if (path === '/') { setIsSecretSignupRoute(false); setIsLoginRoute(false); setIsCalculatorRoute(false); setIsLiffRegisterRoute(false); setIsRegisterRoute(false); setIsBlogRoute(false); setIsBookingRoute(false); setIsAllianceRoute(false); setIsPartnerApplyRoute(false); setIsUltraCloudDemoRoute(false); setIsWhiteboardRoute(false); setIsEnglishRoute(false); setIsResearchRoute(false); setIsPrivacyRoute(false); setIsTermsRoute(false); setIsCustomerReportRoute(false); setIsInsuranceReviewRoute(false); setIsConditionAlertsRoute(false); }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -468,6 +484,10 @@ export default function App() {
     else if (path === '/terms') setIsTermsRoute(true);
     else if (path.startsWith('/r/')) setIsCustomerReportRoute(true); // Sprint 7 F
     else if (path === '/admin/insurance-review-queue') setIsInsuranceReviewRoute(true); // Sprint 15 W1
+    else if (
+      path === '/dashboard/condition-alerts' ||
+      path.startsWith('/dashboard/condition-alerts/')
+    ) setIsConditionAlertsRoute(true); // Sprint 15 W2
 
     // 🆕 SplashScreen 只在這個 session 第一次進入時顯示
     if (sessionStorage.getItem('splash_shown') !== 'true') {
@@ -970,6 +990,28 @@ export default function App() {
     return (
       <Suspense fallback={<SplashScreen />}>
         <InsuranceReviewQueue />
+      </Suspense>
+    );
+  }
+
+  // Sprint 15 W2 — advisor-only condition revision alerts dashboard. Renders
+  // before splash so deeplinks from email / LINE notifications open straight
+  // into the alert (no 3-second blackout). Unauthed → bounce to /login,
+  // preserving the deeplinked id by way of `pendingTab` is overkill for an
+  // auth-gated dashboard; we just send them to /login.
+  if (isConditionAlertsRoute ||
+      window.location.pathname === '/dashboard/condition-alerts' ||
+      window.location.pathname.startsWith('/dashboard/condition-alerts/')) {
+    if (loading) return <SplashScreen />;
+    if (!user) {
+      window.history.replaceState({}, '', '/login');
+      setIsConditionAlertsRoute(false);
+      setIsLoginRoute(true);
+      return <SplashScreen />;
+    }
+    return (
+      <Suspense fallback={<SplashScreen />}>
+        <ConditionAlerts />
       </Suspense>
     );
   }
