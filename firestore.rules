@@ -216,6 +216,21 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Sprint 15 W2 — 條款修訂通知 fanout 後的 per-advisor alert
+    // 結構：advisors/{uid}/conditionAlerts/{alertId}
+    // - read: 顧問自己 + admin（跨顧問隔離靠 path uid 比對）
+    // - create / delete: backend admin SDK only（notifyConditionRevision fanout 寫）
+    // - update: 顧問自己僅可改 affectedClients + status（updateClientContactStatus）；
+    //           其它欄位（diffSummary / productId / severity / createdAt 等）一律鎖死
+    match /advisors/{uid}/conditionAlerts/{alertId} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, delete: if false;
+      allow update: if isSignedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['affectedClients', 'status']);
+    }
+
     // Sprint 14 W2 — 顧問申請 quota 加額（達上限後提交 form）
     // - create: 登入顧問可提交
     // - read / update / delete: 僅 admin（審核/拒絕/批准）

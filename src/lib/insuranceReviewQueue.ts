@@ -46,7 +46,8 @@ import {
   where,
   type Query,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -340,30 +341,32 @@ export async function getReviewQueueItem(
 }
 
 // ---------------------------------------------------------------------------
-// Decision endpoints — STUBS for W1
+// Decision endpoints — Sprint 15 W1 stubs, partial wiring in W2
 // ---------------------------------------------------------------------------
 //
-// Why stub:
-//   The merge engine (promote pending → live catalog, write new productVersion
-//   doc, mark previous version as `revised`, trigger client-policy backfill)
-//   lives in `functions/index.js` as a callable, landing in Sprint 15 W2. We
-//   refuse to half-apply a merge from the browser because:
-//     1. We'd need a multi-doc transaction across `insurance_products`,
-//        `insurance_product_versions`, and the queue itself — Firestore client
-//        SDK transactions are practical for at most a handful of docs, and
-//        the version-bump touches many.
-//     2. Audit log writes must be server-side (rules forbid client writes to
-//        `audit_logs/{yyyymm}`).
-//     3. Rolling back a partial merge would require a separate undo flow we
-//        don't have yet.
-//   So W1 stubs throw `NotImplemented`. The UI invokes them on click but
-//   catches and shows "merge engine ships W2" toast. This keeps the surface
-//   stable for the W2 wire-up.
+// W1 shipped these as throw-stubs. W2 wires ONLY the
+// `version_revision` approve path — that one is handled in the admin UI by
+// calling `notifyConditionRevision` directly (the backend callable updates the
+// review queue status to 'merged' as part of fanout, so we don't need a
+// separate decision callable for this branch).
+//
+// `new_product`, `discontinued`, `company_metadata_change`, reject, and
+// need_more_info STILL throw NotImplemented in W2 — backend `reviewQueueDecision`
+// callable lands W3 (catalog promo / company-doc patch / submitter notify).
+// We keep these as functions so the UI imports stay stable; admin UI must
+// check `item.type === 'version_revision'` before calling `approveReview`.
 
 const NOT_IMPLEMENTED_MSG =
-  'Review decision endpoints ship in Sprint 15 W2 (merge engine + backfill ' +
-  'callable). UI is scaffolded but mutations are intentionally disabled.';
+  'Sprint 15 W2：非 version_revision 的決策路徑尚未實作（待 W3 reviewQueueDecision callable）';
 
+/** Sprint 15 W1 stub — throws `NotImplemented`. Admin UI must NOT call this
+ *  for `version_revision` items; it should call `notifyConditionRevision`
+ *  directly (the fanout callable updates the queue status server-side).
+ *
+ *  Kept as an explicit function (vs. removed) so other admin tools that import
+ *  this don't fail at build — they just fail loudly at runtime when an admin
+ *  tries to approve a non-revision item before W3 ships. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function approveReview(
   _id: string,
   _decision: ReviewDecision,
@@ -371,15 +374,111 @@ export async function approveReview(
   throw new Error(NOT_IMPLEMENTED_MSG);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function rejectReview(_id: string, _reason: string): Promise<void> {
   throw new Error(NOT_IMPLEMENTED_MSG);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function requestMoreInfo(
   _id: string,
   _message: string,
 ): Promise<void> {
   throw new Error(NOT_IMPLEMENTED_MSG);
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 15 W2 condition-revision notification + LLM diff summary
+// ---------------------------------------------------------------------------
+//
+// The "fanout" callable scans all client policies that bind to
+// (productId, oldVersion), emails the owning advisor of each, and writes a
+// `condition_alerts` doc per (advisor, client) pair. The UI calls this
+// AFTER admin confirms the approve dialog on a `version_revision` item.
+//
+// The LLM diff callable returns a Gemini-generated natural-language summary
+// of the chunk-level diff between v1 and v2. The admin sees this in the
+// review card so they can sanity-check before approving. It is invoked
+// on-demand (button click) — never auto-fetched on list load — because each
+// call burns Gemini quota.
+
+export type NotifyConditionRevisionInput = {
+  productId: string;
+  oldVersion: string;
+  newVersion: string;
+  /** The originating review queue doc — used for audit + idempotency. */
+  reviewQueueId: string;
+};
+
+/** Backend return shape — mirrors `notifyConditionRevision` in
+ *  `functions/index.js` exactly. Field names match the callable's response
+ *  contract; the UI derives `partialFailure` from `writeErrors.length > 0`
+ *  rather than asking the backend to set a separate flag. */
+export type NotifyConditionRevisionResult = {
+  /** Unique fanout run id — useful for cross-referencing audit logs. */
+  runId: string;
+  /** Number of policy docs scanned (pre-grouping). */
+  processed: number;
+  /** Number of advisors actually touched (distinct advisor uids). */
+  notifiedAdvisors: number;
+  /** Total affected client rows across all advisors. */
+  totalAffectedClients: number;
+  /** Number of `conditionAlerts/{alertId}` docs actually written
+   *  (>= notifiedAdvisors when an advisor's clients overflow the per-doc
+   *  chunk size and we write multiple `_pN` shards). */
+  alertDocsWritten: number;
+  /** First few write failures (advisor uid + alert id + message). Used by
+   *  the UI to render a retry banner. The fanout intentionally keeps going
+   *  past per-doc write failures so a single bad shard doesn't abort the
+   *  whole run; partial-failure status is derived from `writeErrors.length`. */
+  writeErrors: Array<{ advisorUid: string; alertId: string; message: string }>;
+  dryRun: boolean;
+};
+
+/** Trigger the condition-revision fanout. Caller must have already
+ *  invoked `approveReview` and confirmed the user understood the impact.
+ *  Throws on hard backend failure; soft failures arrive as
+ *  `result.partialFailure`. */
+export async function notifyConditionRevision(
+  input: NotifyConditionRevisionInput,
+): Promise<NotifyConditionRevisionResult> {
+  const fn = httpsCallable<NotifyConditionRevisionInput, NotifyConditionRevisionResult>(
+    functions,
+    'notifyConditionRevision',
+  );
+  const res = await fn(input);
+  return res.data;
+}
+
+export type ComposeConditionDiffSummaryInput = {
+  reviewQueueId: string;
+};
+
+export type ComposeConditionDiffSummaryResult = {
+  ok: boolean;
+  /** Natural-language summary, generated by Gemini 2.5 Pro. May be empty
+   *  when the backend determines there's no meaningful textual diff (e.g.
+   *  metadata-only change). */
+  summary: string;
+  /** Bullet-point highlights for quick scanning. */
+  highlights?: string[];
+  /** Always set so the UI can render the mandated disclaimer verbatim. */
+  disclaimer: string;
+  /** Token / cost telemetry, optional. */
+  modelUsed?: string;
+};
+
+/** Lazy LLM diff summary fetch. Result is NOT cached client-side — admins
+ *  often want a fresh read. Caller is responsible for spinner state. */
+export async function composeConditionDiffSummary(
+  input: ComposeConditionDiffSummaryInput,
+): Promise<ComposeConditionDiffSummaryResult> {
+  const fn = httpsCallable<
+    ComposeConditionDiffSummaryInput,
+    ComposeConditionDiffSummaryResult
+  >(functions, 'composeConditionDiffSummary');
+  const res = await fn(input);
+  return res.data;
 }
 
 // ---------------------------------------------------------------------------

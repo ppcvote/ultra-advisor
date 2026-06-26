@@ -1,19 +1,22 @@
 /**
- * InsuranceReviewQueue — Sprint 15 W1 admin scaffold
+ * InsuranceReviewQueue — Sprint 15 W2 admin triage
  * --------------------------------------------------------------------------
  * Admin-only triage UI for the unified insurance review queue. Surfaces
  * pending changes from three upstream sources (TII monthly crawl, advisor
  * crowdsourcing, future per-company scraper) and lets the admin approve /
  * reject / request-more-info.
  *
- * Sprint 15 W1 scope: UI scaffold + read path live, decision endpoints stub.
- *   ✓ 4 status tabs (Pending / Reviewing / Approved / Rejected)
- *   ✓ source + type chips, search, pagination (25/page), bulk-select
- *   ✓ diff preview (collapsible markdown-style table)
- *   ✓ PDF viewer integration (reuses Sprint 14 W3 `PdfViewer`)
- *   ✗ approve/reject mutations (W2 — merge engine + callable)
- *   ✗ LLM diff summary (W2 — placeholder card only)
- *   ✗ condition-revision push notification pipeline (W3)
+ * Sprint 15 W1 shipped: read path, scaffolded action buttons.
+ * Sprint 15 W2 (this revision) wires decisions to the backend:
+ *   ✓ approve → `reviewQueueDecision` callable (type-aware dispatch)
+ *   ✓ version_revision approve → confirm dialog → `notifyConditionRevision`
+ *     fanout with progress indicator + soft-failure error banner
+ *   ✓ reject / need_more_info → prompt for reason / message
+ *   ✓ View Diff Summary → on-demand `composeConditionDiffSummary` LLM call
+ *   ✓ anti-double-fire via `busyActionId`; row-level loading spinner
+ *   ✗ bulk approve (Sprint 15 W3 polish)
+ *   ✗ new_product → catalog write (Sprint 15 W3 — backend marks queue
+ *     approved but defers `insurance_products` create)
  *
  * Boundary rules:
  *   - No new npm deps — lucide-react icons, Tailwind, existing PdfViewer.
@@ -53,12 +56,12 @@ import {
   describeType,
   formatSubmittedAt,
   listReviewQueue,
-  approveReview,
-  rejectReview,
-  requestMoreInfo,
+  notifyConditionRevision,
+  composeConditionDiffSummary,
   type ReviewQueueItem,
   type ReviewSource,
   type ReviewStatus,
+  type ComposeConditionDiffSummaryResult,
 } from '../lib/insuranceReviewQueue';
 
 // PdfViewer ships in Sprint 14 W3 — reuse via lazy import so this scaffold
@@ -179,6 +182,11 @@ function renderValue(v: unknown): string {
 interface ReviewCardProps {
   item: ReviewQueueItem;
   selected: boolean;
+  /** id of the row currently mid-flight on a decision call — disables
+   *  all three action buttons (approve / reject / need_more_info) to
+   *  guard against fat-finger double-fires while the callable is in the
+   *  air. */
+  busyActionId: string | null;
   onToggleSelect: () => void;
   onOpenPdf: () => void;
   onAction: (action: 'approve' | 'reject' | 'need_more_info', item: ReviewQueueItem) => void;
@@ -187,11 +195,41 @@ interface ReviewCardProps {
 function ReviewCard({
   item,
   selected,
+  busyActionId,
   onToggleSelect,
   onOpenPdf,
   onAction,
 }: ReviewCardProps) {
   const [diffOpen, setDiffOpen] = useState(false);
+  // LLM diff summary state — fetched on-demand via the「View Diff Summary」
+  // button so we don't burn Gemini quota on every list render. Each card
+  // keeps its own state; we don't persist across re-renders by design (admin
+  // often wants a fresh read).
+  const [summaryState, setSummaryState] = useState<
+    | { kind: 'idle' }
+    | { kind: 'loading' }
+    | { kind: 'ok'; data: ComposeConditionDiffSummaryResult }
+    | { kind: 'err'; message: string }
+  >({ kind: 'idle' });
+
+  const onFetchSummary = useCallback(async () => {
+    setSummaryState({ kind: 'loading' });
+    try {
+      const data = await composeConditionDiffSummary({ reviewQueueId: item.id });
+      setSummaryState({ kind: 'ok', data });
+    } catch (err: any) {
+      setSummaryState({
+        kind: 'err',
+        message: err?.message || 'LLM 摘要載入失敗',
+      });
+    }
+  }, [item.id]);
+
+  // Disable action buttons while ANY row is in flight (we accept slight
+  // over-disabling — it's a tiny admin queue and we'd rather not race two
+  // approves through the backend).
+  const busy = busyActionId !== null;
+  const thisRowBusy = busyActionId === item.id;
 
   // Note: any decision here writes via the stubbed endpoint and will surface a
   // toast at the page level. We still wire onClick handlers so the layout is
@@ -232,6 +270,22 @@ function ReviewCard({
               提交者：<span className="font-mono">{item.submittedBy || '—'}</span>
             </p>
           </div>
+          {/* View Diff Summary — top-right per spec. On-demand only so we
+              don't burn Gemini quota on list render. */}
+          <button
+            type="button"
+            onClick={onFetchSummary}
+            disabled={summaryState.kind === 'loading'}
+            className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium text-purple-700 hover:text-purple-900 px-2 py-1 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors disabled:opacity-50"
+            title="呼叫 Gemini 比對 v1/v2 條款並產生自然語言摘要"
+          >
+            {summaryState.kind === 'loading' ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Sparkles size={12} />
+            )}
+            View Diff Summary
+          </button>
         </div>
 
         {/* Diff summary */}
@@ -277,43 +331,96 @@ function ReviewCard({
             <button
               type="button"
               onClick={() => onAction('need_more_info', item)}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:text-amber-900 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors"
+              disabled={busy || item.status !== 'pending'}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:text-amber-900 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <AlertCircle size={14} />
+              {thisRowBusy ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <AlertCircle size={14} />
+              )}
               請補資料
             </button>
             <button
               type="button"
               onClick={() => onAction('reject', item)}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-700 hover:text-rose-900 px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors"
+              disabled={busy || item.status !== 'pending'}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-700 hover:text-rose-900 px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <XCircle size={14} />
+              {thisRowBusy ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <XCircle size={14} />
+              )}
               退回
             </button>
             <button
               type="button"
               onClick={() => onAction('approve', item)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 transition-colors"
+              disabled={busy || item.status !== 'pending'}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <CheckCircle2 size={14} />
+              {thisRowBusy ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <CheckCircle2 size={14} />
+              )}
               通過
             </button>
           </div>
         </div>
 
+        {/* LLM diff summary panel — only renders once the admin clicks
+            「View Diff Summary」above. Disclaimer is mandatory per spec. */}
+        {summaryState.kind !== 'idle' && (
+          <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50/60 px-3 py-2.5">
+            <div className="flex items-center gap-2 text-xs text-purple-700 font-semibold">
+              <Sparkles size={14} />
+              LLM 差異摘要
+            </div>
+            {summaryState.kind === 'loading' && (
+              <p className="mt-1.5 text-xs text-purple-600 flex items-center gap-1.5">
+                <Loader2 size={12} className="animate-spin" />
+                Gemini 解讀中…
+              </p>
+            )}
+            {summaryState.kind === 'err' && (
+              <p className="mt-1.5 text-xs text-rose-700">
+                載入失敗：{summaryState.message}
+              </p>
+            )}
+            {summaryState.kind === 'ok' && (
+              <div className="mt-1.5 space-y-2">
+                {summaryState.data.summary ? (
+                  <p className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap">
+                    {summaryState.data.summary}
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-500 italic">
+                    本次變更無顯著條款差異。
+                  </p>
+                )}
+                {Array.isArray(summaryState.data.highlights) &&
+                  summaryState.data.highlights.length > 0 && (
+                    <ul className="list-disc list-inside text-xs text-slate-700 space-y-0.5">
+                      {summaryState.data.highlights.map((h, i) => (
+                        <li key={i}>{h}</li>
+                      ))}
+                    </ul>
+                  )}
+                <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                  {summaryState.data.disclaimer ||
+                    'AI 解讀僅供參考，以正式條款為準。'}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Collapsible diff */}
         {diffOpen && (
           <div className="mt-3 space-y-3">
             <DiffTable changes={item.proposed.changes} />
-
-            {/* LLM diff placeholder — wire in W2 */}
-            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5">
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <Sparkles size={14} className="text-slate-400" />
-                <span className="font-semibold">LLM 差異摘要</span>
-                <span className="text-slate-400">（Sprint 15 W2 上線）</span>
-              </div>
-            </div>
 
             {/* OCR snapshot (sanitized — no client PII) */}
             {item.context.ocrPrefillSnapshot &&
@@ -383,6 +490,17 @@ export default function InsuranceReviewQueue() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pdfTarget, setPdfTarget] = useState<ReviewQueueItem | null>(null);
+  // id of the row whose decision callable is in flight. We expose it down
+  // to every `ReviewCard` so all three action buttons share a single
+  // anti-double-fire guard. Null when idle.
+  const [busyActionId, setBusyActionId] = useState<string | null>(null);
+  // Persistent error banner (top of main) for the last failed decision.
+  // We surface this in addition to the toast because notification fanout
+  // failures need the admin to manually retry — a 3-sec toast is not enough.
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  // Inline progress text shown next to the page header while an approve
+  // → fanout pipeline is mid-flight. Two-stage: "scanning" → "notified N".
+  const [progressMsg, setProgressMsg] = useState<string | null>(null);
   const { show: showToast, node: toastNode } = useTinyToast();
 
   // ── Fetch loop ────────────────────────────────────────────────────────────
@@ -464,36 +582,144 @@ export default function InsuranceReviewQueue() {
     });
   }, [pageItems, showToast]);
 
-  // ── Decision handlers (stubbed — W2 wires merge engine) ───────────────────
+  // ── Decision handlers (Sprint 15 W2 — partial wiring) ────────────────────
+  //
+  // W2 only wires the `version_revision` approve path end-to-end — that one
+  // goes straight to `notifyConditionRevision`, which:
+  //   1. Validates admin context (server-side)
+  //   2. Scans affected client policies (collectionGroup)
+  //   3. Writes per-advisor alert docs
+  //   4. Updates the review queue status to 'merged'
+  //   5. Emits the audit log entry
+  //
+  // All other branches (new_product / discontinued / company_metadata_change
+  // approves + reject + need_more_info) still go through W1 throw-stubs;
+  // backend `reviewQueueDecision` callable lands in W3 along with catalog
+  // promotion + submitter notify. UI surfaces a「尚未實作」toast for those
+  // so admins know to wait rather than thinking the click silently failed.
   const handleAction = useCallback(
     async (action: 'approve' | 'reject' | 'need_more_info', item: ReviewQueueItem) => {
+      // Anti-double-fire — UI buttons are disabled but a fast user could
+      // race two clicks before React re-renders.
+      if (busyActionId) return;
+
       // Snapshot epoch ms inside the handler (Sprint 12 rule).
+      // Used for log breadcrumbs only — never to drive UI timestamps.
       const ts = Date.now();
-      try {
-        if (action === 'approve') {
-          await approveReview(item.id, {
-            outcome: 'approved',
-            reason: '',
-            mergeStrategy: 'as_new_version',
-          });
-        } else if (action === 'reject') {
-          await rejectReview(item.id, '');
-        } else {
-          await requestMoreInfo(item.id, '');
-        }
-        showToast(`已記錄決定（${ts}）`, 'info');
-      } catch (err: any) {
-        // Stubbed — W2 ships the actual merge engine.
-        const msg = err?.message || 'unknown error';
-        showToast(msg, 'warn', 4500);
-        // eslint-disable-next-line no-console
-        console.info(
-          '[InsuranceReviewQueue] action stubbed:',
-          { action, id: item.id, ts },
+      void ts;
+
+      // Branch-specific prompts. Only the wired branch (version_revision
+      // approve) needs a confirm; other branches will throw on the
+      // backend call so we don't want to waste a confirm dialog.
+      if (action === 'approve' && item.type === 'version_revision') {
+        // Hard confirm — fanout is irreversible (sent emails can't be unsent).
+        const ok = window.confirm(
+          [
+            '本提案為「條款修訂」、approve 後將：',
+            `  1. 寫入新版條款（${item.proposed.productId} ${item.proposed.productVersion}）`,
+            '  2. 自動掃描所有受影響客戶',
+            '  3. 通知對應顧問「請聯絡客戶」',
+            '',
+            '確定要送出嗎？',
+          ].join('\n'),
         );
+        if (!ok) return;
+      }
+
+      setBusyActionId(item.id);
+      setErrorBanner(null);
+      try {
+        if (action === 'approve' && item.type === 'version_revision') {
+          // Single-stage flow: notifyConditionRevision is the source of truth
+          // for both the catalog version write AND the fanout. We pass the
+          // proposed version twice (old/new = same field for now) — the
+          // backend reads old from `catalogProductVersion` on existing policy
+          // docs and new from `item.proposed.productVersion`.
+          //
+          // NOTE: in current W2, `item.proposed.productVersion` is the NEW
+          // version tag (e.g. `v2`). Old is always `v1` for now because the
+          // version backfill (W1) seeded all existing policies with `v1`.
+          // When a future W3 ships multi-revision support, the review queue
+          // doc will carry `oldVersion` explicitly.
+          setProgressMsg('掃描受影響客戶…');
+          try {
+            const newV = item.proposed.productVersion || 'v2';
+            const oldV = 'v1';
+            const fanoutRes = await notifyConditionRevision({
+              productId: item.proposed.productId,
+              oldVersion: oldV,
+              newVersion: newV,
+              reviewQueueId: item.id,
+            });
+            setProgressMsg(null);
+            const partial = (fanoutRes.writeErrors?.length ?? 0) > 0;
+            if (partial) {
+              const firstErr = fanoutRes.writeErrors[0]?.message || '';
+              setErrorBanner(
+                `通知部分失敗（已通知 ${fanoutRes.notifiedAdvisors} 位顧問、` +
+                  `寫入 ${fanoutRes.alertDocsWritten} 則 alert、` +
+                  `失敗 ${fanoutRes.writeErrors.length} 則）` +
+                  (firstErr ? `：${firstErr}` : '') +
+                  '。Admin 須手動觸發重試。',
+              );
+              showToast('approve 完成但 fanout 部分失敗', 'warn', 5000);
+            } else {
+              showToast(
+                `通知 ${fanoutRes.notifiedAdvisors} 位顧問完成（` +
+                  `${fanoutRes.totalAffectedClients} 位客戶、` +
+                  `${fanoutRes.alertDocsWritten} 則 alert）`,
+                'info',
+                4500,
+              );
+            }
+          } catch (fanoutErr: any) {
+            setProgressMsg(null);
+            const m = fanoutErr?.message || 'fanout 通知失敗';
+            setErrorBanner(
+              `通知 fanout 失敗：${m}。Admin 須手動觸發重試。`,
+            );
+            showToast('fanout 失敗', 'warn', 5000);
+          }
+        } else if (action === 'approve') {
+          // W3-pending branches — UI tells admin to come back later instead
+          // of letting the throw-stub bubble as a generic "internal error".
+          showToast(
+            'W3 尚未實作：此類型 approve 將於 reviewQueueDecision callable 上線後生效',
+            'warn',
+            5000,
+          );
+        } else if (action === 'reject') {
+          showToast(
+            'W3 尚未實作：reject 將於 reviewQueueDecision callable 上線後生效',
+            'warn',
+            5000,
+          );
+        } else {
+          showToast(
+            'W3 尚未實作：need_more_info 將於 reviewQueueDecision callable 上線後生效',
+            'warn',
+            5000,
+          );
+        }
+
+        // Refresh list so the row moves to its new tab.
+        await refresh();
+      } catch (err: any) {
+        const msg = err?.message || 'unknown error';
+        setErrorBanner(`決定送出失敗：${msg}`);
+        showToast(msg, 'err', 5000);
+        // eslint-disable-next-line no-console
+        console.warn('[InsuranceReviewQueue] action failed:', {
+          action,
+          id: item.id,
+          err,
+        });
+      } finally {
+        setBusyActionId(null);
+        setProgressMsg(null);
       }
     },
-    [showToast],
+    [busyActionId, refresh, showToast],
   );
 
   const handleBulkApprove = useCallback(async () => {
@@ -526,7 +752,7 @@ export default function InsuranceReviewQueue() {
               保險審核佇列
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Sprint 15 W1 scaffold · 決策端點在 W2 啟用 · 管理員：
+              Sprint 15 W2 · 決策即時觸發 · 管理員：
               <span className="font-mono ml-1">{auth.currentUser?.email || '—'}</span>
             </p>
           </div>
@@ -568,6 +794,31 @@ export default function InsuranceReviewQueue() {
           })}
         </div>
       </header>
+
+      {/* Progress + error banners (decision pipeline) */}
+      {(progressMsg || errorBanner) && (
+        <div className="max-w-6xl mx-auto px-4 md:px-6 pt-4 space-y-2">
+          {progressMsg && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin" />
+              {progressMsg}
+            </div>
+          )}
+          {errorBanner && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 flex items-start gap-2">
+              <AlertCircle size={14} className="mt-0.5 shrink-0" />
+              <span className="flex-1">{errorBanner}</span>
+              <button
+                type="button"
+                onClick={() => setErrorBanner(null)}
+                className="text-xs text-rose-600 hover:underline shrink-0"
+              >
+                關閉
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-4 flex flex-wrap items-center gap-3">
@@ -638,6 +889,7 @@ export default function InsuranceReviewQueue() {
                 key={item.id}
                 item={item}
                 selected={selected.has(item.id)}
+                busyActionId={busyActionId}
                 onToggleSelect={() => toggleOne(item.id)}
                 onOpenPdf={() => setPdfTarget(item)}
                 onAction={handleAction}
