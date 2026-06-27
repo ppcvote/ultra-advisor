@@ -105,7 +105,9 @@ Usage: node scripts/build-embeddings.cjs [options]
 // ---------------------------------------------------------------------------
 
 const STATE_FILE = path.join(__dirname, 'embeddings-state.json');
-const GEMINI_MODEL = 'text-embedding-004';
+// 2026-06-28: text-embedding-004 is no longer served on v1beta. Migrate to
+// gemini-embedding-001 (current production embedding model, 768d default).
+const GEMINI_MODEL = 'gemini-embedding-001';
 const GEMINI_BATCH_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:batchEmbedContents`;
 
@@ -491,6 +493,10 @@ async function callGeminiBatchEmbed(texts, apiKey, attempt = 0) {
       model: `models/${GEMINI_MODEL}`,
       content: { parts: [{ text: t }] },
       taskType: 'RETRIEVAL_DOCUMENT',
+      // Matryoshka truncation 到 768 維。gemini-embedding-001 預設 3072 維、
+      // 超過 Firestore vector index 2048 維上限；768 是 Sprint 14 W2 既有規格、
+      // 對齊 chunks.embedding 既有 query 維度。
+      outputDimensionality: 768,
     })),
   };
 
