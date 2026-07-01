@@ -197,14 +197,16 @@ function getFirebase(bucketName) {
 
 function deriveBucketName(explicit) {
   if (explicit) return explicit;
-  // 從 .firebaserc 推導 → <projectId>.appspot.com
+  if (process.env.FIREBASE_STORAGE_BUCKET) return process.env.FIREBASE_STORAGE_BUCKET;
+  // 從 .firebaserc 推導。Firebase 2024+ 新 project 用 .firebasestorage.app、
+  // 舊 project 用 .appspot.com。優先猜新格式。
   const rcPath = path.resolve(__dirname, '..', '.firebaserc');
   if (!fs.existsSync(rcPath)) return null;
   try {
     const rc = JSON.parse(fs.readFileSync(rcPath, 'utf8'));
     const projectId = rc?.projects?.default;
     if (!projectId) return null;
-    return `${projectId}.appspot.com`;
+    return `${projectId}.firebasestorage.app`;
   } catch (e) {
     return null;
   }

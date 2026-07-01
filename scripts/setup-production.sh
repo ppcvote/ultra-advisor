@@ -177,7 +177,9 @@ if $SKIP_EMBED; then
 else
   step "Step 2/8: Build embeddings for 180k chunks (預估 60-90 min, ~NT\$50, 可 resume)"
   check_file "scripts/build-embeddings.cjs"
-  node scripts/build-embeddings.cjs --resume
+  # 2026-06-30 fix: Gemini gemini-embedding-001 free tier ~100 RPM、預設 concurrency=20
+  # batchSize=100 撞 429; 降到 5/20 實測穩定通過。
+  node scripts/build-embeddings.cjs --resume --concurrency 5 --batch-size 20
   ok "embeddings built"
 fi
 
@@ -203,12 +205,15 @@ fi
 if $SKIP_UPLOAD; then
   step "Step 4/8: Upload chunks to Firestore — SKIPPED"
 else
-  step "Step 4/8: Upload 180k chunks to Firestore (預估 30 min, batched)"
+  step "Step 4/8: Upload 1.24M chunks to Firestore (預估 3-5 hr, batched)"
   check_file "scripts/upload-chunks-to-firestore.cjs"
+  # Sprint 14 W2 embeddings.jsonl lives outside repo (research-only path)、
+  # 不是 script default (scripts/embeddings.jsonl)
+  EMBEDDINGS_INPUT="${EMBEDDINGS_INPUT:-c:/Users/User/insurance-db/research-only/embeddings.jsonl}"
   if $DRY_RUN; then
-    node scripts/upload-chunks-to-firestore.cjs --dry-run
+    node scripts/upload-chunks-to-firestore.cjs --input "$EMBEDDINGS_INPUT" --dry-run
   else
-    node scripts/upload-chunks-to-firestore.cjs --commit
+    node scripts/upload-chunks-to-firestore.cjs --input "$EMBEDDINGS_INPUT" --commit
   fi
   ok "chunks uploaded"
 fi
