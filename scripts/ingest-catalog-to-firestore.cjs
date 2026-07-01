@@ -312,15 +312,15 @@ let _admin = null;
 function getFirebase() {
   if (_admin) return _admin;
   // 用 functions/node_modules/firebase-admin (Sprint 12 鐵則：不引入新依賴)
+  // Force resolve from functions/node_modules (v12) — root v14 removed admin.firestore()
   let admin;
   try {
-    admin = require('firebase-admin');
-  } catch (e) {
-    // fallback：從 functions/ resolve
     const resolved = require.resolve('firebase-admin', {
       paths: [path.resolve(__dirname, '..', 'functions', 'node_modules')],
     });
     admin = require(resolved);
+  } catch (e) {
+    admin = require('firebase-admin');
   }
   // firebase-admin v14 removed `admin.apps`; v12 still has it. Support both.
   const existingApps = typeof admin.getApps === 'function' ? admin.getApps() : (admin.apps || []);
