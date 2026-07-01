@@ -184,7 +184,9 @@ function getFirebase(bucketName) {
     });
     admin = require(resolved);
   }
-  if (!admin.apps.length) {
+  // firebase-admin v14 removed `admin.apps`; v12 still has it. Support both.
+  const existingApps = typeof admin.getApps === 'function' ? admin.getApps() : (admin.apps || []);
+  if (existingApps.length === 0) {
     const init = {};
     if (bucketName) init.storageBucket = bucketName;
     admin.initializeApp(init);

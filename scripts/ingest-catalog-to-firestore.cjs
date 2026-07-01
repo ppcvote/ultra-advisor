@@ -322,7 +322,9 @@ function getFirebase() {
     });
     admin = require(resolved);
   }
-  if (!admin.apps.length) {
+  // firebase-admin v14 removed `admin.apps`; v12 still has it. Support both.
+  const existingApps = typeof admin.getApps === 'function' ? admin.getApps() : (admin.apps || []);
+  if (existingApps.length === 0) {
     admin.initializeApp({
       // storageBucket 故意不設 — Sprint 13 不 host PDF、不會用到 Storage
     });

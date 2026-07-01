@@ -409,7 +409,9 @@ function getFirebase() {
   if (_admin) return _admin;
   // eslint-disable-next-line global-require
   const admin = require('firebase-admin');
-  if (!admin.apps.length) {
+  // firebase-admin v14 removed `admin.apps`; v12 still has it. Support both.
+  const existingApps = typeof admin.getApps === 'function' ? admin.getApps() : (admin.apps || []);
+  if (existingApps.length === 0) {
     admin.initializeApp({
       storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'ultra-advisor.appspot.com',
     });
