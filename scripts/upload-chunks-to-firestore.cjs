@@ -266,7 +266,18 @@ function validateChunk(row) {
 // JSONL streaming load
 // ---------------------------------------------------------------------------
 
-async function loadChunks(inputPath, opts) {
+/**
+ * Streaming batch iterator — yields batches without materializing full array.
+ * Critical for 1.24M chunks × ~15KB payload = 18GB memory footprint.
+ *
+ * Trade-offs vs original loadChunks():
+ *  - No global sort (would need full materialization). File is written in
+ *    productId order by build-embeddings.cjs so batches stay coherent per-product.
+ *  - --resume-from now compares chunkId against opts.resumeFrom as chunks arrive
+ *    (skips lines until we hit a chunkId >= resumeFrom).
+ *  - Skipped chunks not accumulated as full list — only counted.
+ */
+async function* iterateBatches(inputPath, opts) {
   if (!fs.existsSync(inputPath)) {
     throw new Error(`input not found: ${inputPath}`);
   }
@@ -275,9 +286,16 @@ async function loadChunks(inputPath, opts) {
     crlfDelay: Infinity,
   });
 
-  const valid = [];
-  const skipped = [];
+  const batchSize = opts.batchSize;
+  const limit = opts.limit;
+  const resumeFrom = opts.resumeFrom || null;
+
+  let batch = [];
   let lineNo = 0;
+  let validEmitted = 0;
+  let skippedCount = 0;
+  let skippedSamples = []; // 只保留前 20 個給 debug
+  let resumeReached = !resumeFrom;
 
   for await (const line of rl) {
     lineNo += 1;
@@ -287,31 +305,51 @@ async function loadChunks(inputPath, opts) {
     try {
       row = JSON.parse(trimmed);
     } catch (e) {
-      skipped.push({ line: lineNo, reason: `JSON parse error: ${e.message}` });
+      skippedCount++;
+      if (skippedSamples.length < 20) skippedSamples.push({ line: lineNo, reason: `JSON parse error: ${e.message}` });
       continue;
     }
     const r = validateChunk(row);
     if (!r.ok) {
-      skipped.push({ line: lineNo, chunkId: row.chunkId || '(no-id)', reason: r.reason });
+      skippedCount++;
+      if (skippedSamples.length < 20) skippedSamples.push({ line: lineNo, chunkId: row.chunkId || '(no-id)', reason: r.reason });
       continue;
     }
-    valid.push({ productId: r.productId, chunkId: r.chunkId, payload: r.payload });
-    if (opts.limit && valid.length >= opts.limit) break;
+
+    if (!resumeReached) {
+      if (r.chunkId < resumeFrom) continue;
+      resumeReached = true;
+    }
+
+    batch.push({ productId: r.productId, chunkId: r.chunkId, payload: r.payload });
+    validEmitted++;
+
+    if (batch.length >= batchSize) {
+      yield { batch, totalEmitted: validEmitted };
+      batch = [];
+    }
+
+    if (limit && validEmitted >= limit) break;
   }
 
-  // deterministic order — productId, chunkId
-  valid.sort((a, b) => {
-    if (a.productId !== b.productId) return a.productId.localeCompare(b.productId);
-    return a.chunkId.localeCompare(b.chunkId);
-  });
-
-  // --resume-from filter (after sort)
-  let filtered = valid;
-  if (opts.resumeFrom) {
-    filtered = filtered.filter((c) => c.chunkId >= opts.resumeFrom);
+  if (batch.length > 0) {
+    yield { batch, totalEmitted: validEmitted };
   }
 
-  return { valid: filtered, skipped, totalLines: lineNo };
+  // Terminal marker — expose stats via property so caller can read after loop
+  iterateBatches._stats = { lineNo, validEmitted, skippedCount, skippedSamples };
+}
+
+// Backward-compat wrapper for --dry-run sample path.
+async function loadChunksSample(inputPath, opts) {
+  const sample = [];
+  for await (const b of iterateBatches(inputPath, { ...opts, batchSize: 3 })) {
+    for (const c of b.batch) {
+      sample.push(c);
+      if (sample.length >= 3) return { sample, stats: iterateBatches._stats || {} };
+    }
+  }
+  return { sample, stats: iterateBatches._stats || {} };
 }
 
 // ---------------------------------------------------------------------------
@@ -447,23 +485,15 @@ async function runBatchPool(batches, concurrency, worker, onProgress) {
 async function runIngest(args) {
   const startedAt = new Date().toISOString();
   process.stdout.write(`upload-chunks start: input=${args.input} dryRun=${args.dryRun} commit=${args.commit}\n`);
+  process.stdout.write(`streaming mode: batchSize=${args.batchSize} concurrency=${args.concurrency}\n`);
 
-  const { valid, skipped, totalLines } = await loadChunks(args.input, {
-    limit: args.limit,
-    resumeFrom: args.resumeFrom,
-  });
-  process.stdout.write(`loaded ${totalLines} lines → ${valid.length} valid chunks, ${skipped.length} skipped\n`);
-
-  // Slice into batches
-  const batches = [];
-  for (let i = 0; i < valid.length; i += args.batchSize) {
-    batches.push(valid.slice(i, i + args.batchSize));
-  }
-  process.stdout.write(`batches: ${batches.length} (batchSize=${args.batchSize}, concurrency=${args.concurrency})\n`);
-
-  // Dry-run sample
+  // Dry-run sample (only reads first 3 valid chunks)
   if (args.dryRun) {
-    const sample = valid.slice(0, 3).map((c) => ({
+    const { sample, stats } = await loadChunksSample(args.input, {
+      limit: 3,
+      resumeFrom: args.resumeFrom,
+    });
+    const preview = sample.map((c) => ({
       productId: c.productId,
       chunkId: c.chunkId,
       pageNum: c.payload.pageNum,
@@ -474,44 +504,61 @@ async function runIngest(args) {
       embeddingHead: c.payload.embedding.slice(0, 4),
     }));
     process.stdout.write('[dry-run] sample (first 3 chunks):\n');
-    process.stdout.write(JSON.stringify(sample, null, 2) + '\n');
-    if (skipped.length) {
-      process.stdout.write('[dry-run] skipped reasons (first 5):\n');
-      for (const s of skipped.slice(0, 5)) {
-        process.stdout.write(`  line ${s.line} ${s.chunkId || ''}: ${s.reason}\n`);
-      }
-    }
+    process.stdout.write(JSON.stringify(preview, null, 2) + '\n');
+    process.stdout.write(`[dry-run] scanned ${stats.lineNo || 0} lines, ${stats.skippedCount || 0} skipped\n`);
+    return { summary: { total: 0, wouldWrite: 0, wrote: 0, skipped: stats.skippedCount || 0 }, failed: [], skipped: [] };
   }
 
-  let admin = null;
-  let db = null;
-  if (!args.dryRun) {
-    admin = getFirebase();
-    db = admin.firestore();
-  }
+  const admin = getFirebase();
+  const db = admin.firestore();
 
   const summary = {
-    total: valid.length,
+    total: 0,
     wouldWrite: 0,
     wrote: 0,
-    skipped: skipped.length,
+    skipped: 0,
     byProduct: {},
     startedAt,
   };
   const failed = [];
-
   const getNow = () => new Date().toISOString();  // runtime callback (Sprint 7/12 規)
 
-  await runBatchPool(
-    batches,
-    args.concurrency,
-    async (slice) => writeBatch(admin, db, slice, args.dryRun, getNow, summary, failed),
-    (done, total) => {
-      if (done % 5 === 0 || done === total) {
-        process.stdout.write(`progress: ${done}/${total} batches (${(done * 100 / total).toFixed(1)}%)\n`);
+  // ── Streaming: 讀一批寫一批、不 materialize 全部 ──
+  // 為了 concurrency > 1、我們用「pending batches queue」— 累積到
+  // args.concurrency 個 batch 才 flush parallel、避免同時吃太多記憶體。
+  const pending = [];
+  let batchNo = 0;
+  let progressPrinted = 0;
+
+  const flushPending = async () => {
+    if (pending.length === 0) return;
+    const slices = pending.splice(0, pending.length);
+    await Promise.all(slices.map((slice) => writeBatch(admin, db, slice, false, getNow, summary, failed)));
+    // Free the reference so GC can reclaim vector buffers
+    for (let i = 0; i < slices.length; i++) slices[i] = null;
+  };
+
+  for await (const { batch, totalEmitted } of iterateBatches(args.input, {
+    batchSize: args.batchSize,
+    limit: args.limit,
+    resumeFrom: args.resumeFrom,
+  })) {
+    summary.total = totalEmitted;
+    pending.push(batch);
+    batchNo += 1;
+
+    if (pending.length >= args.concurrency) {
+      await flushPending();
+      if (batchNo - progressPrinted >= 5) {
+        process.stdout.write(`progress: ${summary.total} chunks streamed, ${summary.wrote} written, ${failed.length} failed\n`);
+        progressPrinted = batchNo;
       }
-    },
-  );
+    }
+  }
+  await flushPending();
+
+  const iterStats = iterateBatches._stats || {};
+  summary.skipped = iterStats.skippedCount || 0;
 
   // Fail log
   if (failed.length) {
@@ -549,7 +596,7 @@ async function runIngest(args) {
     process.stdout.write('(Firebase Console > Firestore > Indexes > Add 也行)\n');
   }
 
-  return { summary, failed, skipped };
+  return { summary, failed, skipped: iterStats.skippedSamples || [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -578,7 +625,8 @@ module.exports = {
   validateChunk,
   containsForbidden,
   toVectorField,
-  loadChunks,
+  iterateBatches,
+  loadChunksSample,
   writeBatch,
   writeSingleBatch,
   estimateDocBytes,
